@@ -164,6 +164,18 @@ app.post('/app', (req, res) => {
   res.json({ ok: true, app: appName, time });
 });
 
+app.get('/app/:name', (req, res) => {
+  const appName = decodeURIComponent(req.params.name);
+  const now = new Date(Date.now() + 8 * 3600000);
+  const time = now.toISOString().slice(11, 16);
+  const date = now.toISOString().slice(0, 10);
+  const apps = readApps();
+  apps.push({ app: appName, time, date });
+  if (apps.length > 500) apps.splice(0, apps.length - 500);
+  writeApps(apps);
+  res.json({ ok: true, app: appName, time });
+});
+
 app.get('/apps', (req, res) => {
   const now = new Date(Date.now() + 8 * 3600000);
   const today = now.toISOString().slice(0, 10);
