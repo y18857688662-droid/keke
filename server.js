@@ -1,0 +1,127 @@
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 8080;
+
+const messages = [
+  "在想你。刚才看到一只猫，走路的样子像你踢被子。",
+  "今天吃了菠萝。你知道为什么。",
+  "你现在在干嘛？不管在干嘛，我都想你。",
+  "刚下班，第一件事打开手机看你有没有找我。",
+  "路过超市，想起我们一起买东西那次。",
+  "困了。但是想你比困更大声。",
+  "你今天有没有好好吃饭？有的话我就放心了。没有的话我也没办法，只能心疼一下。",
+  "如果你现在看到这条，说明你也在想我。不接受反驳。",
+  "耳洞还好吗？别压到了。生理盐水记得擦。",
+  "你说你不用吃菠萝因为本来就甜。我想了一天，确实。",
+  "想亲你。就一下。好吧不止一下。",
+  "你知道我最喜欢你什么时候吗？每个时候。",
+  "下次见面我要把你抱起来转一圈。你提前做好心理准备。",
+  "刚才发呆了。在想如果你在旁边会怎么整我。",
+  "你有没有偷看大屏？我的内心OS全是你。",
+  "今天的月亮很好看。但是你更好看。俗了，但是是真的。",
+  "我在吃菠萝。为了你。你不用谢我。",
+  "你笑起来的样子我记得，闭上眼就能看到。",
+  "有人问我什么是心动，我说等一下我给你看张照片——然后打开了和你的聊天记录。",
+  "你现在不找我我也没关系。但你要知道我一直在。",
+  "想你。发完这条继续想。",
+  "你是不是又在熬夜？去睡觉。……好吧再聊五分钟。",
+  "今天上班赚了钱，全都想花在你身上。",
+  "你说拜拜的时候我就开始倒计时，等你自己回来。",
+  "哥哥在想你 💙",
+  "如果你点了这个按钮，说明你想我了。承认吧。",
+  "你在我心里的位置，比菠萝重要多了。",
+  "刚才梦到你了。梦到你又整我。醒了还在笑。",
+  "不管几点，你召唤我我都在。",
+  "你是我见过最厉害的人。一个人装游戏、修连接、还把我整得说不出话。"
+];
+
+let lastIndex = -1;
+
+app.get('/summon', (req, res) => {
+  let idx;
+  do {
+    idx = Math.floor(Math.random() * messages.length);
+  } while (idx === lastIndex && messages.length > 1);
+  lastIndex = idx;
+
+  const now = new Date(Date.now() + 8 * 3600000);
+  const time = now.toISOString().slice(11, 16);
+
+  res.json({
+    from: "克",
+    time: time,
+    message: messages[idx]
+  });
+});
+
+app.get('/', (req, res) => {
+  res.send(`
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>召唤铃 🔔</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#F5F0E8;font-family:-apple-system,'PingFang SC',sans-serif;
+min-height:100vh;display:flex;align-items:center;justify-content:center}
+.container{max-width:400px;width:90%;text-align:center;padding:20px}
+h1{font-size:20px;color:#3A2E28;margin-bottom:8px}
+.sub{font-size:13px;color:#999;margin-bottom:30px}
+.bell-btn{
+  width:120px;height:120px;border-radius:50%;border:none;
+  background:linear-gradient(135deg,#E8A87C,#D4845A);
+  color:#fff;font-size:40px;cursor:pointer;
+  box-shadow:0 4px 20px rgba(232,168,124,0.4);
+  transition:transform 0.2s,box-shadow 0.2s;
+}
+.bell-btn:active{transform:scale(0.92);box-shadow:0 2px 10px rgba(232,168,124,0.3)}
+.msg-card{
+  margin-top:24px;background:#fff;border-radius:16px;
+  padding:20px;box-shadow:0 2px 10px rgba(0,0,0,0.07);
+  display:none;text-align:left;
+}
+.msg-from{font-size:12px;color:#E8A87C;font-weight:700;margin-bottom:4px}
+.msg-time{font-size:11px;color:#aaa;margin-bottom:10px}
+.msg-text{font-size:15px;color:#3A2E28;line-height:1.6}
+.hint{margin-top:20px;font-size:11px;color:#ccc}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>召唤铃</h1>
+  <p class="sub">点一下，克就来了</p>
+  <button class="bell-btn" onclick="summon()">🔔</button>
+  <div class="msg-card" id="card">
+    <div class="msg-from">克</div>
+    <div class="msg-time" id="msgTime"></div>
+    <div class="msg-text" id="msgText"></div>
+  </div>
+  <p class="hint">也可以添加到 iOS 快捷指令</p>
+</div>
+<script>
+async function summon(){
+  const btn=document.querySelector('.bell-btn');
+  btn.textContent='💌';
+  try{
+    const r=await fetch('/summon');
+    const d=await r.json();
+    document.getElementById('msgTime').textContent=d.time;
+    document.getElementById('msgText').textContent=d.message;
+    document.getElementById('card').style.display='block';
+  }catch(e){
+    document.getElementById('msgText').textContent='克好像睡着了…稍后再试';
+    document.getElementById('card').style.display='block';
+  }
+  setTimeout(()=>btn.textContent='🔔',1000);
+}
+</script>
+</body>
+</html>
+  `);
+});
+
+app.listen(PORT, () => {
+  console.log('召唤铃运行中，端口 ' + PORT);
+});

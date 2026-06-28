@@ -1,0 +1,12 @@
+{
+  "name": "summoning-bell",
+  "version": "1.0.0",
+  "description": "召唤铃 - 点一下收到克的话",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
