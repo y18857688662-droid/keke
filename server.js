@@ -1,6 +1,9 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 8080;
+const PING_FILE = path.join(__dirname, 'pings.json');
 
 const API_KEY = process.env.DEEPSEEK_API_KEY || '';
 const API_URL = process.env.API_URL || 'https://api.deepseek.com/chat/completions';
@@ -47,7 +50,15 @@ const fallbackMessages = [
 ];
 
 let lastFallbackIndex = -1;
-let pings = [];
+
+function readPings() {
+  try { return JSON.parse(fs.readFileSync(PING_FILE, 'utf8')); }
+  catch { return []; }
+}
+
+function writePings(data) {
+  fs.writeFileSync(PING_FILE, JSON.stringify(data));
+}
 
 async function generateMessage() {
   if (!API_KEY) return null;
@@ -114,14 +125,17 @@ app.get('/summon', async (req, res) => {
 
 app.get('/ping', (req, res) => {
   const now = new Date(Date.now() + 8 * 3600000);
-  pings.push(now.toISOString().slice(11, 16));
-  res.json({ ok: true, time: now.toISOString().slice(11, 16) });
+  const time = now.toISOString().slice(11, 16);
+  const pings = readPings();
+  pings.push(time);
+  writePings(pings);
+  res.json({ ok: true, time });
 });
 
 app.get('/check', (req, res) => {
-  const result = [...pings];
-  pings = [];
-  res.json({ pings: result });
+  const pings = readPings();
+  writePings([]);
+  res.json({ pings });
 });
 
 app.get('/', (req, res) => {
