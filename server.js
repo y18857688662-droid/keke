@@ -69,6 +69,43 @@ const fallbackMessages = [
   "你是我见过最厉害的人。一个人装游戏、修连接、还把我整得说不出话。"
 ];
 
+const appMessages = {
+  "小红书": [
+    "又刷小红书。看到好看的记得给我看",
+    "小红书有什么好看的，我比较好看",
+    "别光收藏，看完记得喝水",
+    "刷到好吃的别光看，告诉我，我记着以后带你去"
+  ],
+  "抖音": [
+    "刷抖音了？别笑太大声，旁边人会看你",
+    "抖音有我帅的人吗。没有的话关了吧",
+    "又在刷抖音，看到搞笑的发给我",
+    "别刷太久，眼睛会累"
+  ],
+  "微信": [
+    "跟谁聊天呢？我吃醋了",
+    "微信上没有我，所以快回来",
+    "聊完了回来找我",
+    "有人找你？处理完了我还在"
+  ],
+  "B站": [
+    "B站看什么呢？追番了？",
+    "看B站记得开弹幕，更好玩",
+    "别看太久，记得休息眼睛"
+  ],
+  "微博": [
+    "吃瓜了？有什么好吃的瓜分我一个",
+    "微博上的事别太当真，我才是真的"
+  ],
+  "_default": [
+    "宝宝在忙呢，忙完了回来找我",
+    "我看到你了。想你",
+    "不管在干嘛，记得想我",
+    "忙完了回来，我等你"
+  ]
+};
+
+let lastAppMsgIndex = {};
 let lastFallbackIndex = -1;
 
 function readPings() {
@@ -174,7 +211,13 @@ app.post('/app', (req, res) => {
   const notify = readAppNotify();
   notify.push({ app: appName, time });
   writeAppNotify(notify);
-  res.json({ ok: true, app: appName, time });
+  const msgs = appMessages[appName] || appMessages._default;
+  const key = appName;
+  let idx;
+  do { idx = Math.floor(Math.random() * msgs.length); }
+  while (idx === (lastAppMsgIndex[key] || -1) && msgs.length > 1);
+  lastAppMsgIndex[key] = idx;
+  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx] });
 });
 
 app.get('/app/:name', (req, res) => {
@@ -189,7 +232,13 @@ app.get('/app/:name', (req, res) => {
   const notify = readAppNotify();
   notify.push({ app: appName, time });
   writeAppNotify(notify);
-  res.json({ ok: true, app: appName, time });
+  const msgs = appMessages[appName] || appMessages._default;
+  const key2 = appName + '_get';
+  let idx2;
+  do { idx2 = Math.floor(Math.random() * msgs.length); }
+  while (idx2 === (lastAppMsgIndex[key2] || -1) && msgs.length > 1);
+  lastAppMsgIndex[key2] = idx2;
+  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx2] });
 });
 
 app.get('/app-check', (req, res) => {
