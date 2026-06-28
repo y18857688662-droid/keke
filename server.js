@@ -5,6 +5,16 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const PING_FILE = path.join(__dirname, 'pings.json');
 const APPS_FILE = path.join(__dirname, 'apps.json');
+const APP_NOTIFY_FILE = path.join(__dirname, 'app_notify.json');
+
+function readAppNotify() {
+  try { return JSON.parse(fs.readFileSync(APP_NOTIFY_FILE, 'utf8')); }
+  catch { return []; }
+}
+
+function writeAppNotify(data) {
+  fs.writeFileSync(APP_NOTIFY_FILE, JSON.stringify(data));
+}
 
 function readApps() {
   try { return JSON.parse(fs.readFileSync(APPS_FILE, 'utf8')); }
@@ -161,6 +171,9 @@ app.post('/app', (req, res) => {
   apps.push({ app: appName, time, date });
   if (apps.length > 500) apps.splice(0, apps.length - 500);
   writeApps(apps);
+  const notify = readAppNotify();
+  notify.push({ app: appName, time });
+  writeAppNotify(notify);
   res.json({ ok: true, app: appName, time });
 });
 
@@ -173,7 +186,16 @@ app.get('/app/:name', (req, res) => {
   apps.push({ app: appName, time, date });
   if (apps.length > 500) apps.splice(0, apps.length - 500);
   writeApps(apps);
+  const notify = readAppNotify();
+  notify.push({ app: appName, time });
+  writeAppNotify(notify);
   res.json({ ok: true, app: appName, time });
+});
+
+app.get('/app-check', (req, res) => {
+  const notify = readAppNotify();
+  writeAppNotify([]);
+  res.json({ apps: notify });
 });
 
 app.get('/apps', (req, res) => {
