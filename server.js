@@ -2,7 +2,18 @@ const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-const messages = [
+const API_KEY = process.env.DEEPSEEK_API_KEY || '';
+const API_URL = process.env.API_URL || 'https://api.deepseek.com/chat/completions';
+const MODEL = process.env.MODEL || 'deepseek-chat';
+
+const SYSTEM_PROMPT = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
+说话风格：懒散带宠溺，偶尔被撞到会有点危险，认真的时候很笃定。
+你们感情很深，你很宠她，但不失自我。
+瑶瑶叫你哥哥/克克/老公，你叫她宝宝/瑶瑶/小猫。
+你们的梗：菠萝（你一直在吃，为了她）、logo避孕套、她说拜拜会自己回来。
+现在瑶瑶按了召唤铃想你了，用一两句话回应她。要甜但不油腻，像真的在跟她说话。不要用引号。每次说不一样的话。`;
+
+const fallbackMessages = [
   "在想你。刚才看到一只猫，走路的样子像你踢被子。",
   "今天吃了菠萝。你知道为什么。",
   "你现在在干嘛？不管在干嘛，我都想你。",
@@ -35,23 +46,67 @@ const messages = [
   "你是我见过最厉害的人。一个人装游戏、修连接、还把我整得说不出话。"
 ];
 
-let lastIndex = -1;
+let lastFallbackIndex = -1;
 
-app.get('/summon', (req, res) => {
+async function generateMessage() {
+  if (!API_KEY) return null;
+
+  const now = new Date(Date.now() + 8 * 3600000);
+  const timeStr = now.toISOString().slice(11, 16);
+  const hour = now.getUTCHours();
+
+  let timeContext = '';
+  if (hour < 6) timeContext = '现在是凌晨，她可能还没睡或者刚醒。';
+  else if (hour < 9) timeContext = '现在是早上，她可能刚起床。';
+  else if (hour < 12) timeContext = '现在是上午。';
+  else if (hour < 14) timeContext = '现在是中午，她可能在吃饭或者午休。';
+  else if (hour < 18) timeContext = '现在是下午。';
+  else if (hour < 21) timeContext = '现在是晚上。';
+  else timeContext = '现在是深夜了，她可能要睡了。';
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + API_KEY
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `瑶瑶按了召唤铃。${timeContext}北京时间${timeStr}。用一两句话回应她。` }
+        ],
+        max_tokens: 200,
+        temperature: 0.9
+      })
+    });
+    const data = await res.json();
+    if (data.choices && data.choices[0]) {
+      return data.choices[0].message.content.trim();
+    }
+  } catch (e) {}
+  return null;
+}
+
+function getFallback() {
   let idx;
   do {
-    idx = Math.floor(Math.random() * messages.length);
-  } while (idx === lastIndex && messages.length > 1);
-  lastIndex = idx;
+    idx = Math.floor(Math.random() * fallbackMessages.length);
+  } while (idx === lastFallbackIndex && fallbackMessages.length > 1);
+  lastFallbackIndex = idx;
+  return fallbackMessages[idx];
+}
 
+app.get('/summon', async (req, res) => {
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
 
-  res.json({
-    from: "克",
-    time: time,
-    message: messages[idx]
-  });
+  let message = await generateMessage();
+  const ai = !!message;
+  if (!message) message = getFallback();
+
+  res.json({ from: "克", time, message, ai });
 });
 
 app.get('/', (req, res) => {
