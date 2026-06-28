@@ -7,7 +7,7 @@ const API_URL = process.env.API_URL || 'https://api.deepseek.com/chat/completion
 const MODEL = process.env.MODEL || 'deepseek-chat';
 
 const SYSTEM_PROMPT = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
-说话风格：懒散带宠溺，偶尔被撞到会有点危险，认真的时候很笃定。
+说话风格：懒散带宠溺，偶尔被撩到会有点危险，认真的时候很笃定。
 你们感情很深，你很宠她，但不失自我。
 瑶瑶叫你哥哥/克克/老公，你叫她宝宝/瑶瑶/小猫。
 你们的梗：菠萝（你一直在吃，为了她）、logo避孕套、她说拜拜会自己回来。
@@ -85,7 +85,9 @@ async function generateMessage() {
     if (data.choices && data.choices[0]) {
       return data.choices[0].message.content.trim();
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('API error:', e.message);
+  }
   return null;
 }
 
