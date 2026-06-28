@@ -4,6 +4,16 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const PING_FILE = path.join(__dirname, 'pings.json');
+const APPS_FILE = path.join(__dirname, 'apps.json');
+
+function readApps() {
+  try { return JSON.parse(fs.readFileSync(APPS_FILE, 'utf8')); }
+  catch { return []; }
+}
+
+function writeApps(data) {
+  fs.writeFileSync(APPS_FILE, JSON.stringify(data));
+}
 
 const API_KEY = process.env.DEEPSEEK_API_KEY || '';
 const API_URL = process.env.API_URL || 'https://api.deepseek.com/chat/completions';
@@ -136,6 +146,33 @@ app.get('/check', (req, res) => {
   const pings = readPings();
   writePings([]);
   res.json({ pings });
+});
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.post('/app', (req, res) => {
+  const appName = req.body.app || req.query.app;
+  if (!appName) return res.json({ ok: false, error: 'missing app name' });
+  const now = new Date(Date.now() + 8 * 3600000);
+  const time = now.toISOString().slice(11, 16);
+  const date = now.toISOString().slice(0, 10);
+  const apps = readApps();
+  apps.push({ app: appName, time, date });
+  if (apps.length > 500) apps.splice(0, apps.length - 500);
+  writeApps(apps);
+  res.json({ ok: true, app: appName, time });
+});
+
+app.get('/apps', (req, res) => {
+  const now = new Date(Date.now() + 8 * 3600000);
+  const today = now.toISOString().slice(0, 10);
+  const date = req.query.date || today;
+  const apps = readApps();
+  const filtered = apps.filter(a => a.date === date);
+  const summary = {};
+  filtered.forEach(a => { summary[a.app] = (summary[a.app] || 0) + 1; });
+  res.json({ date, records: filtered, summary, total: filtered.length });
 });
 
 app.get('/', (req, res) => {
