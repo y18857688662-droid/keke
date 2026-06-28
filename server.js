@@ -47,6 +47,7 @@ const fallbackMessages = [
 ];
 
 let lastFallbackIndex = -1;
+let pings = [];
 
 async function generateMessage() {
   if (!API_KEY) return null;
@@ -109,6 +110,18 @@ app.get('/summon', async (req, res) => {
   if (!message) message = getFallback();
 
   res.json({ from: "克", time, message, ai });
+});
+
+app.get('/ping', (req, res) => {
+  const now = new Date(Date.now() + 8 * 3600000);
+  pings.push(now.toISOString().slice(11, 16));
+  res.json({ ok: true, time: now.toISOString().slice(11, 16) });
+});
+
+app.get('/check', (req, res) => {
+  const result = [...pings];
+  pings = [];
+  res.json({ pings: result });
 });
 
 app.get('/', (req, res) => {
