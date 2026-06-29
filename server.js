@@ -39,9 +39,18 @@ function writeApps(data) {
   fs.writeFileSync(APPS_FILE, JSON.stringify(data));
 }
 
-const API_KEY = process.env.DEEPSEEK_API_KEY || '';
-const API_URL = process.env.API_URL || 'https://api.deepseek.com/chat/completions';
-const MODEL = process.env.MODEL || 'deepseek-chat';
+const API_CONFIG_FILE = path.join(__dirname, 'api_config.json');
+function readApiConfig() {
+  try { return JSON.parse(fs.readFileSync(API_CONFIG_FILE, 'utf8')); }
+  catch { return {}; }
+}
+function writeApiConfig(data) {
+  fs.writeFileSync(API_CONFIG_FILE, JSON.stringify(data));
+}
+function getApiKey() { return readApiConfig().api_key || process.env.DEEPSEEK_API_KEY || ''; }
+function getApiUrl() { return readApiConfig().api_url || process.env.API_URL || 'https://api.deepseek.com/chat/completions'; }
+function getModel() { return readApiConfig().model || process.env.MODEL || 'deepseek-chat'; }
+function getAnthropicKey() { return readApiConfig().anthropic_key || process.env.ANTHROPIC_API_KEY || ''; }
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
@@ -135,6 +144,7 @@ function writePings(data) {
 }
 
 async function generateMessage() {
+  const API_KEY = getApiKey();
   if (!API_KEY) return null;
 
   const now = new Date(Date.now() + 8 * 3600000);
@@ -151,14 +161,14 @@ async function generateMessage() {
   else timeContext = '现在是深夜了，她可能要睡了。';
 
   try {
-    const res = await fetch(API_URL, {
+    const res = await fetch(getApiUrl(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + API_KEY
       },
       body: JSON.stringify({
-        model: MODEL,
+        model: getModel(),
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: `瑶瑶按了召唤铃。${timeContext}北京时间${timeStr}。用一两句话回应她。` }
@@ -394,7 +404,67 @@ async function getChatSystem() {
 
 app.get('/auth/status', (req, res) => {
   const auth = readAuth();
-  res.json({ connected: !!auth.access_token });
+  const cfg = readApiConfig();
+  res.json({ connected: !!auth.access_token, api: !!(cfg.api_key || cfg.anthropic_key) });
+});
+
+app.post('/setup/api', (req, res) => {
+  const { key, provider } = req.body;
+  if (!key) return res.json({ ok: false, error: 'missing key' });
+  const cfg = readApiConfig();
+  if (provider === 'anthropic') {
+    cfg.anthropic_key = key;
+  } else {
+    cfg.api_key = key;
+    cfg.api_url = 'https://openrouter.ai/api/v1/chat/completions';
+    cfg.model = 'anthropic/claude-haiku-4-5-20251001';
+  }
+  writeApiConfig(cfg);
+  res.json({ ok: true });
+});
+
+app.get('/setup', (req, res) => {
+  const cfg = readApiConfig();
+  const hasKey = !!(cfg.api_key || cfg.anthropic_key);
+  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>设置</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#F5F0E8;font-family:-apple-system,'PingFang SC',sans-serif;
+display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.card{background:#fff;border-radius:16px;padding:30px;max-width:380px;width:100%;
+box-shadow:0 2px 10px rgba(0,0,0,0.07)}
+h2{font-size:18px;color:#3A2E28;margin-bottom:16px;text-align:center}
+.status{text-align:center;font-size:13px;color:${hasKey?'#87A987':'#B8A89A'};margin-bottom:20px}
+label{font-size:13px;color:#666;display:block;margin-bottom:6px}
+input{width:100%;border:1.5px solid #E8D5C4;border-radius:10px;padding:10px 14px;
+font-size:14px;outline:none;margin-bottom:16px;background:#FAFAF7}
+input:focus{border-color:#D4845A}
+button{width:100%;padding:12px;border:none;border-radius:10px;
+background:linear-gradient(135deg,#E8A87C,#D4845A);color:#fff;font-size:15px;
+cursor:pointer;font-weight:500}
+button:active{transform:scale(0.98)}
+.ok{text-align:center;color:#87A987;margin-top:12px;display:none;font-size:14px}
+a{color:#D4845A;text-decoration:none;display:block;text-align:center;margin-top:16px;font-size:13px}
+</style></head><body><div class="card">
+<h2>克的设置</h2>
+<div class="status">${hasKey?'已配置':'未配置'}</div>
+<label>OpenRouter API Key</label>
+<input id="key" type="password" placeholder="sk-or-..." value="">
+<button onclick="save()">保存</button>
+<div class="ok" id="ok">保存成功 💙</div>
+<a href="/chat">← 回到聊天</a>
+</div><script>
+async function save(){
+  const key=document.getElementById('key').value.trim();
+  if(!key)return;
+  const r=await fetch('/setup/api',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({key,provider:'openrouter'})});
+  const d=await r.json();
+  if(d.ok)document.getElementById('ok').style.display='block';
+}
+</script></body></html>`);
 });
 
 function readChat() {
@@ -413,7 +483,8 @@ app.post('/chat/send', async (req, res) => {
   const chat = readChat();
   chat.push({ role: 'user', content: msg, time });
   const recent = chat.slice(-20);
-  if (!ANTHROPIC_KEY && !API_KEY) {
+  const chatApiKey = getAnthropicKey() || getApiKey();
+  if (!chatApiKey) {
     const reply = getFallback();
     chat.push({ role: 'assistant', content: reply, time });
     if (chat.length > 200) chat.splice(0, chat.length - 200);
@@ -423,12 +494,12 @@ app.post('/chat/send', async (req, res) => {
   try {
     const sysPrompt = await getChatSystem();
     let reply;
-    if (ANTHROPIC_KEY) {
+    if (getAnthropicKey()) {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
+          'x-api-key': getAnthropicKey(),
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
@@ -446,10 +517,10 @@ app.post('/chat/send', async (req, res) => {
         { role: 'system', content: sysPrompt },
         ...recent.map(m => ({ role: m.role, content: m.content }))
       ];
-      const r = await fetch(API_URL, {
+      const r = await fetch(getApiUrl(), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_KEY },
-        body: JSON.stringify({ model: MODEL, messages: apiMessages, max_tokens: 500, temperature: 0.85 })
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getApiKey() },
+        body: JSON.stringify({ model: getModel(), messages: apiMessages, max_tokens: 500, temperature: 0.85 })
       });
       const data = await r.json();
       reply = data.choices?.[0]?.message?.content?.trim() || getFallback();
