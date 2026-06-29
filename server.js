@@ -1162,6 +1162,10 @@ const empty=document.getElementById('empty');
 const sendBtn=document.getElementById('sendBtn');
 const statusEl=document.getElementById('status');
 let sending=false,thinkId=0,lastMsgCount=0;
+const chatStore=[];
+function saveLocal(){try{localStorage.setItem('ke_chat',JSON.stringify(chatStore.slice(-200)));}catch(e){}}
+function loadLocal(){try{return JSON.parse(localStorage.getItem('ke_chat')||'[]');}catch(e){return[];}}
+
 
 function parseThink(text){
   const m=text.match(/^<think>([\\s\\S]*?)<\\/think>([\\s\\S]*)$/);
@@ -1189,8 +1193,9 @@ function hideTyping(){
   checkMemory();
 }
 
-function addMsg(role,text,time){
+function addMsg(role,text,time,noSave){
   empty.style.display='none';
+  if(!noSave){chatStore.push({role,content:text,time:time||''});saveLocal();}
   if(role==='assistant'){
     const p=parseThink(text);
     if(p.think){
@@ -1276,14 +1281,37 @@ sse.onerror=()=>{console.log('[sse] reconnecting...');};
 async function waitForReply(){}
 
 async function loadHistory(){
+  const local=loadLocal();
+  let serverMsgs=[];
   try{
     const r=await fetch('/chat/history');
     const d=await r.json();
-    if(d.messages&&d.messages.length>0){
-      d.messages.forEach(m=>addMsg(m.role,m.content,m.time));
-      lastMsgCount=d.messages.length;
-    }
+    if(d.messages&&d.messages.length>0) serverMsgs=d.messages;
   }catch(e){}
+  let msgs=local;
+  if(serverMsgs.length>0){
+    if(serverMsgs.length>=local.length){
+      msgs=serverMsgs;
+    }else{
+      const lastServer=serverMsgs[serverMsgs.length-1];
+      const idx=local.findIndex((m,i)=>i>=local.length-serverMsgs.length&&m.content===lastServer.content&&m.role===lastServer.role);
+      if(idx===-1){
+        const seen=new Set(local.map(m=>m.role+':'+m.content+':'+m.time));
+        serverMsgs.forEach(m=>{
+          const k=m.role+':'+m.content+':'+m.time;
+          if(!seen.has(k)){msgs.push(m);seen.add(k);}
+        });
+      }
+    }
+  }
+  msgs=msgs.slice(-200);
+  chatStore.length=0;
+  msgs.forEach(m=>{chatStore.push({role:m.role,content:m.content,time:m.time||''});});
+  saveLocal();
+  if(msgs.length>0){
+    msgs.forEach(m=>addMsg(m.role,m.content,m.time,true));
+    lastMsgCount=msgs.length;
+  }
 }
 loadHistory();
 
