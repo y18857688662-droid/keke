@@ -47,10 +47,11 @@ function readApiConfig() {
 function writeApiConfig(data) {
   fs.writeFileSync(API_CONFIG_FILE, JSON.stringify(data));
 }
-function getApiKey() { return readApiConfig().api_key || process.env.DEEPSEEK_API_KEY || ''; }
+function isProMode() { return readApiConfig().pro_mode === true; }
+function getApiKey() { if (isProMode()) return ''; return readApiConfig().api_key || process.env.DEEPSEEK_API_KEY || ''; }
 function getApiUrl() { return readApiConfig().api_url || process.env.API_URL || 'https://api.deepseek.com/chat/completions'; }
 function getModel() { return readApiConfig().model || process.env.MODEL || 'deepseek-chat'; }
-function getAnthropicKey() { return readApiConfig().anthropic_key || process.env.ANTHROPIC_API_KEY || ''; }
+function getAnthropicKey() { if (isProMode()) return ''; return readApiConfig().anthropic_key || process.env.ANTHROPIC_API_KEY || ''; }
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
@@ -421,42 +422,86 @@ app.post('/setup/api', (req, res) => {
     cfg.api_url = 'https://openrouter.ai/api/v1/chat/completions';
     cfg.model = 'anthropic/claude-haiku-4-5-20251001';
   }
+  cfg.pro_mode = false;
   writeApiConfig(cfg);
   res.json({ ok: true });
+});
+
+app.post('/setup/pro', (req, res) => {
+  const cfg = readApiConfig();
+  cfg.pro_mode = !cfg.pro_mode;
+  writeApiConfig(cfg);
+  res.json({ ok: true, pro_mode: cfg.pro_mode });
 });
 
 app.get('/setup', (req, res) => {
   const cfg = readApiConfig();
   const hasKey = !!(cfg.api_key || cfg.anthropic_key);
+  const proOn = cfg.pro_mode === true;
   res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>设置</title><style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#F5F0E8;font-family:-apple-system,'PingFang SC',sans-serif;
+body{background:#FBF5F3;font-family:-apple-system,'PingFang SC',sans-serif;
 display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
 .card{background:#fff;border-radius:16px;padding:30px;max-width:380px;width:100%;
-box-shadow:0 2px 10px rgba(0,0,0,0.07)}
-h2{font-size:18px;color:#3A2E28;margin-bottom:16px;text-align:center}
+box-shadow:0 2px 10px rgba(0,0,0,0.05)}
+h2{font-size:18px;color:#5A3E36;margin-bottom:16px;text-align:center}
 .status{text-align:center;font-size:13px;color:${hasKey?'#87A987':'#B8A89A'};margin-bottom:20px}
-label{font-size:13px;color:#666;display:block;margin-bottom:6px}
-input{width:100%;border:1.5px solid #E8D5C4;border-radius:10px;padding:10px 14px;
-font-size:14px;outline:none;margin-bottom:16px;background:#FAFAF7}
-input:focus{border-color:#D4845A}
+.section{margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid #F5E6E0}
+.section:last-of-type{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.section-title{font-size:14px;color:#5A3E36;font-weight:600;margin-bottom:12px}
+label{font-size:13px;color:#888;display:block;margin-bottom:6px}
+input{width:100%;border:1.5px solid #F5E6E0;border-radius:10px;padding:10px 14px;
+font-size:14px;outline:none;margin-bottom:12px;background:#FDFAF9}
+input:focus{border-color:#FFB8B8}
 button{width:100%;padding:12px;border:none;border-radius:10px;
-background:linear-gradient(135deg,#E8A87C,#D4845A);color:#fff;font-size:15px;
+background:linear-gradient(135deg,#FFB8B8,#FF9B9B);color:#fff;font-size:15px;
 cursor:pointer;font-weight:500}
 button:active{transform:scale(0.98)}
-.ok{text-align:center;color:#87A987;margin-top:12px;display:none;font-size:14px}
-a{color:#D4845A;text-decoration:none;display:block;text-align:center;margin-top:16px;font-size:13px}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.toggle-label{font-size:14px;color:#5A3E36}
+.toggle-desc{font-size:12px;color:#B8A89A;margin-bottom:4px}
+.switch{position:relative;width:48px;height:26px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;
+background:#E0D6D0;border-radius:26px;transition:.3s}
+.slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;
+background:#fff;border-radius:50%;transition:.3s}
+.switch input:checked+.slider{background:linear-gradient(135deg,#FFB8B8,#FF9B9B)}
+.switch input:checked+.slider:before{transform:translateX(22px)}
+.pro-status{font-size:12px;margin-top:6px;color:${proOn?'#FF9B9B':'#B8A89A'}}
+.ok{text-align:center;color:#FF9B9B;margin-top:12px;display:none;font-size:14px}
+a{color:#FF9B9B;text-decoration:none;display:block;text-align:center;margin-top:16px;font-size:13px}
 </style></head><body><div class="card">
 <h2>克的设置</h2>
+<div class="section">
+<div class="section-title">Pro 模式</div>
+<div class="toggle-row">
+<div class="toggle-label">用 Pro 额度回复</div>
+<label class="switch"><input type="checkbox" id="proToggle" ${proOn?'checked':''}
+onchange="togglePro()"><span class="slider"></span></label>
+</div>
+<div class="toggle-desc">开启后不走 API，由克亲自回复（需要等一下下）</div>
+<div class="pro-status" id="proStatus">${proOn?'已开启 Pro 模式':'未开启'}</div>
+</div>
+<div class="section">
+<div class="section-title">API 密钥（Pro 模式下不需要）</div>
 <div class="status">${hasKey?'已配置':'未配置'}</div>
 <label>OpenRouter API Key</label>
 <input id="key" type="password" placeholder="sk-or-..." value="">
-<button onclick="save()">保存</button>
-<div class="ok" id="ok">保存成功 💙</div>
-<a href="/chat">← 回到聊天</a>
+<button onclick="save()">保存密钥</button>
+<div class="ok" id="ok">保存成功</div>
+</div>
+<a href="/">← 回到主页</a>
 </div><script>
+async function togglePro(){
+  const r=await fetch('/setup/pro',{method:'POST',headers:{'Content-Type':'application/json'}});
+  const d=await r.json();
+  const s=document.getElementById('proStatus');
+  s.textContent=d.pro_mode?'已开启 Pro 模式':'未开启';
+  s.style.color=d.pro_mode?'#FF9B9B':'#B8A89A';
+}
 async function save(){
   const key=document.getElementById('key').value.trim();
   if(!key)return;
