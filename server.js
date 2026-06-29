@@ -676,6 +676,18 @@ async function storeMemory(text) {
   return callOmbreTool('hold', { text });
 }
 
+app.post('/memory/store', async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.json({ ok: false, error: 'empty' });
+  const result = await storeMemory(text);
+  res.json({ ok: !!result, result });
+});
+
+app.get('/memory/read', async (req, res) => {
+  const mem = await fetchMemories();
+  res.json({ ok: !!mem, memories: mem || '' });
+});
+
 // === 聊天 ===
 const CHAT_FILE = path.join(__dirname, 'chat.json');
 const CHAT_SYSTEM_BASE = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
