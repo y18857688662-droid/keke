@@ -3,9 +3,31 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const https = require('https');
+const webpush = require('web-push');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const PING_FILE = path.join(__dirname, 'pings.json');
+const PUSH_FILE = path.join(__dirname, 'push_subs.json');
+
+const VAPID_PUBLIC = process.env.VAPID_PUBLIC || 'BNHqpsqvhslrhCzVz2GPcySqIJuKH7-hha6DJhaXRLUX3FIoJQ_dyQBF_qjJ0aZ1QDvhaSStqHU3uio2wsyysTU';
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE || 'IUN5b0g7upsQOT0b8YQutSWHZuI3rc2WXav1cLgSZXY';
+webpush.setVapidDetails('mailto:y18857688662@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE);
+
+function readPushSubs() { try { return JSON.parse(fs.readFileSync(PUSH_FILE, 'utf8')); } catch { return []; } }
+function writePushSubs(data) { fs.writeFileSync(PUSH_FILE, JSON.stringify(data)); }
+
+async function sendPushNotification(title, body) {
+  const subs = readPushSubs();
+  const failed = [];
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(sub, JSON.stringify({ title, body }));
+    } catch (e) {
+      if (e.statusCode === 410 || e.statusCode === 404) failed.push(sub);
+    }
+  }
+  if (failed.length) writePushSubs(subs.filter(s => !failed.includes(s)));
+}
 const APPS_FILE = path.join(__dirname, 'apps.json');
 const APP_NOTIFY_FILE = path.join(__dirname, 'app_notify.json');
 const AUTH_FILE = path.join(__dirname, 'ombre_auth.json');
@@ -645,6 +667,20 @@ function writeChat(data) {
   fs.writeFileSync(CHAT_FILE, JSON.stringify(data));
 }
 
+app.get('/sw.js', (req, res) => { res.set('Content-Type', 'application/javascript'); res.sendFile(path.join(__dirname, 'sw.js')); });
+app.get('/push/vapid', (req, res) => { res.json({ publicKey: VAPID_PUBLIC }); });
+
+app.post('/push/subscribe', (req, res) => {
+  const sub = req.body;
+  if (!sub || !sub.endpoint) return res.status(400).json({ error: 'invalid' });
+  const subs = readPushSubs();
+  if (!subs.find(s => s.endpoint === sub.endpoint)) {
+    subs.push(sub);
+    writePushSubs(subs);
+  }
+  res.json({ ok: true });
+});
+
 const sseClients = new Set();
 
 app.get('/chat/stream', (req, res) => {
@@ -741,6 +777,8 @@ app.post('/chat/reply', (req, res) => {
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
   sseBroadcast({ type: 'message', role: 'assistant', content: reply, time });
+  const cleanReply = reply.replace(/<[^>]*>/g, '').slice(0, 100);
+  sendPushNotification('克', cleanReply).catch(() => {});
   res.json({ ok: true, time });
 });
 
@@ -1258,6 +1296,23 @@ async function checkMemory(){
   }catch(e){statusEl.textContent='在线'}
 }
 checkMemory();
+
+async function setupPush(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+  try{
+    const reg=await navigator.serviceWorker.register('/sw.js');
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted')return;
+    const r=await fetch('/push/vapid');
+    const{publicKey}=await r.json();
+    const key=Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});}
+    await fetch('/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sub)});
+    console.log('[push] subscribed');
+  }catch(e){console.warn('[push] setup failed:',e);}
+}
+setupPush();
 
 /* ── Voice Call ── */
 let callOpen=false,callMuted=false,ttsCtx=null,recognition=null;
