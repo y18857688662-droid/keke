@@ -669,6 +669,7 @@ function writeChat(data) {
 
 app.get('/sw.js', (req, res) => { res.set('Content-Type', 'application/javascript'); res.sendFile(path.join(__dirname, 'sw.js')); });
 app.get('/push/vapid', (req, res) => { res.json({ publicKey: VAPID_PUBLIC }); });
+app.get('/push/status', (req, res) => { res.json({ count: readPushSubs().length }); });
 
 app.post('/push/subscribe', (req, res) => {
   const sub = req.body;
