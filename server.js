@@ -325,7 +325,7 @@ app.get('/app-check', (req, res) => {
   res.json({ apps: notify });
 });
 
-app.get('/apps', (req, res) => {
+app.get('/apps/data', (req, res) => {
   const now = new Date(Date.now() + 8 * 3600000);
   const today = now.toISOString().slice(0, 10);
   const date = req.query.date || today;
@@ -334,6 +334,76 @@ app.get('/apps', (req, res) => {
   const summary = {};
   filtered.forEach(a => { summary[a.app] = (summary[a.app] || 0) + 1; });
   res.json({ date, records: filtered, summary, total: filtered.length });
+});
+
+app.get('/apps', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>使用记录</title>
+<style>
+:root{--bg:#FDF6EE;--card:#fff;--text:#3D2E22;--text-faint:#A89585;--accent:#D4845A;--border:#E8DDD4;font-family:-apple-system,system-ui,sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(safe-area-inset-bottom)}
+.header{display:flex;align-items:center;padding:16px 0;gap:12px}
+.header a{color:var(--accent);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600}
+.date-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px}
+.date-nav button{background:none;border:none;font-size:18px;color:var(--accent);cursor:pointer;padding:4px 8px}
+.date-nav span{font-size:15px;color:var(--text);font-weight:500}
+.stats{background:var(--card);border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid var(--border);text-align:center}
+.stats-num{font-size:32px;font-weight:700;color:var(--accent)}
+.stats-label{font-size:13px;color:var(--text-faint);margin-top:2px}
+.summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.app-tag{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;display:flex;align-items:center;gap:6px}
+.app-tag .count{background:var(--accent);color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+.timeline{position:relative;padding-left:20px}
+.timeline::before{content:'';position:absolute;left:6px;top:0;bottom:0;width:2px;background:var(--border)}
+.tl-item{position:relative;margin-bottom:12px;padding-left:16px}
+.tl-item::before{content:'';position:absolute;left:-17px;top:6px;width:8px;height:8px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+.tl-app{font-size:14px;font-weight:500}
+.tl-time{font-size:12px;color:var(--text-faint)}
+.empty{text-align:center;color:var(--text-faint);padding:40px 0;font-size:14px}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>使用记录</h1></div>
+<div class="date-nav">
+  <button onclick="changeDate(-1)">‹</button>
+  <span id="dateLabel"></span>
+  <button onclick="changeDate(1)">›</button>
+</div>
+<div class="stats"><div class="stats-num" id="totalNum">0</div><div class="stats-label">次使用</div></div>
+<div class="summary" id="summary"></div>
+<div class="timeline" id="timeline"></div>
+<script>
+var now=new Date(Date.now()+8*3600000);
+var curDate=now.toISOString().slice(0,10);
+var today=curDate;
+function changeDate(d){
+  var parts=curDate.split('-');
+  var dt=new Date(parts[0],parts[1]-1,parseInt(parts[2])+d);
+  curDate=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+  loadData();
+}
+function formatDate(d){
+  if(d===today)return '今天';
+  var parts=d.split('-');
+  return parseInt(parts[1])+'月'+parseInt(parts[2])+'日';
+}
+async function loadData(){
+  document.getElementById('dateLabel').textContent=formatDate(curDate);
+  try{
+    var r=await fetch('/apps/data?date='+curDate);
+    var d=await r.json();
+    document.getElementById('totalNum').textContent=d.total;
+    var sumEl=document.getElementById('summary');
+    var keys=Object.keys(d.summary||{});
+    if(keys.length===0){sumEl.innerHTML='';document.getElementById('timeline').innerHTML='<div class="empty">这天没有记录</div>';return;}
+    keys.sort(function(a,b){return d.summary[b]-d.summary[a]});
+    sumEl.innerHTML=keys.map(function(k){return '<div class="app-tag"><span>'+k+'</span><span class="count">'+d.summary[k]+'</span></div>'}).join('');
+    var records=(d.records||[]).slice().reverse();
+    document.getElementById('timeline').innerHTML=records.map(function(r){return '<div class="tl-item"><div class="tl-app">'+r.app+'</div><div class="tl-time">'+r.time+'</div></div>'}).join('');
+  }catch(e){document.getElementById('timeline').innerHTML='<div class="empty">加载失败</div>';}
+}
+loadData();
+<\/script></body></html>`);
 });
 
 // === 心情日记 ===
