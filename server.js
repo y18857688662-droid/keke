@@ -1355,15 +1355,18 @@ async function speakOne(text){
     if(r.ok){
       const blob=await r.blob();
       const url=URL.createObjectURL(blob);
-      const audio=new Audio(url);
+      const audio=callAudio||new Audio();
+      audio.onended=null;audio.onerror=null;
+      audio.pause();audio.currentTime=0;
+      audio.src=url;
       await new Promise((resolve)=>{
         let done=false;
         const finish=()=>{if(done)return;done=true;URL.revokeObjectURL(url);resolve();};
         audio.onended=finish;
         audio.onerror=finish;
-        const safety=setTimeout(()=>{audio.pause();finish();},30000);
-        audio.play().then(()=>{console.log('[call] audio playing, duration:',audio.duration);}).catch(e=>{
-          clearTimeout(safety);console.warn('[call] play blocked:',e);finish();
+        const safety=setTimeout(()=>{finish();},30000);
+        audio.play().then(()=>{console.log('[call] playing, dur:',audio.duration);}).catch(e=>{
+          clearTimeout(safety);console.warn('[call] play err:',e);finish();
         });
       });
       console.log('[call] speak done (server TTS)');
