@@ -328,7 +328,7 @@ app.get('/auth/start', (req, res) => {
     redirect_uri: OMBRE_REDIRECT,
     code_challenge: challenge,
     code_challenge_method: 'S256',
-    scope: 'mcp',
+    scope: 'mcp offline_access',
     state
   });
   res.redirect(`${OMBRE_URL}/oauth/authorize?${params}`);
