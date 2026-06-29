@@ -1188,7 +1188,7 @@ function parseThink(text){
   if(m)return{think:m[1].trim(),body:m[2].trim()};
   return{think:'',body:text};
 }
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*([^*]+)\*/g,'<span class="action">$1</span>').replace(/\\n/g,'<br>')}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\*([^*]+)\\*/g,'<span class="action">$1</span>').replace(/\\n/g,'<br>')}
 
 function showTyping(){
   let el=document.getElementById('typing-row');
