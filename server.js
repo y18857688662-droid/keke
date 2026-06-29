@@ -1164,6 +1164,9 @@ async function openCall(){
   callOpen=true;
   overlay.classList.add('open');
   ensureTtsCtx();
+  const wu=new SpeechSynthesisUtterance('');
+  wu.lang='zh-CN';wu.volume=0;
+  speechSynthesis.speak(wu);
   callStart=Date.now();
   callTimer.textContent='00:00';
   timerInterval=setInterval(()=>{
@@ -1256,6 +1259,7 @@ function callWaitReply(){
       if(d.messages&&d.messages.length>lastMsgCount){
         const last=d.messages[d.messages.length-1];
         if(last.role==='assistant'){
+          console.log('[call] found reply in poll, count:',d.messages.length);
           lastMsgCount=d.messages.length;
           callSpeak(last.content);
           return;
@@ -1268,6 +1272,7 @@ function callWaitReply(){
 }
 
 function callSpeak(text){
+  console.log('[call] got reply:',text.slice(0,50));
   const p=parseThink(text);
   const body=p.body||text;
   addMsg('assistant',text,new Date(Date.now()+8*3600000).toISOString().slice(11,16));
@@ -1295,29 +1300,18 @@ async function drainSpeakQueue(){
 async function speakOne(text){
   const clean=text.replace(/<[^>]*>/g,'').slice(0,500);
   if(!clean)return;
-  try{
-    const r=await fetch('/chat/tts',{method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text:clean})});
-    if(r.ok){
-      const blob=await r.blob();
-      const ctx=ensureTtsCtx();
-      const arrayBuf=await blob.arrayBuffer();
-      const audioBuf=await ctx.decodeAudioData(arrayBuf);
-      await new Promise((resolve)=>{
-        const source=ctx.createBufferSource();
-        source.buffer=audioBuf;source.connect(ctx.destination);source.start(0);
-        const safety=setTimeout(resolve,audioBuf.duration*1000+3000);
-        source.onended=()=>{clearTimeout(safety);resolve();};
-      });
-      return;
-    }
-  }catch(e){console.warn('Edge TTS failed, falling back to browser TTS');}
-  await new Promise((resolve)=>{
+  console.log('[call] speaking:',clean.slice(0,30));
+  return new Promise((resolve)=>{
     const u=new SpeechSynthesisUtterance(clean);
-    u.lang='zh-CN';u.rate=1.0;u.pitch=0.9;
-    u.onend=resolve;u.onerror=resolve;
+    u.lang='zh-CN';u.rate=1.05;u.pitch=0.85;
+    const voices=speechSynthesis.getVoices();
+    const zh=voices.find(v=>v.lang.startsWith('zh'));
+    if(zh)u.voice=zh;
+    u.onend=()=>{console.log('[call] speak done');resolve();};
+    u.onerror=(e)=>{console.error('[call] speak error:',e);resolve();};
+    speechSynthesis.cancel();
     speechSynthesis.speak(u);
+    setTimeout(()=>{if(speechSynthesis.speaking)return;resolve();},8000);
   });
 }
 </script>
