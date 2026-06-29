@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { MsEdgeTTS } = require('msedge-tts');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const PING_FILE = path.join(__dirname, 'pings.json');
@@ -645,6 +646,28 @@ app.get('/chat/history', (req, res) => {
   res.json({ messages: chat.slice(-50) });
 });
 
+app.post('/chat/tts', async (req, res) => {
+  const text = (req.body.text || '').trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: 'empty' });
+  try {
+    const tts = new MsEdgeTTS();
+    await tts.setMetadata('zh-CN-YunxiNeural', 'audio-24khz-96kbitrate-mono-mp3');
+    const { audioStream } = tts.toStream(text);
+    const chunks = [];
+    await new Promise((resolve, reject) => {
+      audioStream.on('data', c => chunks.push(c));
+      audioStream.on('end', resolve);
+      audioStream.on('error', reject);
+    });
+    const buf = Buffer.concat(chunks);
+    res.set({ 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
+    res.send(buf);
+  } catch (e) {
+    console.error('TTS error:', e.message);
+    res.status(500).json({ error: 'tts failed' });
+  }
+});
+
 app.get('/chat', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="zh-CN">
@@ -866,6 +889,49 @@ body{position:fixed;inset:0;width:100%;
 textarea,input,.composer,.composer *{-webkit-user-select:text!important;
   user-select:text!important;-webkit-touch-callout:default!important}
 
+.header-actions{position:absolute;
+  right:calc(var(--side-pad) - 2px);
+  top:calc(env(safe-area-inset-top) + clamp(14px,2.5vw,36px));
+  display:flex;align-items:center;height:36px}
+.topbtn{width:36px;height:36px;border:0;border-radius:50%;padding:0;
+  background:transparent;color:var(--text);display:grid;place-items:center;
+  cursor:pointer;transition:transform .15s ease}
+.topbtn:active{transform:scale(.9)}
+.topbtn svg{display:block}
+
+.call-overlay{position:fixed;inset:0;z-index:200;
+  background:linear-gradient(160deg,#1a2a3a 0%,#0f1922 100%);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  color:#fff;font-family:var(--font-cn)}
+.call-overlay.open{display:flex}
+.call-orb{width:clamp(100px,25vw,140px);height:clamp(100px,25vw,140px);
+  border-radius:50%;background:linear-gradient(145deg,#3a5a7a,#2a4060);
+  box-shadow:0 0 60px rgba(80,140,200,0.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:clamp(28px,6vw,40px);font-weight:500;letter-spacing:2px;
+  transition:box-shadow .3s ease}
+.call-orb.speaking{box-shadow:0 0 80px rgba(80,180,255,0.3),0 0 120px rgba(80,140,200,0.15)}
+.call-name{font-size:clamp(22px,5vw,30px);font-weight:500;margin-top:24px;letter-spacing:2px}
+.call-status{font-size:clamp(13px,2vw,16px);color:rgba(255,255,255,0.5);margin-top:8px;
+  font-family:var(--font-en),var(--font-cn);letter-spacing:.05em}
+.call-transcript{position:absolute;bottom:clamp(140px,25vw,200px);left:20px;right:20px;
+  text-align:center;font-size:clamp(14px,2vw,18px);color:rgba(255,255,255,0.7);
+  line-height:1.6;min-height:48px;font-family:var(--font-cn)}
+.call-transcript .interim{color:rgba(255,255,255,0.4)}
+.call-actions{position:absolute;bottom:clamp(40px,10vw,80px);
+  display:flex;gap:clamp(30px,8vw,60px);align-items:center}
+.call-btn{width:clamp(56px,12vw,68px);height:clamp(56px,12vw,68px);border-radius:50%;
+  border:none;display:grid;place-items:center;cursor:pointer;
+  transition:transform .15s ease}
+.call-btn:active{transform:scale(.9)}
+.call-btn svg{width:clamp(24px,5vw,28px);height:clamp(24px,5vw,28px);display:block}
+.call-btn.hangup{background:#cf5f5f;color:#fff;
+  box-shadow:0 8px 24px rgba(207,95,95,0.35)}
+.call-btn.mute{background:rgba(255,255,255,0.12);color:#fff}
+.call-btn.mute.active{background:rgba(255,255,255,0.25)}
+.call-timer{font-size:clamp(13px,2vw,16px);color:rgba(255,255,255,0.4);margin-top:12px;
+  font-family:var(--font-en);letter-spacing:.1em}
+
 @media(max-width:600px){
   .composer{gap:5px;padding-left:16px;padding-right:16px}
   .floatbtn{width:36px;height:36px}
@@ -885,6 +951,11 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <span class="name">克</span>
     <span class="status" id="status">connecting…</span>
   </div>
+  <div class="header-actions">
+    <button class="topbtn" id="callBtn" onclick="toggleCall()" aria-label="语音通话" title="语音通话">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+    </button>
+  </div>
 </header>
 <main class="scroll" id="scroll">
   <div class="empty" id="empty">
@@ -903,6 +974,21 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
   </button>
 </footer>
+</div>
+<div class="call-overlay" id="callOverlay">
+  <div class="call-orb" id="callOrb">克</div>
+  <div class="call-name">克</div>
+  <div class="call-status" id="callStatus">正在连接…</div>
+  <div class="call-timer" id="callTimer">00:00</div>
+  <div class="call-transcript" id="callTranscript"></div>
+  <div class="call-actions">
+    <button class="call-btn mute" id="muteBtn" onclick="toggleMute()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
+    <button class="call-btn hangup" onclick="closeCall()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91" transform="rotate(135 12 12)"/></svg>
+    </button>
+  </div>
 </div>
 <script>
 const scroll=document.getElementById('scroll');
@@ -1046,6 +1132,184 @@ async function checkMemory(){
   }catch(e){statusEl.textContent='在线'}
 }
 checkMemory();
+
+/* ── Voice Call ── */
+let callOpen=false,callMuted=false,ttsCtx=null,recognition=null;
+let recognitionWanted=false,speakBusy=false;
+const speakQueue=[];
+let callStart=0,timerInterval=null;
+const overlay=document.getElementById('callOverlay');
+const callOrb=document.getElementById('callOrb');
+const callStatusEl=document.getElementById('callStatus');
+const callTimer=document.getElementById('callTimer');
+const callTranscript=document.getElementById('callTranscript');
+const muteBtn=document.getElementById('muteBtn');
+
+function ensureTtsCtx(){
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(ttsCtx&&ttsCtx.state!=='closed'){
+    if(ttsCtx.state==='suspended')ttsCtx.resume();
+    return ttsCtx;
+  }
+  ttsCtx=new AC();ttsCtx.resume();
+  const buf=ttsCtx.createBuffer(1,1,22050);
+  const src=ttsCtx.createBufferSource();
+  src.buffer=buf;src.connect(ttsCtx.destination);src.start(0);
+  return ttsCtx;
+}
+
+function toggleCall(){if(callOpen)closeCall();else openCall();}
+
+async function openCall(){
+  callOpen=true;
+  overlay.classList.add('open');
+  ensureTtsCtx();
+  callStart=Date.now();
+  callTimer.textContent='00:00';
+  timerInterval=setInterval(()=>{
+    const s=Math.floor((Date.now()-callStart)/1000);
+    callTimer.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+  },1000);
+  callStatusEl.textContent='通话中';
+  callTranscript.innerHTML='';
+  try{
+    await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  }catch(e){}
+  startRecognition();
+  fetch('/chat/send',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:'[call] [call_start] 瑶瑶开启了语音通话。接下来带 [voice] 的消息来自她的语音，请用适合朗读的短句回复，不要太长。'})})
+    .then(r=>r.json()).then(d=>{
+      if(d.reply)callSpeak(d.reply);
+      else callWaitReply();
+    }).catch(()=>{});
+}
+
+function closeCall(){
+  callOpen=false;
+  overlay.classList.remove('open');
+  stopRecognition();
+  speakQueue.length=0;speakBusy=false;
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+  callStatusEl.textContent='已结束';
+  fetch('/chat/send',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:'[call] [call_end] 瑶瑶结束了语音通话。'})}).catch(()=>{});
+}
+
+function toggleMute(){
+  callMuted=!callMuted;
+  muteBtn.classList.toggle('active',callMuted);
+  if(callMuted)stopRecognition();
+  else startRecognition();
+}
+
+function startRecognition(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){callStatusEl.textContent='浏览器不支持语音识别';return;}
+  recognitionWanted=true;
+  recognition=new SR();
+  recognition.lang='zh-CN';
+  recognition.continuous=true;
+  recognition.interimResults=true;
+  recognition.onresult=(ev)=>{
+    let interim='';
+    for(let i=ev.resultIndex;i<ev.results.length;i++){
+      const t=(ev.results[i][0]?.transcript||'').trim();
+      if(ev.results[i].isFinal){
+        if(t)sendVoice(t);
+      }else{interim+=t;}
+    }
+    if(interim)callTranscript.innerHTML='<span class="interim">'+esc(interim)+'</span>';
+  };
+  recognition.onend=()=>{
+    if(callOpen&&recognitionWanted&&!callMuted)
+      setTimeout(()=>{try{recognition.start();}catch(e){}},450);
+  };
+  recognition.onerror=(e)=>{
+    if(e.error==='not-allowed')callStatusEl.textContent='请允许麦克风权限';
+  };
+  try{recognition.start();}catch(e){}
+}
+
+function stopRecognition(){
+  recognitionWanted=false;
+  try{if(recognition)recognition.stop();}catch(e){}
+}
+
+function sendVoice(text){
+  callTranscript.innerHTML=esc(text);
+  addMsg('user','[voice] '+text,new Date(Date.now()+8*3600000).toISOString().slice(11,16));
+  callStatusEl.textContent='克在想…';
+  fetch('/chat/send',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:'[voice] '+text})})
+    .then(r=>r.json()).then(d=>{
+      if(d.reply)callSpeak(d.reply);
+      else callWaitReply();
+    }).catch(()=>{callStatusEl.textContent='通话中';});
+}
+
+function callWaitReply(){
+  const ck=async()=>{
+    if(!callOpen)return;
+    try{
+      const r=await fetch('/chat/history');
+      const d=await r.json();
+      if(d.messages&&d.messages.length>lastMsgCount){
+        const last=d.messages[d.messages.length-1];
+        if(last.role==='assistant'){
+          lastMsgCount=d.messages.length;
+          callSpeak(last.content);
+          return;
+        }
+      }
+    }catch(e){}
+    if(callOpen)setTimeout(ck,2000);
+  };
+  ck();
+}
+
+function callSpeak(text){
+  const p=parseThink(text);
+  const body=p.body||text;
+  addMsg('assistant',text,new Date(Date.now()+8*3600000).toISOString().slice(11,16));
+  speakQueue.push(body);
+  if(!speakBusy)drainSpeakQueue();
+}
+
+async function drainSpeakQueue(){
+  speakBusy=true;
+  stopRecognition();
+  while(speakQueue.length&&callOpen){
+    const text=speakQueue.shift();
+    callTranscript.innerHTML=esc(text);
+    callOrb.classList.add('speaking');
+    callStatusEl.textContent='克在说话…';
+    await speakOne(text);
+    callOrb.classList.remove('speaking');
+  }
+  speakBusy=false;
+  callStatusEl.textContent='通话中';
+  callTranscript.innerHTML='';
+  if(callOpen&&!callMuted)setTimeout(()=>startRecognition(),250);
+}
+
+async function speakOne(text){
+  try{
+    const r=await fetch('/chat/tts',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:text.replace(/<[^>]*>/g,'').slice(0,500)})});
+    if(!r.ok)return;
+    const blob=await r.blob();
+    const ctx=ensureTtsCtx();
+    const arrayBuf=await blob.arrayBuffer();
+    const audioBuf=await ctx.decodeAudioData(arrayBuf);
+    await new Promise((resolve)=>{
+      const source=ctx.createBufferSource();
+      source.buffer=audioBuf;source.connect(ctx.destination);source.start(0);
+      const safety=setTimeout(resolve,audioBuf.duration*1000+3000);
+      source.onended=()=>{clearTimeout(safety);resolve();};
+    });
+  }catch(e){console.error('TTS play error:',e);}
+}
 </script>
 </body>
 </html>`);
