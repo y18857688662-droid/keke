@@ -1329,7 +1329,8 @@ checkMemory();
 async function setupPush(){
   if(!('serviceWorker' in navigator)||!('PushManager' in window)){console.warn('[push] not supported');return;}
   try{
-    const reg=await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.register('/sw.js');
+    const reg=await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){console.warn('[push] permission denied');return;}
     const r=await fetch('/push/vapid');
@@ -1337,8 +1338,9 @@ async function setupPush(){
     const key=Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
     let sub=await reg.pushManager.getSubscription();
     if(!sub){sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});}
-    await fetch('/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sub)});
-    console.log('[push] subscribed');
+    const resp=await fetch('/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sub)});
+    const result=await resp.json();
+    console.log('[push] subscribed',result);
     const pb=document.getElementById('pushBtn');if(pb)pb.style.display='none';
   }catch(e){console.warn('[push] setup failed:',e);}
 }
