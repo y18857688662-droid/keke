@@ -645,6 +645,23 @@ function writeChat(data) {
   fs.writeFileSync(CHAT_FILE, JSON.stringify(data));
 }
 
+const sseClients = new Set();
+
+app.get('/chat/stream', (req, res) => {
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
+  res.flushHeaders();
+  res.write('data: {"type":"connected"}\n\n');
+  sseClients.add(res);
+  req.on('close', () => sseClients.delete(res));
+});
+
+function sseBroadcast(event) {
+  const data = JSON.stringify(event);
+  for (const client of sseClients) {
+    try { client.write(`data: ${data}\n\n`); } catch {}
+  }
+}
+
 app.post('/chat/send', async (req, res) => {
   const msg = req.body.message;
   if (!msg) return res.json({ ok: false, error: 'empty message' });
@@ -699,6 +716,7 @@ app.post('/chat/send', async (req, res) => {
     chat2.push({ role: 'assistant', content: reply, time: replyTime });
     if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
     writeChat(chat2);
+    sseBroadcast({ type: 'message', role: 'assistant', content: reply, time: replyTime });
     res.json({ ok: true, reply, time: replyTime });
   } catch (e) {
     console.error('Chat API error:', e.message);
@@ -722,6 +740,7 @@ app.post('/chat/reply', (req, res) => {
   chat.push({ role: 'assistant', content: reply, time });
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
+  sseBroadcast({ type: 'message', role: 'assistant', content: reply, time });
   res.json({ ok: true, time });
 });
 
@@ -1197,27 +1216,26 @@ async function send(){
   input.focus();
 }
 
-async function waitForReply(){
-  const check=async()=>{
-    try{
-      const r=await fetch('/chat/history');
-      const d=await r.json();
-      if(d.messages&&d.messages.length>0){
-        const last=d.messages[d.messages.length-1];
-        if(last.role==='assistant'&&d.messages.length>lastMsgCount){
-          hideTyping();
-          addMsg('assistant',last.content,last.time);
-          lastMsgCount=d.messages.length;
-          sending=false;sendBtn.disabled=false;
-          input.focus();
-          return;
-        }
+const sse=new EventSource('/chat/stream');
+sse.onmessage=(e)=>{
+  try{
+    const d=JSON.parse(e.data);
+    if(d.type==='message'&&d.role==='assistant'){
+      if(callOpen){
+        callSpeak(d.content);
+      }else{
+        hideTyping();
+        addMsg('assistant',d.content,d.time);
+        lastMsgCount++;
+        sending=false;sendBtn.disabled=false;
+        input.focus();
       }
-    }catch(e){}
-    setTimeout(check,2000);
-  };
-  check();
-}
+    }
+  }catch(err){}
+};
+sse.onerror=()=>{console.log('[sse] reconnecting...');};
+
+async function waitForReply(){}
 
 async function loadHistory(){
   try{
@@ -1362,26 +1380,7 @@ function sendVoice(text){
     }).catch(()=>{callStatusEl.textContent='通话中';});
 }
 
-function callWaitReply(){
-  const ck=async()=>{
-    if(!callOpen)return;
-    try{
-      const r=await fetch('/chat/history');
-      const d=await r.json();
-      if(d.messages&&d.messages.length>lastMsgCount){
-        const last=d.messages[d.messages.length-1];
-        if(last.role==='assistant'){
-          console.log('[call] found reply in poll, count:',d.messages.length);
-          lastMsgCount=d.messages.length;
-          callSpeak(last.content);
-          return;
-        }
-      }
-    }catch(e){}
-    if(callOpen)setTimeout(ck,2000);
-  };
-  ck();
-}
+function callWaitReply(){}
 
 function callSpeak(text){
   console.log('[call] got reply:',text.slice(0,50));
