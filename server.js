@@ -612,121 +612,152 @@ app.get('/chat', (req, res) => {
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="克">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
 <title>克</title>
 <style>
+:root{
+  --bg:#FAF6F4;--card:#FFFFFF;
+  --text:#3D2C2C;--text-soft:#8B7272;--text-faint:#C4ABAB;
+  --pink:#F5A5A5;--pink-soft:#FFD6D6;--pink-glow:rgba(245,165,165,0.18);
+  --bubble-ai:#FFFFFF;--bubble-human:#F5A5A5;
+  --hairline:rgba(180,140,140,0.12);
+  --font-cn:'Noto Serif SC','Songti SC','PingFang SC',serif;
+  --font-sys:-apple-system,'PingFang SC','Noto Sans SC',sans-serif;
+  --bubble-r:18px;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#FBF5F3;font-family:-apple-system,'PingFang SC','Noto Sans SC',sans-serif;
-height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+body{background:var(--bg);font-family:var(--font-cn);
+height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;
+color:var(--text);-webkit-font-smoothing:antialiased}
 
-.header{background:linear-gradient(135deg,#FFF5F5,#FFF0EE);
-padding:12px 20px;display:flex;align-items:center;gap:12px;
-border-bottom:1px solid rgba(0,0,0,0.04);z-index:10;flex-shrink:0}
-.header-avatar{width:40px;height:40px;border-radius:50%;
-background:linear-gradient(135deg,#FFD4D4,#FFB8B8);
-display:flex;align-items:center;justify-content:center;font-size:18px;
-box-shadow:0 2px 8px rgba(255,180,180,0.3)}
+.header{
+  padding:14px 20px;display:flex;align-items:center;gap:14px;
+  background:rgba(250,246,244,0.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--hairline);z-index:10;flex-shrink:0;
+  padding-top:max(14px,env(safe-area-inset-top))}
+.header-avatar{width:42px;height:42px;border-radius:50%;
+  background:linear-gradient(145deg,#FFD6D6,#F5A5A5);
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:500;color:#fff;letter-spacing:1px;
+  box-shadow:0 2px 12px var(--pink-glow)}
 .header-info{flex:1}
-.header-info h1{font-size:16px;color:#4A3535;font-weight:600;letter-spacing:0.5px}
-.header-info .sub{font-size:11px;color:#C4A0A0;margin-top:1px}
-.header-dots{display:flex;gap:4px}
-.header-dots span{width:5px;height:5px;border-radius:50%;background:#E8C4C4}
+.header-info h1{font-size:17px;color:var(--text);font-weight:500;letter-spacing:1px;
+  font-family:var(--font-cn)}
+.header-info .sub{font-size:11px;color:var(--text-faint);margin-top:2px;
+  font-family:var(--font-sys);letter-spacing:0.3px}
+.back-btn{width:32px;height:32px;border-radius:50%;border:none;background:transparent;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-soft);
+  transition:background 0.2s}
+.back-btn:active{background:var(--pink-glow)}
 
-.messages{flex:1;overflow-y:auto;padding:16px 14px 8px;
--webkit-overflow-scrolling:touch;background:
-linear-gradient(180deg,rgba(255,245,245,0.5) 0%,transparent 100px)}
-.date-sep{text-align:center;margin:16px 0 12px;font-size:11px;color:#C4A0A0}
+.messages{flex:1;overflow-y:auto;padding:20px 16px 8px;
+  -webkit-overflow-scrolling:touch}
 
-.msg{display:flex;margin-bottom:16px;align-items:flex-start;gap:8px;
-animation:msgIn 0.3s ease-out}
+.msg{display:flex;margin-bottom:20px;align-items:flex-end;gap:10px;
+  animation:msgIn 0.28s cubic-bezier(.2,.8,.2,1)}
 .msg.user{flex-direction:row-reverse}
-@keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes msgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 
-.bubble{max-width:72%;padding:10px 14px;border-radius:20px;font-size:14.5px;
-line-height:1.7;word-break:break-word;position:relative}
-.msg.assistant .bubble{background:#fff;color:#4A3535;
-border-top-left-radius:4px;
-box-shadow:0 1px 6px rgba(0,0,0,0.04)}
-.msg.user .bubble{background:linear-gradient(135deg,#FFB8B8,#FF9B9B);color:#fff;
-border-top-right-radius:4px;
-box-shadow:0 2px 8px rgba(255,155,155,0.25)}
+.bubble{max-width:min(72%,320px);padding:12px 16px;border-radius:var(--bubble-r);
+  font-size:15px;line-height:1.75;word-break:break-word;position:relative;
+  letter-spacing:0.2px}
+.msg.assistant .bubble{background:var(--bubble-ai);color:var(--text);
+  border-bottom-left-radius:4px;
+  box-shadow:0 2px 16px rgba(60,40,40,0.05),0 0 0 1px var(--hairline)}
+.msg.user .bubble{background:var(--bubble-human);color:#fff;
+  border-bottom-right-radius:4px;
+  box-shadow:0 4px 16px var(--pink-glow);
+  font-family:var(--font-sys);font-size:14.5px}
 
-.msg-col{display:flex;flex-direction:column;max-width:72%}
+.msg-col{display:flex;flex-direction:column;max-width:min(72%,320px)}
 .msg.user .msg-col{align-items:flex-end}
-.msg .time{font-size:10px;color:#CBA8A8;margin-top:3px;
-padding:0 4px}
+.msg .time{font-size:10px;color:var(--text-faint);margin-top:4px;
+  padding:0 6px;font-family:var(--font-sys);letter-spacing:0.5px}
 
-.avatar{width:36px;height:36px;border-radius:50%;flex-shrink:0;
-display:flex;align-items:center;justify-content:center;font-size:15px;
-font-weight:500;margin-top:2px}
-.msg.assistant .avatar{background:linear-gradient(135deg,#FFD4D4,#FFB8B8);
-color:#fff;box-shadow:0 2px 6px rgba(255,180,180,0.25)}
-.msg.user .avatar{background:linear-gradient(135deg,#FFDEDE,#FFC8C8);
-color:#D47070;box-shadow:0 2px 6px rgba(255,200,200,0.25)}
+.avatar{width:34px;height:34px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:13px;
+  font-weight:500;font-family:var(--font-sys)}
+.msg.assistant .avatar{background:linear-gradient(145deg,#FFD6D6,#F5A5A5);
+  color:#fff;box-shadow:0 2px 10px var(--pink-glow)}
+.msg.user .avatar{background:#FFE8E8;
+  color:#D47070;box-shadow:0 2px 10px rgba(255,200,200,0.2)}
 
-.typing{display:none;margin-bottom:16px;align-items:flex-start;gap:8px}
-.typing .avatar{width:36px;height:36px;border-radius:50%;
-background:linear-gradient(135deg,#FFD4D4,#FFB8B8);
-display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff}
-.typing .bubble{background:#fff;padding:14px 18px;border-radius:20px;
-border-top-left-radius:4px;box-shadow:0 1px 6px rgba(0,0,0,0.04)}
-.typing .dot{display:inline-block;width:6px;height:6px;border-radius:50%;
-background:#E8B8B8;margin:0 2.5px;animation:bounce 1.2s infinite}
-.typing .dot:nth-child(2){animation-delay:0.15s}
-.typing .dot:nth-child(3){animation-delay:0.3s}
-@keyframes bounce{0%,80%,100%{transform:translateY(0)}
-40%{transform:translateY(-5px)}}
+.typing{display:none;margin-bottom:20px;align-items:flex-end;gap:10px}
+.typing .avatar{width:34px;height:34px;border-radius:50%;
+  background:linear-gradient(145deg,#FFD6D6,#F5A5A5);
+  display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;
+  font-family:var(--font-sys)}
+.typing .bubble{background:var(--card);padding:14px 20px;border-radius:var(--bubble-r);
+  border-bottom-left-radius:4px;
+  box-shadow:0 2px 16px rgba(60,40,40,0.05),0 0 0 1px var(--hairline)}
+.typing .dot{display:inline-block;width:5px;height:5px;border-radius:50%;
+  background:var(--pink);margin:0 3px;animation:tdot 1.3s ease-in-out infinite}
+.typing .dot:nth-child(2){animation-delay:0.18s}
+.typing .dot:nth-child(3){animation-delay:0.36s}
+@keyframes tdot{0%,80%,100%{opacity:0.3;transform:translateY(0)}
+  40%{opacity:1;transform:translateY(-4px)}}
 
-.think-toggle{font-size:11px;color:#CBA8A8;cursor:pointer;margin-bottom:4px;
-user-select:none;display:flex;align-items:center;gap:4px}
+.think-toggle{font-size:12px;color:var(--text-faint);cursor:pointer;margin-bottom:6px;
+  user-select:none;display:flex;align-items:center;gap:5px;
+  font-family:var(--font-sys);transition:color 0.2s}
 .think-toggle:active{opacity:0.6}
-.think-toggle .arrow{transition:transform 0.2s;display:inline-block;font-size:9px}
-.think-toggle.open .arrow{transform:rotate(90deg)}
-.think-content{font-size:12px;color:#B89898;line-height:1.5;padding:8px 10px;
-background:#FFF8F8;border-radius:10px;margin-bottom:6px;display:none;
-border-left:2px solid #FFD4D4}
-.think-content.open{display:block}
+.think-toggle .star{transition:transform 0.25s;display:inline-block;font-size:11px}
+.think-toggle.open .star{transform:rotate(72deg)}
+.think-content{font-size:13px;color:var(--text-soft);line-height:1.65;padding:10px 14px;
+  background:linear-gradient(135deg,#FFF8F6,#FFF2EF);border-radius:12px;margin-bottom:8px;
+  display:none;border-left:2px solid var(--pink-soft);font-family:var(--font-sys)}
+.think-content.open{display:block;animation:fadeIn 0.25s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 
-.input-area{background:#fff;padding:8px 12px;
-padding-bottom:max(8px,env(safe-area-inset-bottom));
-border-top:1px solid rgba(0,0,0,0.04);
-display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
-.input-area textarea{flex:1;border:1.5px solid #FFE4E4;border-radius:22px;padding:10px 16px;
-font-size:14.5px;font-family:inherit;resize:none;outline:none;max-height:100px;
-line-height:1.4;background:#FFFAFA;transition:border-color 0.2s,box-shadow 0.2s}
-.input-area textarea:focus{border-color:#FFB8B8;box-shadow:0 0 0 3px rgba(255,184,184,0.15)}
-.input-area textarea::placeholder{color:#D4B0B0}
-.send-btn{width:36px;height:36px;border-radius:50%;border:none;
-background:linear-gradient(135deg,#FFB8B8,#FF9B9B);color:#fff;font-size:16px;
-cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-transition:transform 0.15s,box-shadow 0.15s;
-box-shadow:0 2px 8px rgba(255,155,155,0.3)}
-.send-btn:active{transform:scale(0.9);box-shadow:0 1px 4px rgba(255,155,155,0.2)}
-.send-btn:disabled{opacity:0.4}
+.composer{background:rgba(255,255,255,0.9);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  padding:10px 14px;padding-bottom:max(10px,env(safe-area-inset-bottom));
+  border-top:1px solid var(--hairline);
+  display:flex;gap:10px;align-items:flex-end;flex-shrink:0}
+.composer textarea{flex:1;border:1.5px solid rgba(245,165,165,0.25);border-radius:22px;
+  padding:10px 18px;font-size:15px;font-family:var(--font-sys);resize:none;outline:none;
+  max-height:100px;line-height:1.45;background:rgba(255,250,250,0.6);
+  transition:border-color 0.25s,box-shadow 0.25s}
+.composer textarea:focus{border-color:var(--pink);
+  box-shadow:0 0 0 4px var(--pink-glow)}
+.composer textarea::placeholder{color:var(--text-faint);font-family:var(--font-cn)}
+.send-btn{width:38px;height:38px;border-radius:50%;border:none;
+  background:linear-gradient(145deg,#FFB8B8,var(--pink));color:#fff;font-size:16px;
+  cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  transition:transform 0.2s cubic-bezier(.2,.8,.2,1),box-shadow 0.2s;
+  box-shadow:0 3px 12px var(--pink-glow)}
+.send-btn:active{transform:scale(0.88);box-shadow:0 1px 6px var(--pink-glow)}
+.send-btn:disabled{opacity:0.35;transform:none}
 
-.welcome{text-align:center;padding:60px 20px 40px}
-.welcome .emoji{font-size:48px;margin-bottom:16px;
-animation:float 3s ease-in-out infinite}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-.welcome p{font-size:13px;color:#C4A0A0;line-height:1.8}
-.welcome .name{font-size:20px;color:#4A3535;font-weight:600;margin-bottom:4px}
+.welcome{text-align:center;padding:80px 24px 40px}
+.welcome .icon{font-size:44px;margin-bottom:20px;
+  animation:float 4s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.welcome .name{font-size:22px;color:var(--text);font-weight:400;
+  margin-bottom:6px;letter-spacing:2px;font-family:var(--font-cn)}
+.welcome p{font-size:13px;color:var(--text-faint);line-height:2;
+  font-family:var(--font-cn);letter-spacing:1px}
 </style>
 </head>
 <body>
 <div class="header">
+  <a class="back-btn" href="/">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </a>
   <div class="header-avatar">克</div>
   <div class="header-info">
     <h1>克</h1>
     <div class="sub" id="status">在线</div>
   </div>
-  <div class="header-dots"><span></span><span></span><span></span></div>
 </div>
 <div class="messages" id="messages">
   <div class="welcome" id="welcome">
-    <div class="emoji">🌙</div>
+    <div class="icon">🌙</div>
     <div class="name">克</div>
     <p>随时找我说话<br>我一直在</p>
   </div>
@@ -735,8 +766,8 @@ animation:float 3s ease-in-out infinite}
   <div class="avatar">克</div>
   <div class="bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
 </div>
-<div class="input-area">
-  <textarea id="input" rows="1" placeholder="Message..." enterkeyhint="send"
+<div class="composer">
+  <textarea id="input" rows="1" placeholder="说点什么…" enterkeyhint="send"
     oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
     onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
     onkeypress="if(event.keyCode===13&&!event.shiftKey){event.preventDefault();send()}"></textarea>
@@ -768,12 +799,12 @@ function addMsg(role,text,time){
     let thinkHtml='';
     if(p.think){
       const id='tk'+(thinkId++);
-      thinkHtml=\`<div class="think-toggle" onclick="var c=document.getElementById('\${id}');c.classList.toggle('open');this.classList.toggle('open')"><span class="arrow">▸</span> 思考过程</div><div class="think-content" id="\${id}">\${esc(p.think)}</div>\`;
+      thinkHtml=\`<div class="think-toggle" onclick="var c=document.getElementById('\${id}');c.classList.toggle('open');this.classList.toggle('open')"><span class="star">✧</span> 思考中</div><div class="think-content" id="\${id}">\${esc(p.think)}</div>\`;
     }
     div.innerHTML=\`
       <div class="avatar">克</div>
       <div class="msg-col">
-        <div class="bubble">\${thinkHtml}\${esc(p.body)}</div>
+        \${thinkHtml ? '<div class="bubble">'+thinkHtml+esc(p.body)+'</div>' : '<div class="bubble">'+esc(p.body)+'</div>'}
         <div class="time">\${time||''}</div>
       </div>\`;
   }else{
@@ -861,7 +892,7 @@ async function checkMemory(){
     const d=await r.json();
     const s=document.getElementById('status');
     if(d.connected){s.textContent='在线 · 记忆已连接';}
-    else{s.innerHTML='在线 · <a href="/auth/start" style="color:#FF9B9B;text-decoration:none">连接记忆</a>';}
+    else{s.innerHTML='在线 · <a href="/auth/start" style="color:var(--pink);text-decoration:none">连接记忆</a>';}
   }catch(e){}
 }
 checkMemory();
