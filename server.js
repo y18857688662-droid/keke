@@ -1350,19 +1350,20 @@ async function speakOne(text){
       body:JSON.stringify({text:clean})});
     if(r.ok){
       const blob=await r.blob();
-      const ctx=ensureTtsCtx();
-      const arrayBuf=await blob.arrayBuffer();
-      const audioBuf=await ctx.decodeAudioData(arrayBuf);
-      await new Promise((resolve)=>{
-        const source=ctx.createBufferSource();
-        source.buffer=audioBuf;source.connect(ctx.destination);source.start(0);
-        const safety=setTimeout(resolve,audioBuf.duration*1000+3000);
-        source.onended=()=>{clearTimeout(safety);resolve();};
+      const url=URL.createObjectURL(blob);
+      await new Promise((resolve,reject)=>{
+        const audio=new Audio(url);
+        audio.onended=()=>{URL.revokeObjectURL(url);resolve();};
+        audio.onerror=(e)=>{URL.revokeObjectURL(url);console.warn('[call] audio error:',e);resolve();};
+        const safety=setTimeout(()=>{audio.pause();URL.revokeObjectURL(url);resolve();},30000);
+        audio.play().then(()=>{console.log('[call] audio playing');}).catch(e=>{
+          clearTimeout(safety);URL.revokeObjectURL(url);console.warn('[call] play failed:',e);resolve();
+        });
       });
-      console.log('[call] speak done (MiniMax)');
+      console.log('[call] speak done (server TTS)');
       return;
     }
-  }catch(e){console.warn('[call] MiniMax TTS failed:',e);}
+  }catch(e){console.warn('[call] server TTS failed:',e);}
   await new Promise((resolve)=>{
     const u=new SpeechSynthesisUtterance(clean);
     u.lang='zh-CN';u.rate=1.05;u.pitch=0.85;
