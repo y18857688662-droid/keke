@@ -1344,14 +1344,14 @@ async function setupPush(){
     const pb=document.getElementById('pushBtn');if(pb)pb.style.display='none';
   }catch(e){console.warn('[push] setup failed:',e);}
 }
-if(Notification&&Notification.permission==='granted'){setupPush();}
-else{
+{
   const pb=document.createElement('button');
   pb.id='pushBtn';
   pb.textContent='开启消息通知';
   pb.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:20px;border:none;background:var(--accent,#D4845A);color:#fff;font-size:14px;cursor:pointer;z-index:99;box-shadow:0 2px 8px rgba(0,0,0,0.15)';
   pb.onclick=()=>setupPush();
   document.body.appendChild(pb);
+  if(window.Notification&&Notification.permission==='granted'){setupPush();}
 }
 
 /* ── Voice Call ── */
