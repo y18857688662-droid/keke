@@ -667,7 +667,7 @@ app.post('/chat/tts', async (req, res) => {
     const payload = JSON.stringify({
       model: 'speech-01-turbo',
       text,
-      voice_setting: { voice_id: 'male-qn-qingse', speed: 1.0, vol: 1.0, pitch: 0 }
+      voice_setting: { voice_id: 'male-qn-jingying', speed: 1.0, vol: 1.0, pitch: 0 }
     });
     const url = `https://api.minimax.chat/v1/t2a_v2?GroupId=${mmGroup}`;
     const resp = await fetch(url, {
