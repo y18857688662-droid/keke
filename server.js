@@ -483,17 +483,15 @@ app.post('/chat/send', async (req, res) => {
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
   const chat = readChat();
-  chat.push({ role: 'user', content: msg, time });
-  const recent = chat.slice(-20);
+  chat.push({ role: 'user', content: msg, time, pending: true });
+  if (chat.length > 200) chat.splice(0, chat.length - 200);
+  writeChat(chat);
   const chatApiKey = getAnthropicKey() || getApiKey();
   if (!chatApiKey) {
-    const reply = getFallback();
-    chat.push({ role: 'assistant', content: reply, time });
-    if (chat.length > 200) chat.splice(0, chat.length - 200);
-    writeChat(chat);
-    return res.json({ ok: true, reply, time });
+    return res.json({ ok: true, time, async: true });
   }
   try {
+    const recent = chat.slice(-20);
     const sysPrompt = await getChatSystem();
     let reply;
     if (getAnthropicKey()) {
@@ -522,22 +520,41 @@ app.post('/chat/send', async (req, res) => {
       const r = await fetch(getApiUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getApiKey() },
-        body: JSON.stringify({ model: getModel(), messages: apiMessages, max_tokens: 500, temperature: 0.85 })
+        body: JSON.stringify({ model: getModel(), messages: apiMessages, max_tokens: 800, temperature: 0.85 })
       });
       const data = await r.json();
       reply = data.choices?.[0]?.message?.content?.trim() || getFallback();
     }
-    chat.push({ role: 'assistant', content: reply, time: new Date(Date.now() + 8 * 3600000).toISOString().slice(11, 16) });
-    if (chat.length > 200) chat.splice(0, chat.length - 200);
-    writeChat(chat);
-    res.json({ ok: true, reply, time });
+    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(11, 16);
+    const chat2 = readChat();
+    chat2.forEach(m => { if (m.pending) delete m.pending; });
+    chat2.push({ role: 'assistant', content: reply, time: replyTime });
+    if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
+    writeChat(chat2);
+    res.json({ ok: true, reply, time: replyTime });
   } catch (e) {
     console.error('Chat API error:', e.message);
-    const reply = getFallback();
-    chat.push({ role: 'assistant', content: reply, time });
-    writeChat(chat);
-    res.json({ ok: true, reply, time, fallback: true });
+    return res.json({ ok: true, time, async: true });
   }
+});
+
+app.get('/chat/pending', (req, res) => {
+  const chat = readChat();
+  const pending = chat.filter(m => m.pending);
+  res.json({ messages: pending });
+});
+
+app.post('/chat/reply', (req, res) => {
+  const { reply } = req.body;
+  if (!reply) return res.json({ ok: false });
+  const now = new Date(Date.now() + 8 * 3600000);
+  const time = now.toISOString().slice(11, 16);
+  const chat = readChat();
+  chat.forEach(m => { if (m.pending) delete m.pending; });
+  chat.push({ role: 'assistant', content: reply, time });
+  if (chat.length > 200) chat.splice(0, chat.length - 200);
+  writeChat(chat);
+  res.json({ ok: true, time });
 });
 
 app.get('/chat/history', (req, res) => {
@@ -691,14 +708,42 @@ async function send(){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({message:msg})});
     const d=await r.json();
-    typing.style.display='none';
-    addMsg('assistant',d.reply,d.time);
+    if(d.reply){
+      typing.style.display='none';
+      addMsg('assistant',d.reply,d.time);
+      sending=false;sendBtn.disabled=false;
+    }else{
+      waitForReply();
+      return;
+    }
   }catch(e){
     typing.style.display='none';
     addMsg('assistant','克好像走神了…再说一次？','');
+    sending=false;sendBtn.disabled=false;
   }
-  sending=false;sendBtn.disabled=false;
   input.focus();
+}
+let lastMsgCount=0;
+async function waitForReply(){
+  const check=async()=>{
+    try{
+      const r=await fetch('/chat/history');
+      const d=await r.json();
+      if(d.messages&&d.messages.length>0){
+        const last=d.messages[d.messages.length-1];
+        if(last.role==='assistant'&&d.messages.length>lastMsgCount){
+          typing.style.display='none';
+          addMsg('assistant',last.content,last.time);
+          lastMsgCount=d.messages.length;
+          sending=false;sendBtn.disabled=false;
+          input.focus();
+          return;
+        }
+      }
+    }catch(e){}
+    setTimeout(check,2000);
+  };
+  check();
 }
 
 async function loadHistory(){
@@ -707,6 +752,7 @@ async function loadHistory(){
     const d=await r.json();
     if(d.messages&&d.messages.length>0){
       d.messages.forEach(m=>addMsg(m.role,m.content,m.time));
+      lastMsgCount=d.messages.length;
     }
   }catch(e){}
 }
