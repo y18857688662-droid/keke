@@ -506,6 +506,31 @@ app.post('/diary/write', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/diary/pending', (req, res) => {
+  const entries = readDiary();
+  const pending = entries.filter(e => e.pending);
+  res.json({ entries: pending });
+});
+
+app.post('/diary/reply', (req, res) => {
+  const { index, reply } = req.body;
+  const entries = readDiary();
+  if (index !== undefined && index >= 0 && index < entries.length) {
+    entries[index].reply = reply;
+    entries[index].pending = false;
+    writeDiary(entries);
+    return res.json({ ok: true });
+  }
+  const pending = entries.findIndex(e => e.pending);
+  if (pending >= 0) {
+    entries[pending].reply = reply;
+    entries[pending].pending = false;
+    writeDiary(entries);
+    return res.json({ ok: true });
+  }
+  res.json({ ok: false, error: 'no pending entry' });
+});
+
 // === OAuth 记忆库授权 ===
 let pkceStore = {};
 
