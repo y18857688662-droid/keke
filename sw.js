@@ -6,7 +6,7 @@ self.addEventListener('push', (e) => {
       body: data.body,
       icon: '/static/icon.svg',
       badge: '/static/icon.svg',
-      tag: 'ke-msg',
+      tag: 'ke-msg-' + Date.now(),
       renotify: true
     })
   );
@@ -17,7 +17,10 @@ self.addEventListener('notificationclick', (e) => {
   e.waitUntil(
     clients.matchAll({ type: 'window' }).then(list => {
       for (const c of list) {
-        if (c.url.includes('/chat') && 'focus' in c) return c.focus();
+        if (c.url.includes('/chat') && 'focus' in c) {
+          c.navigate('/chat');
+          return c.focus();
+        }
       }
       return clients.openWindow('/chat');
     })

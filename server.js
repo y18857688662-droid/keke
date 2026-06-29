@@ -1421,6 +1421,14 @@ async function loadHistory(){
 }
 loadHistory();
 
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState==='visible'){
+    scroll.innerHTML='';
+    chatStore.length=0;
+    loadHistory();
+  }
+});
+
 async function checkMemory(){
   try{
     const r=await fetch('/auth/status');
