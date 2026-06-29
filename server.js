@@ -783,8 +783,16 @@ app.post('/chat/reply', (req, res) => {
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
   sseBroadcast({ type: 'message', role: 'assistant', content: reply, time });
-  const cleanReply = reply.replace(/<[^>]*>/g, '').slice(0, 100);
-  sendPushNotification('克', cleanReply).catch(() => {});
+  const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
+  (async () => {
+    for (const line of lines) {
+      const isAction = line.startsWith('*') && line.endsWith('*');
+      const text = isAction ? line.slice(1, -1) : line;
+      await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+      if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+    }
+  })().catch(() => {});
   res.json({ ok: true, time });
 });
 
