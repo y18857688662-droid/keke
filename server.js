@@ -1180,6 +1180,7 @@ checkMemory();
 let callOpen=false,callMuted=false,ttsCtx=null,recognition=null;
 let recognitionWanted=false,speakBusy=false;
 const speakQueue=[];
+let callAudio=null;
 let callStart=0,timerInterval=null;
 const overlay=document.getElementById('callOverlay');
 const callOrb=document.getElementById('callOrb');
@@ -1207,6 +1208,9 @@ async function openCall(){
   callOpen=true;
   overlay.classList.add('open');
   ensureTtsCtx();
+  callAudio=new Audio();
+  callAudio.src='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+  callAudio.play().catch(()=>{});
   const wu=new SpeechSynthesisUtterance('');
   wu.lang='zh-CN';wu.volume=0;
   speechSynthesis.speak(wu);
@@ -1351,18 +1355,20 @@ async function speakOne(text){
     if(r.ok){
       const blob=await r.blob();
       const url=URL.createObjectURL(blob);
-      await new Promise((resolve,reject)=>{
-        const audio=new Audio(url);
+      const audio=callAudio||new Audio();
+      await new Promise((resolve)=>{
         audio.onended=()=>{URL.revokeObjectURL(url);resolve();};
-        audio.onerror=(e)=>{URL.revokeObjectURL(url);console.warn('[call] audio error:',e);resolve();};
+        audio.onerror=()=>{URL.revokeObjectURL(url);resolve();};
+        audio.src=url;
         const safety=setTimeout(()=>{audio.pause();URL.revokeObjectURL(url);resolve();},30000);
         audio.play().then(()=>{console.log('[call] audio playing');}).catch(e=>{
-          clearTimeout(safety);URL.revokeObjectURL(url);console.warn('[call] play failed:',e);resolve();
+          clearTimeout(safety);URL.revokeObjectURL(url);console.warn('[call] play blocked:',e);resolve();
         });
       });
       console.log('[call] speak done (server TTS)');
       return;
     }
+    console.warn('[call] TTS resp not ok:',r.status);
   }catch(e){console.warn('[call] server TTS failed:',e);}
   await new Promise((resolve)=>{
     const u=new SpeechSynthesisUtterance(clean);
