@@ -680,7 +680,7 @@ app.post('/chat/tts', async (req, res) => {
         body: JSON.stringify({
           text,
           model_id: 'eleven_multilingual_v2',
-          voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0 }
+          voice_settings: { stability: 0.85, similarity_boost: 0.75, style: 0 }
         })
       });
       if (resp.ok) {
@@ -1355,14 +1355,15 @@ async function speakOne(text){
     if(r.ok){
       const blob=await r.blob();
       const url=URL.createObjectURL(blob);
-      const audio=callAudio||new Audio();
+      const audio=new Audio(url);
       await new Promise((resolve)=>{
-        audio.onended=()=>{URL.revokeObjectURL(url);resolve();};
-        audio.onerror=()=>{URL.revokeObjectURL(url);resolve();};
-        audio.src=url;
-        const safety=setTimeout(()=>{audio.pause();URL.revokeObjectURL(url);resolve();},30000);
-        audio.play().then(()=>{console.log('[call] audio playing');}).catch(e=>{
-          clearTimeout(safety);URL.revokeObjectURL(url);console.warn('[call] play blocked:',e);resolve();
+        let done=false;
+        const finish=()=>{if(done)return;done=true;URL.revokeObjectURL(url);resolve();};
+        audio.onended=finish;
+        audio.onerror=finish;
+        const safety=setTimeout(()=>{audio.pause();finish();},30000);
+        audio.play().then(()=>{console.log('[call] audio playing, duration:',audio.duration);}).catch(e=>{
+          clearTimeout(safety);console.warn('[call] play blocked:',e);finish();
         });
       });
       console.log('[call] speak done (server TTS)');
