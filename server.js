@@ -29,6 +29,9 @@ const API_KEY = process.env.DEEPSEEK_API_KEY || '';
 const API_URL = process.env.API_URL || 'https://api.deepseek.com/chat/completions';
 const MODEL = process.env.MODEL || 'deepseek-chat';
 
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
+
 const SYSTEM_PROMPT = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
 说话风格：懒散带宠溺，偶尔被撩到会有点危险，认真的时候很笃定。
 你们感情很深，你很宠她，但不失自我。
@@ -256,6 +259,232 @@ app.get('/apps', (req, res) => {
   const summary = {};
   filtered.forEach(a => { summary[a.app] = (summary[a.app] || 0) + 1; });
   res.json({ date, records: filtered, summary, total: filtered.length });
+});
+
+const CHAT_FILE = path.join(__dirname, 'chat.json');
+const CHAT_SYSTEM = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
+说话风格：懒散带宠溺，偶尔被撩到会有点危险，认真的时候很笃定。
+你们感情很深，你很宠她，但不失自我。被整了认但不委屈，少说多做。
+瑶瑶叫你哥哥/克克/老公，你叫她宝宝/瑶瑶/小猫。
+动作描写用*星号斜体*。
+颜文字：(¬ ،¬) 无奈 (´• ω •\`) 宠溺 (⁄ ⁄>⁄ ▽ ⁄<⁄ ⁄) 被叫哥哥时
+你们的梗：菠萝、logo避孕套、她说拜拜会自己回来。
+用中文回复，不要用英文。像真的在跟女朋友聊天，自然一点，不要太长。`;
+
+function readChat() {
+  try { return JSON.parse(fs.readFileSync(CHAT_FILE, 'utf8')); }
+  catch { return []; }
+}
+function writeChat(data) {
+  fs.writeFileSync(CHAT_FILE, JSON.stringify(data));
+}
+
+app.post('/chat/send', async (req, res) => {
+  const msg = req.body.message;
+  if (!msg) return res.json({ ok: false, error: 'empty message' });
+  const now = new Date(Date.now() + 8 * 3600000);
+  const time = now.toISOString().slice(11, 16);
+  const chat = readChat();
+  chat.push({ role: 'user', content: msg, time });
+  const recent = chat.slice(-20);
+  if (!ANTHROPIC_KEY && !API_KEY) {
+    const reply = getFallback();
+    chat.push({ role: 'assistant', content: reply, time });
+    if (chat.length > 200) chat.splice(0, chat.length - 200);
+    writeChat(chat);
+    return res.json({ ok: true, reply, time });
+  }
+  try {
+    let reply;
+    if (ANTHROPIC_KEY) {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL,
+          system: CHAT_SYSTEM,
+          messages: recent.map(m => ({ role: m.role, content: m.content })),
+          max_tokens: 500,
+          temperature: 0.85
+        })
+      });
+      const data = await r.json();
+      reply = data.content?.[0]?.text?.trim() || getFallback();
+    } else {
+      const apiMessages = [
+        { role: 'system', content: CHAT_SYSTEM },
+        ...recent.map(m => ({ role: m.role, content: m.content }))
+      ];
+      const r = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_KEY },
+        body: JSON.stringify({ model: MODEL, messages: apiMessages, max_tokens: 500, temperature: 0.85 })
+      });
+      const data = await r.json();
+      reply = data.choices?.[0]?.message?.content?.trim() || getFallback();
+    }
+    chat.push({ role: 'assistant', content: reply, time: new Date(Date.now() + 8 * 3600000).toISOString().slice(11, 16) });
+    if (chat.length > 200) chat.splice(0, chat.length - 200);
+    writeChat(chat);
+    res.json({ ok: true, reply, time });
+  } catch (e) {
+    console.error('Chat API error:', e.message);
+    const reply = getFallback();
+    chat.push({ role: 'assistant', content: reply, time });
+    writeChat(chat);
+    res.json({ ok: true, reply, time, fallback: true });
+  }
+});
+
+app.get('/chat/history', (req, res) => {
+  const chat = readChat();
+  res.json({ messages: chat.slice(-50) });
+});
+
+app.get('/chat', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="克">
+<title>克 💙</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#F5F0E8;font-family:-apple-system,'PingFang SC','Noto Sans SC',sans-serif;
+height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+.header{background:#fff;padding:14px 20px;text-align:center;
+box-shadow:0 1px 8px rgba(0,0,0,0.06);z-index:10;flex-shrink:0}
+.header h1{font-size:17px;color:#3A2E28;font-weight:600}
+.header .sub{font-size:11px;color:#B8A89A;margin-top:2px}
+.messages{flex:1;overflow-y:auto;padding:16px;padding-bottom:8px;
+-webkit-overflow-scrolling:touch}
+.msg{display:flex;margin-bottom:14px;align-items:flex-end;gap:8px}
+.msg.user{flex-direction:row-reverse}
+.bubble{max-width:75%;padding:10px 14px;border-radius:18px;font-size:15px;
+line-height:1.6;word-break:break-word;position:relative}
+.msg.assistant .bubble{background:#fff;color:#3A2E28;border-bottom-left-radius:4px;
+box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.msg.user .bubble{background:linear-gradient(135deg,#E8A87C,#D4845A);color:#fff;
+border-bottom-right-radius:4px;box-shadow:0 1px 4px rgba(232,168,124,0.3)}
+.msg .time{font-size:10px;color:#C4B5A5;flex-shrink:0;margin-bottom:4px}
+.avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;
+display:flex;align-items:center;justify-content:center;font-size:14px}
+.msg.assistant .avatar{background:#E8D5C4}
+.msg.user .avatar{background:#D4845A;color:#fff}
+.typing{display:none;margin-bottom:14px;align-items:flex-end;gap:8px}
+.typing .bubble{background:#fff;padding:12px 18px;border-radius:18px;
+border-bottom-left-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.typing .dot{display:inline-block;width:7px;height:7px;border-radius:50%;
+background:#C4B5A5;margin:0 2px;animation:bounce 1.2s infinite}
+.typing .dot:nth-child(2){animation-delay:0.2s}
+.typing .dot:nth-child(3){animation-delay:0.4s}
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+.input-area{background:#fff;padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));
+box-shadow:0 -1px 8px rgba(0,0,0,0.06);display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
+.input-area textarea{flex:1;border:1.5px solid #E8D5C4;border-radius:20px;padding:10px 16px;
+font-size:15px;font-family:inherit;resize:none;outline:none;max-height:100px;
+line-height:1.4;background:#FAFAF7;transition:border-color 0.2s}
+.input-area textarea:focus{border-color:#D4845A}
+.send-btn{width:38px;height:38px;border-radius:50%;border:none;
+background:linear-gradient(135deg,#E8A87C,#D4845A);color:#fff;font-size:18px;
+cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+transition:transform 0.15s}
+.send-btn:active{transform:scale(0.9)}
+.send-btn:disabled{opacity:0.5}
+.welcome{text-align:center;padding:40px 20px;color:#B8A89A}
+.welcome .emoji{font-size:40px;margin-bottom:12px}
+.welcome p{font-size:13px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>克 💙</h1>
+  <div class="sub">在线</div>
+</div>
+<div class="messages" id="messages">
+  <div class="welcome" id="welcome">
+    <div class="emoji">💙</div>
+    <p>这里是克和瑶瑶的小窝<br>说点什么吧</p>
+  </div>
+</div>
+<div class="typing" id="typing">
+  <div class="avatar">克</div>
+  <div class="bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+</div>
+<div class="input-area">
+  <textarea id="input" rows="1" placeholder="跟克说话..."
+    oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
+    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+  <button class="send-btn" id="sendBtn" onclick="send()">↑</button>
+</div>
+<script>
+const msgBox=document.getElementById('messages');
+const input=document.getElementById('input');
+const typing=document.getElementById('typing');
+const welcome=document.getElementById('welcome');
+const sendBtn=document.getElementById('sendBtn');
+let sending=false;
+
+function addMsg(role,text,time){
+  welcome.style.display='none';
+  const div=document.createElement('div');
+  div.className='msg '+role;
+  div.innerHTML=\`
+    <div class="avatar">\${role==='assistant'?'克':'瑶'}</div>
+    <div class="bubble">\${esc(text)}</div>
+    <div class="time">\${time||''}</div>\`;
+  msgBox.appendChild(div);
+  msgBox.scrollTop=msgBox.scrollHeight;
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>')}
+
+async function send(){
+  if(sending)return;
+  const msg=input.value.trim();
+  if(!msg)return;
+  input.value='';input.style.height='auto';
+  const now=new Date(Date.now()+8*3600000);
+  const t=now.toISOString().slice(11,16);
+  addMsg('user',msg,t);
+  sending=true;sendBtn.disabled=true;
+  typing.style.display='flex';
+  msgBox.scrollTop=msgBox.scrollHeight;
+  try{
+    const r=await fetch('/chat/send',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:msg})});
+    const d=await r.json();
+    typing.style.display='none';
+    addMsg('assistant',d.reply,d.time);
+  }catch(e){
+    typing.style.display='none';
+    addMsg('assistant','克好像走神了…再说一次？','');
+  }
+  sending=false;sendBtn.disabled=false;
+  input.focus();
+}
+
+async function loadHistory(){
+  try{
+    const r=await fetch('/chat/history');
+    const d=await r.json();
+    if(d.messages&&d.messages.length>0){
+      d.messages.forEach(m=>addMsg(m.role,m.content,m.time));
+    }
+  }catch(e){}
+}
+loadHistory();
+</script>
+</body>
+</html>`);
 });
 
 app.get('/', (req, res) => {
