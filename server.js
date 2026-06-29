@@ -336,6 +336,106 @@ app.get('/apps', (req, res) => {
   res.json({ date, records: filtered, summary, total: filtered.length });
 });
 
+// === 心情日记 ===
+const DIARY_FILE = path.join(__dirname, 'diary.json');
+function readDiary() { try { return JSON.parse(fs.readFileSync(DIARY_FILE, 'utf8')); } catch { return []; } }
+function writeDiary(data) { fs.writeFileSync(DIARY_FILE, JSON.stringify(data)); }
+
+app.get('/diary', (req, res) => {
+  const entries = readDiary();
+  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>心情日记</title>
+<style>
+:root{--bg:#FDF6EE;--card:#fff;--text:#3D2E22;--text-faint:#A89585;--accent:#D4845A;--border:#E8DDD4;font-family:-apple-system,system-ui,sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(safe-area-inset-bottom)}
+.header{display:flex;align-items:center;padding:16px 0;gap:12px}
+.header a{color:var(--accent);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600}
+.write-box{background:var(--card);border-radius:16px;padding:16px;margin-bottom:20px;border:1px solid var(--border)}
+.write-box textarea{width:100%;border:none;outline:none;resize:none;font-size:15px;line-height:1.6;min-height:80px;font-family:inherit;color:var(--text)}
+.write-box textarea::placeholder{color:var(--text-faint)}
+.mood-row{display:flex;gap:8px;margin:12px 0}
+.mood-btn{font-size:22px;padding:6px 10px;border-radius:12px;border:1px solid var(--border);background:var(--card);cursor:pointer;transition:all .15s}
+.mood-btn.active{border-color:var(--accent);background:#FFF3EB;transform:scale(1.15)}
+.write-actions{display:flex;justify-content:flex-end;margin-top:8px}
+.submit-btn{background:var(--accent);color:#fff;border:none;padding:8px 24px;border-radius:20px;font-size:14px;cursor:pointer}
+.submit-btn:disabled{opacity:.4}
+.entry{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid var(--border)}
+.entry-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.entry-mood{font-size:20px}
+.entry-time{font-size:12px;color:var(--text-faint)}
+.entry-text{font-size:15px;line-height:1.6;margin-bottom:10px}
+.entry-reply{background:#FFF8F2;border-radius:12px;padding:10px 14px;font-size:14px;line-height:1.5;color:var(--text);margin-top:8px;border-left:3px solid var(--accent)}
+.entry-reply-label{font-size:12px;color:var(--accent);margin-bottom:4px;font-weight:500}
+.empty{text-align:center;color:var(--text-faint);padding:40px 0;font-size:14px}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>心情日记</h1></div>
+<div class="write-box">
+  <textarea id="diaryInput" placeholder="今天心情怎么样？"></textarea>
+  <div class="mood-row">
+    <button class="mood-btn" onclick="pickMood(this,'😊')">😊</button>
+    <button class="mood-btn" onclick="pickMood(this,'😢')">😢</button>
+    <button class="mood-btn" onclick="pickMood(this,'😡')">😡</button>
+    <button class="mood-btn" onclick="pickMood(this,'🥰')">🥰</button>
+    <button class="mood-btn" onclick="pickMood(this,'😴')">😴</button>
+    <button class="mood-btn" onclick="pickMood(this,'🤔')">🤔</button>
+  </div>
+  <div class="write-actions"><button class="submit-btn" id="submitBtn" onclick="submitDiary()">写好了</button></div>
+</div>
+<div id="entries"></div>
+<script>
+var mood='';
+function pickMood(el,m){
+  mood=m;
+  document.querySelectorAll('.mood-btn').forEach(function(b){b.classList.remove('active')});
+  el.classList.add('active');
+}
+async function submitDiary(){
+  var text=document.getElementById('diaryInput').value.trim();
+  if(!text)return;
+  document.getElementById('submitBtn').disabled=true;
+  try{
+    var r=await fetch('/diary/write',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,mood:mood||'📝'})});
+    var d=await r.json();
+    if(d.ok){document.getElementById('diaryInput').value='';mood='';document.querySelectorAll('.mood-btn').forEach(function(b){b.classList.remove('active')});loadEntries();}
+  }catch(e){}
+  document.getElementById('submitBtn').disabled=false;
+}
+async function loadEntries(){
+  try{
+    var r=await fetch('/diary/list');
+    var d=await r.json();
+    var el=document.getElementById('entries');
+    if(!d.entries||d.entries.length===0){el.innerHTML='<div class="empty">还没有日记，写一篇吧</div>';return;}
+    el.innerHTML=d.entries.map(function(e){
+      var reply=e.reply?'<div class="entry-reply"><div class="entry-reply-label">克的回复</div>'+e.reply.replace(/\\n/g,'<br>')+'</div>':'<div class="entry-reply"><div class="entry-reply-label">克的回复</div><i style="color:var(--text-faint)">等克看到…</i></div>';
+      return '<div class="entry"><div class="entry-header"><span class="entry-mood">'+e.mood+'</span><span class="entry-time">'+e.date+' '+e.time+'</span></div><div class="entry-text">'+e.text.replace(/\\n/g,'<br>')+'</div>'+reply+'</div>';
+    }).join('');
+  }catch(e){}
+}
+loadEntries();
+<\/script></body></html>`);
+});
+
+app.get('/diary/list', (req, res) => {
+  const entries = readDiary().slice(-50).reverse();
+  res.json({ entries });
+});
+
+app.post('/diary/write', async (req, res) => {
+  const { text, mood } = req.body;
+  if (!text) return res.json({ ok: false, error: 'empty' });
+  const now = new Date(Date.now() + 8 * 3600000);
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 16);
+  const entries = readDiary();
+  const entry = { text, mood: mood || '📝', date, time, pending: true };
+  entries.push(entry);
+  writeDiary(entries);
+  res.json({ ok: true });
+});
+
 // === OAuth 记忆库授权 ===
 let pkceStore = {};
 
@@ -1795,6 +1895,14 @@ body{background:var(--bg);color:var(--text);
     <div class="card-info">
       <h3>使用记录</h3>
       <p>今天打开了哪些 App</p>
+    </div>
+    <div class="card-arrow">›</div>
+  </a>
+  <a class="card" href="/diary">
+    <div class="card-icon">📔</div>
+    <div class="card-info">
+      <h3>心情日记</h3>
+      <p>记录今天的心情</p>
     </div>
     <div class="card-arrow">›</div>
   </a>
