@@ -1013,7 +1013,8 @@ body{position:fixed;inset:0;width:100%;
   background:linear-gradient(90deg,transparent,var(--think-flourish) 16%,var(--think-flourish) 84%,transparent);opacity:.46}
 .think-body[hidden]{display:none!important}
 .think-body{margin-top:clamp(12px,2.2vw,20px)}
-.action{font-style:italic;color:var(--text-faint);font-size:0.9em;display:block;margin:4px 0;padding-left:4px;border-left:2px solid var(--text-faint);opacity:0.8}
+.row.narration{justify-content:center;padding:2px 0}
+.row.narration .bubble{background:none;box-shadow:none;font-style:italic;color:var(--text-faint);font-size:0.85em;opacity:0.75;padding:2px 12px}
 .think-text{width:min(82%,520px);margin:0 auto clamp(16px,2.6vw,24px);
   color:var(--think-body);font-family:var(--font-cn);
   font-size:clamp(12px,1.25vw,13.5px);line-height:1.72;
@@ -1188,11 +1189,18 @@ function parseThink(text){
   if(m)return{think:m[1].trim(),body:m[2].trim()};
   return{think:'',body:text};
 }
-function esc(s){
-  s=s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  var actionRe=new RegExp(String.fromCharCode(42)+'([^'+String.fromCharCode(42)+']+)'+String.fromCharCode(42),'g');
-  s=s.replace(actionRe,function(_,t){return '<span class="action">'+t+'</span>';});
-  return s.replace(/\\n/g,'<br>');
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>')}
+function splitActions(text){
+  var star=String.fromCharCode(42);
+  var re=new RegExp(star+'([^'+star+']+)'+star,'g');
+  var parts=[],last=0,m;
+  while((m=re.exec(text))!==null){
+    if(m.index>last)parts.push({type:'text',content:text.slice(last,m.index).trim()});
+    parts.push({type:'action',content:m[1].trim()});
+    last=re.lastIndex;
+  }
+  if(last<text.length){var rest=text.slice(last).trim();if(rest)parts.push({type:'text',content:rest});}
+  return parts.length?parts:[{type:'text',content:text}];
 }
 
 function showTyping(){
@@ -1237,7 +1245,7 @@ function addMsg(role,text,time,noSave){
       trow.innerHTML=\`<div class="think-block" id="\${id}-block">
         <button class="think-toggle" onclick="var b=document.getElementById('\${id}-block');b.classList.toggle('open');var r=b.closest('.row');r.classList.toggle('think-open');var bd=document.getElementById('\${id}-body');bd.hidden=!bd.hidden">
           <span class="think-rule"></span>
-          <span class="think-caption"><span class="think-state"></span> thought</span>
+          <span class="think-caption"><span class="think-state"></span> 克的想法</span>
           <span class="think-rule"></span>
         </button>
         <div class="think-body" id="\${id}-body" hidden>
@@ -1247,10 +1255,19 @@ function addMsg(role,text,time,noSave){
       </div>\`;
       scroll.appendChild(trow);
     }
-    const row=document.createElement('div');
-    row.className='row ai tail';
-    row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(p.body)}</span><span class="meta">\${time||''}</span></div>\`;
-    scroll.appendChild(row);
+    const parts=splitActions(p.body);
+    parts.forEach(function(part,i){
+      const row=document.createElement('div');
+      if(part.type==='action'){
+        row.className='row narration';
+        row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(part.content)}</span></div>\`;
+      }else{
+        row.className='row ai tail';
+        var meta=i===parts.length-1?(time||''):'';
+        row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(part.content)}</span><span class="meta">\${meta}</span></div>\`;
+      }
+      scroll.appendChild(row);
+    });
   }else{
     const row=document.createElement('div');
     row.className='row human tail';
