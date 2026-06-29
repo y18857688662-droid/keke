@@ -1338,7 +1338,7 @@ async function setupPush(){
     if(!sub){sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});}
     await fetch('/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sub)});
     console.log('[push] subscribed');
-    document.getElementById('pushBtn').style.display='none';
+    const pb=document.getElementById('pushBtn');if(pb)pb.style.display='none';
   }catch(e){console.warn('[push] setup failed:',e);}
 }
 if(Notification&&Notification.permission==='granted'){setupPush();}
