@@ -1298,11 +1298,11 @@ async function checkMemory(){
 checkMemory();
 
 async function setupPush(){
-  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){console.warn('[push] not supported');return;}
   try{
     const reg=await navigator.serviceWorker.register('/sw.js');
     const perm=await Notification.requestPermission();
-    if(perm!=='granted')return;
+    if(perm!=='granted'){console.warn('[push] permission denied');return;}
     const r=await fetch('/push/vapid');
     const{publicKey}=await r.json();
     const key=Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
@@ -1310,9 +1310,18 @@ async function setupPush(){
     if(!sub){sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});}
     await fetch('/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sub)});
     console.log('[push] subscribed');
+    document.getElementById('pushBtn').style.display='none';
   }catch(e){console.warn('[push] setup failed:',e);}
 }
-setupPush();
+if(Notification&&Notification.permission==='granted'){setupPush();}
+else{
+  const pb=document.createElement('button');
+  pb.id='pushBtn';
+  pb.textContent='开启消息通知';
+  pb.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:20px;border:none;background:var(--accent,#D4845A);color:#fff;font-size:14px;cursor:pointer;z-index:99;box-shadow:0 2px 8px rgba(0,0,0,0.15)';
+  pb.onclick=()=>setupPush();
+  document.body.appendChild(pb);
+}
 
 /* ── Voice Call ── */
 let callOpen=false,callMuted=false,ttsCtx=null,recognition=null;
