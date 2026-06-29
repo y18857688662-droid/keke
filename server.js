@@ -1327,12 +1327,16 @@ async function checkMemory(){
 checkMemory();
 
 async function setupPush(){
-  if(!('serviceWorker' in navigator)||!('PushManager' in window)){console.warn('[push] not supported');return;}
+  const pb=document.getElementById('pushBtn');
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){
+    if(pb)pb.textContent='浏览器不支持推送';return;
+  }
   try{
+    if(pb)pb.textContent='正在连接…';
     await navigator.serviceWorker.register('/sw.js');
     const reg=await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
-    if(perm!=='granted'){console.warn('[push] permission denied');return;}
+    if(perm!=='granted'){if(pb)pb.textContent='需要允许通知权限';return;}
     const r=await fetch('/push/vapid');
     const{publicKey}=await r.json();
     const key=Uint8Array.from(atob(publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
@@ -1341,8 +1345,11 @@ async function setupPush(){
     const resp=await fetch('/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sub)});
     const result=await resp.json();
     console.log('[push] subscribed',result);
-    const pb=document.getElementById('pushBtn');if(pb)pb.style.display='none';
-  }catch(e){console.warn('[push] setup failed:',e);}
+    if(pb){pb.textContent='通知已开启 ✓';setTimeout(()=>pb.style.display='none',2000);}
+  }catch(e){
+    console.warn('[push] setup failed:',e);
+    if(pb)pb.textContent='开启失败: '+e.message;
+  }
 }
 {
   const pb=document.createElement('button');
