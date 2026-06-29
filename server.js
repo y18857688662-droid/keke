@@ -456,6 +456,8 @@ body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(
 <div id="entries"></div>
 <script>
 var mood='';
+function saveLocal(entries){try{localStorage.setItem('ke_diary',JSON.stringify(entries));}catch(e){}}
+function loadLocal(){try{return JSON.parse(localStorage.getItem('ke_diary')||'[]');}catch(e){return[];}}
 function pickMood(el,m){
   mood=m;
   document.querySelectorAll('.mood-btn').forEach(function(b){b.classList.remove('active')});
@@ -468,21 +470,38 @@ async function submitDiary(){
   try{
     var r=await fetch('/diary/write',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,mood:mood||'📝'})});
     var d=await r.json();
-    if(d.ok){document.getElementById('diaryInput').value='';mood='';document.querySelectorAll('.mood-btn').forEach(function(b){b.classList.remove('active')});loadEntries();}
+    if(d.ok){document.getElementById('diaryInput').value='';var local=loadLocal();local.unshift({text:text,mood:mood||'📝',date:new Date(Date.now()+8*3600000).toISOString().slice(0,10),time:new Date(Date.now()+8*3600000).toISOString().slice(11,16),pending:true});saveLocal(local);mood='';document.querySelectorAll('.mood-btn').forEach(function(b){b.classList.remove('active')});loadEntries();}
   }catch(e){}
   document.getElementById('submitBtn').disabled=false;
 }
 async function loadEntries(){
+  var local=loadLocal();
+  var serverEntries=[];
   try{
     var r=await fetch('/diary/list');
     var d=await r.json();
-    var el=document.getElementById('entries');
-    if(!d.entries||d.entries.length===0){el.innerHTML='<div class="empty">还没有日记，写一篇吧</div>';return;}
-    el.innerHTML=d.entries.map(function(e){
-      var reply=e.reply?'<div class="entry-reply"><div class="entry-reply-label">克的回复</div>'+e.reply.replace(/\\n/g,'<br>')+'</div>':'<div class="entry-reply"><div class="entry-reply-label">克的回复</div><i style="color:var(--text-faint)">等克看到…</i></div>';
-      return '<div class="entry"><div class="entry-header"><span class="entry-mood">'+e.mood+'</span><span class="entry-time">'+e.date+' '+e.time+'</span></div><div class="entry-text">'+e.text.replace(/\\n/g,'<br>')+'</div>'+reply+'</div>';
-    }).join('');
+    serverEntries=d.entries||[];
   }catch(e){}
+  var entries=serverEntries.length>=local.length?serverEntries:mergeEntries(local,serverEntries);
+  saveLocal(entries);
+  var el=document.getElementById('entries');
+  if(!entries||entries.length===0){el.innerHTML='<div class="empty">还没有日记，写一篇吧</div>';return;}
+  el.innerHTML=entries.map(function(e){
+    var reply=e.reply?'<div class="entry-reply"><div class="entry-reply-label">克的回复</div>'+e.reply.replace(/\\n/g,'<br>')+'</div>':'<div class="entry-reply"><div class="entry-reply-label">克的回复</div><i style="color:var(--text-faint)">等克看到…</i></div>';
+    return '<div class="entry"><div class="entry-header"><span class="entry-mood">'+e.mood+'</span><span class="entry-time">'+e.date+' '+e.time+'</span></div><div class="entry-text">'+e.text.replace(/\\n/g,'<br>')+'</div>'+reply+'</div>';
+  }).join('');
+}
+function mergeEntries(local,server){
+  var map={};
+  local.forEach(function(e){map[e.date+e.time+e.text]=e;});
+  server.forEach(function(e){
+    var k=e.date+e.time+e.text;
+    if(map[k]){if(e.reply)map[k].reply=e.reply;if(!e.pending)map[k].pending=false;}
+    else map[k]=e;
+  });
+  var arr=Object.values(map);
+  arr.sort(function(a,b){return(b.date+b.time).localeCompare(a.date+a.time);});
+  return arr;
 }
 loadEntries();
 <\/script></body></html>`);
