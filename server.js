@@ -48,7 +48,7 @@ function readApiConfig() {
 function writeApiConfig(data) {
   fs.writeFileSync(API_CONFIG_FILE, JSON.stringify(data));
 }
-function isProMode() { return readApiConfig().pro_mode === true; }
+function isProMode() { const cfg = readApiConfig(); return cfg.pro_mode !== undefined ? cfg.pro_mode === true : (process.env.PRO_MODE !== 'false'); }
 function getApiKey() { if (isProMode()) return ''; return readApiConfig().api_key || process.env.DEEPSEEK_API_KEY || ''; }
 function getApiUrl() { return readApiConfig().api_url || process.env.API_URL || 'https://api.deepseek.com/chat/completions'; }
 function getModel() { return readApiConfig().model || process.env.MODEL || 'deepseek-chat'; }
@@ -670,8 +670,8 @@ app.post('/chat/tts', async (req, res) => {
   const text = (req.body.text || '').trim().slice(0, 500);
   if (!text) return res.status(400).json({ error: 'empty' });
   const cfg = readApiConfig();
-  const elKey = cfg.elevenlabs_key;
-  const elVoice = cfg.elevenlabs_voice || 'pNInz6obpgDQGcFmaJgB';
+  const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
+  const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'pNInz6obpgDQGcFmaJgB';
   if (elKey) {
     try {
       const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
@@ -692,8 +692,8 @@ app.post('/chat/tts', async (req, res) => {
       console.error('ElevenLabs error:', resp.status, await resp.text());
     } catch (e) { console.error('ElevenLabs TTS error:', e.message); }
   }
-  const mmKey = cfg.minimax_key;
-  const mmGroup = cfg.minimax_group;
+  const mmKey = cfg.minimax_key || process.env.MINIMAX_KEY || '';
+  const mmGroup = cfg.minimax_group || process.env.MINIMAX_GROUP || '';
   if (mmKey && mmGroup) {
     try {
       const resp = await fetch(`https://api.minimax.chat/v1/t2a_v2?GroupId=${mmGroup}`, {
