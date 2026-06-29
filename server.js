@@ -699,9 +699,10 @@ function sseBroadcast(event) {
   }
 }
 
-app.post('/chat/send', express.json({ limit: '5mb' }), async (req, res) => {
+app.post('/chat/send', async (req, res) => {
   const msg = req.body.message;
   const image = req.body.image;
+  if (image) console.log('[chat] received image, size:', Math.round(image.length/1024) + 'kb');
   if (!msg && !image) return res.json({ ok: false, error: 'empty message' });
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
@@ -1350,19 +1351,26 @@ function compressImg(file,maxW,quality){
   });
 }
 
-async function sendPhoto(input){
-  const file=input.files[0];
+async function sendPhoto(el){
+  const file=el.files[0];
   if(!file)return;
-  input.value='';
-  const data=await compressImg(file,800,0.7);
+  el.value='';
+  const data=await compressImg(file,600,0.5);
   const now=new Date(Date.now()+8*3600000);
   const t=now.toISOString().slice(11,16);
   addMsg('user',data,t);
+  console.log('[photo] size:',Math.round(data.length/1024)+'kb');
   try{
-    await fetch('/chat/send',{method:'POST',
+    const r=await fetch('/chat/send',{method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({message:'[图片]',image:data})});
-  }catch(e){}
+    const d=await r.json();
+    console.log('[photo] server:',d);
+    if(!d.ok) addMsg('assistant','图片发送失败: '+(d.error||'未知错误'),'');
+  }catch(e){
+    console.warn('[photo] send failed:',e);
+    addMsg('assistant','图片发送失败，请重试','');
+  }
 }
 
 const sse=new EventSource('/chat/stream');
