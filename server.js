@@ -1261,15 +1261,25 @@ function addMsg(role,text,time,noSave){
       scroll.appendChild(trow);
     }
     const parts=splitActions(p.body);
-    parts.forEach(function(part,i){
-      const row=document.createElement('div');
+    var allRows=[];
+    parts.forEach(function(part){
       if(part.type==='action'){
+        allRows.push({type:'action',content:part.content});
+      }else{
+        part.content.split(/\\n+/).forEach(function(line){
+          var t=line.trim();if(t)allRows.push({type:'text',content:t});
+        });
+      }
+    });
+    allRows.forEach(function(r,i){
+      const row=document.createElement('div');
+      if(r.type==='action'){
         row.className='row narration';
-        row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(part.content)}</span></div>\`;
+        row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span></div>\`;
       }else{
         row.className='row ai tail';
-        var meta=i===parts.length-1?(time||''):'';
-        row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(part.content)}</span><span class="meta">\${meta}</span></div>\`;
+        var meta=i===allRows.length-1?(time||''):'';
+        row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span><span class="meta">\${meta}</span></div>\`;
       }
       scroll.appendChild(row);
     });
