@@ -1191,15 +1191,20 @@ function parseThink(text){
 }
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>')}
 function splitActions(text){
-  var star=String.fromCharCode(42);
-  var re=new RegExp(star+'([^'+star+']+)'+star,'g');
-  var parts=[],last=0,m;
-  while((m=re.exec(text))!==null){
-    if(m.index>last)parts.push({type:'text',content:text.slice(last,m.index).trim()});
-    parts.push({type:'action',content:m[1].trim()});
-    last=re.lastIndex;
+  var S=String.fromCharCode(42),parts=[],buf='',i=0;
+  while(i<text.length){
+    if(text[i]===S){
+      var j=text.indexOf(S,i+1);
+      if(j>i+1){
+        var before=buf.trim();if(before)parts.push({type:'text',content:before});
+        buf='';
+        parts.push({type:'action',content:text.slice(i+1,j).trim()});
+        i=j+1;continue;
+      }
+    }
+    buf+=text[i];i++;
   }
-  if(last<text.length){var rest=text.slice(last).trim();if(rest)parts.push({type:'text',content:rest});}
+  var rest=buf.trim();if(rest)parts.push({type:'text',content:rest});
   return parts.length?parts:[{type:'text',content:text}];
 }
 
