@@ -1013,6 +1013,7 @@ body{position:fixed;inset:0;width:100%;
   background:linear-gradient(90deg,transparent,var(--think-flourish) 16%,var(--think-flourish) 84%,transparent);opacity:.46}
 .think-body[hidden]{display:none!important}
 .think-body{margin-top:clamp(12px,2.2vw,20px)}
+.action{font-style:italic;color:var(--text-faint);font-size:0.9em;display:block;margin:4px 0;padding-left:4px;border-left:2px solid var(--text-faint);opacity:0.8}
 .think-text{width:min(82%,520px);margin:0 auto clamp(16px,2.6vw,24px);
   color:var(--think-body);font-family:var(--font-cn);
   font-size:clamp(12px,1.25vw,13.5px);line-height:1.72;
@@ -1187,7 +1188,7 @@ function parseThink(text){
   if(m)return{think:m[1].trim(),body:m[2].trim()};
   return{think:'',body:text};
 }
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>')}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*([^*]+)\*/g,'<span class="action">$1</span>').replace(/\\n/g,'<br>')}
 
 function showTyping(){
   let el=document.getElementById('typing-row');
