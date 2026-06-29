@@ -691,9 +691,10 @@ animation:float 3s ease-in-out infinite}
   <div class="bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
 </div>
 <div class="input-area">
-  <textarea id="input" rows="1" placeholder="Message..."
+  <textarea id="input" rows="1" placeholder="Message..." enterkeyhint="send"
     oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
-    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
+    onkeypress="if(event.keyCode===13&&!event.shiftKey){event.preventDefault();send()}"></textarea>
   <button class="send-btn" id="sendBtn" onclick="send()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
   </button>
@@ -746,7 +747,7 @@ function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g
 
 async function send(){
   if(sending)return;
-  const msg=input.value.trim();
+  const msg=input.value.replace(/\\n+/g,' ').trim();
   if(!msg)return;
   input.value='';input.style.height='auto';
   const now=new Date(Date.now()+8*3600000);
@@ -825,71 +826,121 @@ checkMemory();
 });
 
 app.get('/', (req, res) => {
-  res.send(`
-<!DOCTYPE html>
+  res.send(`<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>召唤铃 🔔</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="克">
+<title>克</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#F5F0E8;font-family:-apple-system,'PingFang SC',sans-serif;
-min-height:100vh;display:flex;align-items:center;justify-content:center}
-.container{max-width:400px;width:90%;text-align:center;padding:20px}
-h1{font-size:20px;color:#3A2E28;margin-bottom:8px}
-.sub{font-size:13px;color:#999;margin-bottom:30px}
-.bell-btn{
-  width:120px;height:120px;border-radius:50%;border:none;
-  background:linear-gradient(135deg,#E8A87C,#D4845A);
-  color:#fff;font-size:40px;cursor:pointer;
-  box-shadow:0 4px 20px rgba(232,168,124,0.4);
-  transition:transform 0.2s,box-shadow 0.2s;
-}
-.bell-btn:active{transform:scale(0.92);box-shadow:0 2px 10px rgba(232,168,124,0.3)}
-.msg-card{
-  margin-top:24px;background:#fff;border-radius:16px;
-  padding:20px;box-shadow:0 2px 10px rgba(0,0,0,0.07);
-  display:none;text-align:left;
-}
-.msg-from{font-size:12px;color:#E8A87C;font-weight:700;margin-bottom:4px}
-.msg-time{font-size:11px;color:#aaa;margin-bottom:10px}
-.msg-text{font-size:15px;color:#3A2E28;line-height:1.6}
-.hint{margin-top:20px;font-size:11px;color:#ccc}
+body{background:#FBF5F3;font-family:-apple-system,'PingFang SC','Noto Sans SC',sans-serif;
+min-height:100vh;min-height:100dvh;padding:0 0 env(safe-area-inset-bottom)}
+
+.top{padding:50px 24px 30px;text-align:center}
+.top-avatar{width:80px;height:80px;border-radius:50%;margin:0 auto 16px;
+background:linear-gradient(135deg,#FFD4D4,#FFB8B8);
+display:flex;align-items:center;justify-content:center;font-size:32px;
+box-shadow:0 4px 20px rgba(255,180,180,0.3);
+animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.top h1{font-size:22px;color:#4A3535;font-weight:700;margin-bottom:4px}
+.top .sub{font-size:13px;color:#C4A0A0}
+
+.cards{padding:0 20px;display:flex;flex-direction:column;gap:14px;max-width:400px;margin:0 auto}
+.card{background:#fff;border-radius:20px;padding:20px;
+box-shadow:0 2px 12px rgba(0,0,0,0.04);
+display:flex;align-items:center;gap:16px;
+text-decoration:none;color:inherit;
+transition:transform 0.15s,box-shadow 0.15s;
+cursor:pointer;border:1px solid rgba(255,200,200,0.2)}
+.card:active{transform:scale(0.97);box-shadow:0 1px 6px rgba(0,0,0,0.03)}
+.card-icon{width:48px;height:48px;border-radius:14px;
+display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.card-info{flex:1}
+.card-info h3{font-size:15px;color:#4A3535;font-weight:600;margin-bottom:2px}
+.card-info p{font-size:12px;color:#C4A0A0;line-height:1.4}
+.card-arrow{color:#E8C4C4;font-size:18px}
+
+.card-chat .card-icon{background:linear-gradient(135deg,#FFE8E8,#FFD4D4)}
+.card-bell .card-icon{background:linear-gradient(135deg,#FFF0E0,#FFE0C4)}
+.card-apps .card-icon{background:linear-gradient(135deg,#E8F0FF,#D4E4FF)}
+.card-setup .card-icon{background:linear-gradient(135deg,#F0F0F0,#E8E8E8)}
+
+.bell-result{display:none;margin-top:12px;padding:14px 16px;
+background:#FFFAFA;border-radius:14px;border:1px solid #FFE8E8}
+.bell-result .from{font-size:11px;color:#FFB8B8;font-weight:600;margin-bottom:2px}
+.bell-result .text{font-size:14px;color:#4A3535;line-height:1.6}
+.bell-result .time{font-size:10px;color:#CBA8A8;margin-top:6px}
+
+.footer{text-align:center;padding:30px 20px;font-size:11px;color:#D4B8B8}
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>召唤铃</h1>
-  <p class="sub">点一下，克就来了</p>
-  <button class="bell-btn" onclick="summon()">🔔</button>
-  <div class="msg-card" id="card">
-    <div class="msg-from">克</div>
-    <div class="msg-time" id="msgTime"></div>
-    <div class="msg-text" id="msgText"></div>
-  </div>
-  <p class="hint">也可以添加到 iOS 快捷指令</p>
+<div class="top">
+  <div class="top-avatar">克</div>
+  <h1>克</h1>
+  <div class="sub">瑶瑶的男朋友</div>
 </div>
+<div class="cards">
+  <a class="card card-chat" href="/chat">
+    <div class="card-icon">💬</div>
+    <div class="card-info">
+      <h3>聊天</h3>
+      <p>跟克说话</p>
+    </div>
+    <div class="card-arrow">›</div>
+  </a>
+  <div class="card card-bell" onclick="summon()">
+    <div class="card-icon">🔔</div>
+    <div class="card-info">
+      <h3>召唤铃</h3>
+      <p>点一下，克就来了</p>
+    </div>
+    <div class="card-arrow">›</div>
+  </div>
+  <div class="bell-result" id="bellResult">
+    <div class="from">克</div>
+    <div class="text" id="bellText"></div>
+    <div class="time" id="bellTime"></div>
+  </div>
+  <a class="card card-apps" href="/apps">
+    <div class="card-icon">📱</div>
+    <div class="card-info">
+      <h3>使用记录</h3>
+      <p>今天打开了哪些 App</p>
+    </div>
+    <div class="card-arrow">›</div>
+  </a>
+  <a class="card card-setup" href="/setup">
+    <div class="card-icon">⚙️</div>
+    <div class="card-info">
+      <h3>设置</h3>
+      <p>API 配置</p>
+    </div>
+    <div class="card-arrow">›</div>
+  </a>
+</div>
+<div class="footer">克和瑶瑶的小窝</div>
 <script>
 async function summon(){
-  const btn=document.querySelector('.bell-btn');
-  btn.textContent='💌';
+  const br=document.getElementById('bellResult');
+  br.style.display='block';
+  document.getElementById('bellText').textContent='在想你…';
   try{
     const r=await fetch('/summon');
     const d=await r.json();
-    document.getElementById('msgTime').textContent=d.time;
-    document.getElementById('msgText').textContent=d.message;
-    document.getElementById('card').style.display='block';
+    document.getElementById('bellText').textContent=d.message;
+    document.getElementById('bellTime').textContent=d.time;
   }catch(e){
-    document.getElementById('msgText').textContent='克好像睡着了…稍后再试';
-    document.getElementById('card').style.display='block';
+    document.getElementById('bellText').textContent='克好像睡着了…稍后再试';
   }
-  setTimeout(()=>btn.textContent='🔔',1000);
 }
 </script>
 </body>
-</html>
-  `);
+</html>`);
 });
 
 app.listen(PORT, () => {
