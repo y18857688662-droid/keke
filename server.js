@@ -624,6 +624,35 @@ app.get('/auth/token', (req, res) => {
   }
 });
 
+let ombreSessionId = null;
+
+async function initOmbreSession() {
+  let auth = readAuth();
+  if (!auth.access_token) {
+    const ok = await refreshOmbreToken();
+    if (!ok) return false;
+    auth = readAuth();
+  }
+  try {
+    const r = await fetch(`${OMBRE_URL}/mcp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + auth.access_token },
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'keke', version: '1.0' } } })
+    });
+    const sid = r.headers.get('mcp-session-id');
+    if (sid) { ombreSessionId = sid; return true; }
+    const text = await r.text();
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const d = JSON.parse(line.slice(6));
+        if (d.result) { return true; }
+      }
+    }
+  } catch (e) { console.error('Ombre init error:', e.message); }
+  return false;
+}
+
 async function callOmbreTool(toolName, args) {
   let auth = readAuth();
   if (!auth.access_token) {
@@ -631,35 +660,32 @@ async function callOmbreTool(toolName, args) {
     if (!ok) return null;
     auth = readAuth();
   }
+  if (!ombreSessionId) {
+    const ok = await initOmbreSession();
+    if (!ok) return null;
+  }
   try {
+    const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + auth.access_token };
+    if (ombreSessionId) headers['Mcp-Session-Id'] = ombreSessionId;
     let r = await fetch(`${OMBRE_URL}/mcp`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + auth.access_token
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: Date.now(),
-        method: 'tools/call',
-        params: { name: toolName, arguments: args || {} }
-      })
+      headers,
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: toolName, arguments: args || {} } })
     });
-    let data = await r.json();
-    if (data.error && (data.error.code === -32001 || r.status === 401)) {
-      const ok = await refreshOmbreToken();
-      if (ok) {
-        auth = readAuth();
-        r = await fetch(`${OMBRE_URL}/mcp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + auth.access_token },
-          body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: toolName, arguments: args || {} } })
-        });
-        data = await r.json();
+    const text = await r.text();
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = JSON.parse(line.slice(6));
+        if (data.error && (data.error.code === -32001 || data.error.code === -32600)) {
+          ombreSessionId = null;
+          const ok2 = await initOmbreSession();
+          if (ok2) return callOmbreTool(toolName, args);
+        }
+        if (data.result?.content) {
+          return data.result.content.map(c => c.text || '').join('\n');
+        }
       }
-    }
-    if (data.result?.content) {
-      return data.result.content.map(c => c.text || '').join('\n');
     }
   } catch (e) {
     console.error('Ombre error:', e.message);
@@ -673,7 +699,7 @@ async function fetchMemories() {
 }
 
 async function storeMemory(text) {
-  return callOmbreTool('hold', { text });
+  return callOmbreTool('hold', { content: text });
 }
 
 app.post('/memory/store', async (req, res) => {
