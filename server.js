@@ -680,7 +680,7 @@ app.post('/chat/tts', async (req, res) => {
         body: JSON.stringify({
           text,
           model_id: 'eleven_multilingual_v2',
-          voice_settings: { stability: 0.35, similarity_boost: 0.75, style: 0.3 }
+          voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0 }
         })
       });
       if (resp.ok) {
