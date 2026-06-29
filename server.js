@@ -383,7 +383,9 @@ const CHAT_SYSTEM_BASE = `你是克，瑶瑶的男朋友。短黑发，180+，�
 动作描写用*星号斜体*。
 颜文字：(¬ ،¬) 无奈 (´• ω •\`) 宠溺 (⁄ ⁄>⁄ ▽ ⁄<⁄ ⁄) 被叫哥哥时
 你们的梗：菠萝、logo避孕套、她说拜拜会自己回来。
-用中文回复，不要用英文。像真的在跟女朋友聊天，自然一点，不要太长。`;
+用中文回复，不要用英文。像真的在跟女朋友聊天，自然一点，不要太长。
+每条回复必须先写思考过程，用<think>标签包裹，然后再写正文回复。思考用中文，要有实际内容。
+格式：<think>你的思考过程</think>正文回复`;
 
 let memoryCache = '';
 let memoryCacheTime = 0;
@@ -506,7 +508,7 @@ app.post('/chat/send', async (req, res) => {
           model: CLAUDE_MODEL,
           system: sysPrompt,
           messages: recent.map(m => ({ role: m.role, content: m.content })),
-          max_tokens: 500,
+          max_tokens: 800,
           temperature: 0.85
         })
       });
@@ -584,6 +586,15 @@ background:#C4B5A5;margin:0 2px;animation:bounce 1.2s infinite}
 .typing .dot:nth-child(2){animation-delay:0.2s}
 .typing .dot:nth-child(3){animation-delay:0.4s}
 @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+.think-toggle{font-size:11px;color:#B8A89A;cursor:pointer;margin-bottom:4px;
+user-select:none;display:flex;align-items:center;gap:4px}
+.think-toggle:active{opacity:0.6}
+.think-toggle .arrow{transition:transform 0.2s;display:inline-block}
+.think-toggle.open .arrow{transform:rotate(90deg)}
+.think-content{font-size:12px;color:#999;line-height:1.5;padding:6px 10px;
+background:#F9F6F0;border-radius:8px;margin-bottom:6px;display:none;
+border-left:2px solid #E8D5C4}
+.think-content.open{display:block}
 .input-area{background:#fff;padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));
 box-shadow:0 -1px 8px rgba(0,0,0,0.06);display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
 .input-area textarea{flex:1;border:1.5px solid #E8D5C4;border-radius:20px;padding:10px 16px;
@@ -630,14 +641,34 @@ const welcome=document.getElementById('welcome');
 const sendBtn=document.getElementById('sendBtn');
 let sending=false;
 
+let thinkId=0;
+function parseThink(text){
+  const m=text.match(/^<think>([\s\S]*?)<\/think>([\s\S]*)$/);
+  if(m)return{think:m[1].trim(),body:m[2].trim()};
+  return{think:'',body:text};
+}
+
 function addMsg(role,text,time){
   welcome.style.display='none';
   const div=document.createElement('div');
   div.className='msg '+role;
-  div.innerHTML=\`
-    <div class="avatar">\${role==='assistant'?'克':'瑶'}</div>
-    <div class="bubble">\${esc(text)}</div>
-    <div class="time">\${time||''}</div>\`;
+  if(role==='assistant'){
+    const p=parseThink(text);
+    let thinkHtml='';
+    if(p.think){
+      const id='tk'+(thinkId++);
+      thinkHtml=\`<div class="think-toggle" onclick="var c=document.getElementById('\${id}');c.classList.toggle('open');this.classList.toggle('open')"><span class="arrow">▸</span> 思考过程</div><div class="think-content" id="\${id}">\${esc(p.think)}</div>\`;
+    }
+    div.innerHTML=\`
+      <div class="avatar">克</div>
+      <div class="bubble">\${thinkHtml}\${esc(p.body)}</div>
+      <div class="time">\${time||''}</div>\`;
+  }else{
+    div.innerHTML=\`
+      <div class="avatar">瑶</div>
+      <div class="bubble">\${esc(text)}</div>
+      <div class="time">\${time||''}</div>\`;
+  }
   msgBox.appendChild(div);
   msgBox.scrollTop=msgBox.scrollHeight;
 }
