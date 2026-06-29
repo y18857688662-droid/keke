@@ -21,6 +21,33 @@ function readAuth() {
 function writeAuth(data) {
   fs.writeFileSync(AUTH_FILE, JSON.stringify(data));
 }
+async function refreshOmbreToken() {
+  const auth = readAuth();
+  const rt = auth.refresh_token || process.env.OMBRE_REFRESH_TOKEN;
+  if (!rt) return false;
+  try {
+    const r = await fetch(`${OMBRE_URL}/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: rt,
+        client_id: OMBRE_CLIENT_ID
+      })
+    });
+    const data = await r.json();
+    if (data.access_token) {
+      const authData = { access_token: data.access_token, ts: Date.now() };
+      if (data.refresh_token) authData.refresh_token = data.refresh_token;
+      else authData.refresh_token = rt;
+      writeAuth(authData);
+      console.log('Ombre token refreshed successfully');
+      return true;
+    }
+    console.error('Ombre refresh failed:', JSON.stringify(data));
+  } catch (e) { console.error('Ombre refresh error:', e.message); }
+  return false;
+}
 
 function readAppNotify() {
   try { return JSON.parse(fs.readFileSync(APP_NOTIFY_FILE, 'utf8')); }
@@ -326,7 +353,10 @@ app.get('/auth/callback', async (req, res) => {
     });
     const data = await r.json();
     if (data.access_token) {
-      writeAuth({ access_token: data.access_token, ts: Date.now() });
+      const authData = { access_token: data.access_token, ts: Date.now() };
+      if (data.refresh_token) authData.refresh_token = data.refresh_token;
+      writeAuth(authData);
+      console.log('Ombre auth saved', data.refresh_token ? '(with refresh token)' : '(no refresh token)');
       res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
         body{background:#F5F0E8;display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,'PingFang SC',sans-serif}
         .card{background:#fff;border-radius:16px;padding:40px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,0.07)}
@@ -340,11 +370,24 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
-async function callOmbreTool(toolName, args) {
+app.get('/auth/refresh-token', (req, res) => {
   const auth = readAuth();
-  if (!auth.access_token) return null;
+  if (auth.refresh_token) {
+    res.json({ ok: true, refresh_token: auth.refresh_token });
+  } else {
+    res.json({ ok: false, error: 'no refresh token, please authorize first' });
+  }
+});
+
+async function callOmbreTool(toolName, args) {
+  let auth = readAuth();
+  if (!auth.access_token) {
+    const ok = await refreshOmbreToken();
+    if (!ok) return null;
+    auth = readAuth();
+  }
   try {
-    const r = await fetch(`${OMBRE_URL}/mcp`, {
+    let r = await fetch(`${OMBRE_URL}/mcp`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -357,7 +400,19 @@ async function callOmbreTool(toolName, args) {
         params: { name: toolName, arguments: args || {} }
       })
     });
-    const data = await r.json();
+    let data = await r.json();
+    if (data.error && (data.error.code === -32001 || r.status === 401)) {
+      const ok = await refreshOmbreToken();
+      if (ok) {
+        auth = readAuth();
+        r = await fetch(`${OMBRE_URL}/mcp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + auth.access_token },
+          body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: toolName, arguments: args || {} } })
+        });
+        data = await r.json();
+      }
+    }
     if (data.result?.content) {
       return data.result.content.map(c => c.text || '').join('\n');
     }
@@ -1543,6 +1598,12 @@ async function summon(){
 </html>`);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
+  const auth = readAuth();
+  if (!auth.access_token) {
+    console.log('No Ombre auth found, attempting auto-refresh...');
+    const ok = await refreshOmbreToken();
+    console.log(ok ? 'Ombre auto-connected!' : 'Ombre auto-refresh failed (need manual auth)');
+  }
 });
