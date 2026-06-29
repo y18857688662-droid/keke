@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { MsEdgeTTS } = require('msedge-tts');
+const https = require('https');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const PING_FILE = path.join(__dirname, 'pings.json');
@@ -428,6 +428,16 @@ app.post('/setup/api', (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/setup/minimax', (req, res) => {
+  const { key, group } = req.body;
+  if (!key || !group) return res.status(400).json({ error: 'need key and group' });
+  const cfg = readApiConfig();
+  cfg.minimax_key = key;
+  cfg.minimax_group = group;
+  writeApiConfig(cfg);
+  res.json({ ok: true });
+});
+
 app.post('/setup/pro', (req, res) => {
   const cfg = readApiConfig();
   cfg.pro_mode = !cfg.pro_mode;
@@ -649,17 +659,28 @@ app.get('/chat/history', (req, res) => {
 app.post('/chat/tts', async (req, res) => {
   const text = (req.body.text || '').trim().slice(0, 500);
   if (!text) return res.status(400).json({ error: 'empty' });
+  const cfg = readApiConfig();
+  const mmKey = cfg.minimax_key;
+  const mmGroup = cfg.minimax_group;
+  if (!mmKey || !mmGroup) return res.status(500).json({ error: 'minimax not configured' });
   try {
-    const tts = new MsEdgeTTS();
-    await tts.setMetadata('zh-CN-YunxiNeural', 'audio-24khz-96kbitrate-mono-mp3');
-    const { audioStream } = tts.toStream(text);
-    const chunks = [];
-    await new Promise((resolve, reject) => {
-      audioStream.on('data', c => chunks.push(c));
-      audioStream.on('end', resolve);
-      audioStream.on('error', reject);
+    const payload = JSON.stringify({
+      model: 'speech-01-turbo',
+      text,
+      voice_setting: { voice_id: 'male-qn-qingse', speed: 1.0, vol: 1.0, pitch: 0 }
     });
-    const buf = Buffer.concat(chunks);
+    const url = `https://api.minimax.chat/v1/t2a_v2?GroupId=${mmGroup}`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${mmKey}`, 'Content-Type': 'application/json' },
+      body: payload
+    });
+    const d = await resp.json();
+    if (!d.data || !d.data.audio) {
+      console.error('MiniMax TTS error:', JSON.stringify(d.base_resp));
+      return res.status(500).json({ error: 'tts failed' });
+    }
+    const buf = Buffer.from(d.data.audio, 'hex');
     res.set({ 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
     res.send(buf);
   } catch (e) {
@@ -1301,18 +1322,34 @@ async function speakOne(text){
   const clean=text.replace(/<[^>]*>/g,'').slice(0,500);
   if(!clean)return;
   console.log('[call] speaking:',clean.slice(0,30));
-  return new Promise((resolve)=>{
+  try{
+    const r=await fetch('/chat/tts',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:clean})});
+    if(r.ok){
+      const blob=await r.blob();
+      const ctx=ensureTtsCtx();
+      const arrayBuf=await blob.arrayBuffer();
+      const audioBuf=await ctx.decodeAudioData(arrayBuf);
+      await new Promise((resolve)=>{
+        const source=ctx.createBufferSource();
+        source.buffer=audioBuf;source.connect(ctx.destination);source.start(0);
+        const safety=setTimeout(resolve,audioBuf.duration*1000+3000);
+        source.onended=()=>{clearTimeout(safety);resolve();};
+      });
+      console.log('[call] speak done (MiniMax)');
+      return;
+    }
+  }catch(e){console.warn('[call] MiniMax TTS failed:',e);}
+  await new Promise((resolve)=>{
     const u=new SpeechSynthesisUtterance(clean);
     u.lang='zh-CN';u.rate=1.05;u.pitch=0.85;
-    const voices=speechSynthesis.getVoices();
-    const zh=voices.find(v=>v.lang.startsWith('zh'));
-    if(zh)u.voice=zh;
-    u.onend=()=>{console.log('[call] speak done');resolve();};
-    u.onerror=(e)=>{console.error('[call] speak error:',e);resolve();};
+    u.onend=resolve;u.onerror=resolve;
     speechSynthesis.cancel();
     speechSynthesis.speak(u);
     setTimeout(()=>{if(speechSynthesis.speaking)return;resolve();},8000);
   });
+  console.log('[call] speak done (browser)');
 }
 </script>
 </body>
