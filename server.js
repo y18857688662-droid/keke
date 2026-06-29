@@ -195,7 +195,7 @@ function writePings(data) {
 }
 
 async function generateMessage() {
-  const API_KEY = getApiKey();
+  const API_KEY = getApiKey() || process.env.ANTHROPIC_API_KEY || '';
   if (!API_KEY) return null;
 
   const now = new Date(Date.now() + 8 * 3600000);
@@ -966,7 +966,8 @@ app.post('/chat/send', async (req, res) => {
   }
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
-  const chatApiKey = getAnthropicKey() || getApiKey();
+  const directKey = process.env.ANTHROPIC_API_KEY || '';
+  const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
   if (!chatApiKey) {
     return res.json({ ok: true, time, async: true });
   }
@@ -974,12 +975,13 @@ app.post('/chat/send', async (req, res) => {
     const recent = chat.slice(-20);
     const sysPrompt = await getChatSystem();
     let reply;
-    if (getAnthropicKey()) {
+    const anthropicKey = getAnthropicKey() || directKey;
+    if (anthropicKey) {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': getAnthropicKey(),
+          'x-api-key': anthropicKey,
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
