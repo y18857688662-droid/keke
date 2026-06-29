@@ -1188,7 +1188,12 @@ function parseThink(text){
   if(m)return{think:m[1].trim(),body:m[2].trim()};
   return{think:'',body:text};
 }
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\*([^*]+)\\*/g,'<span class="action">$1</span>').replace(/\\n/g,'<br>')}
+function esc(s){
+  s=s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  var actionRe=new RegExp(String.fromCharCode(42)+'([^'+String.fromCharCode(42)+']+)'+String.fromCharCode(42),'g');
+  s=s.replace(actionRe,function(_,t){return '<span class="action">'+t+'</span>';});
+  return s.replace(/\\n/g,'<br>');
+}
 
 function showTyping(){
   let el=document.getElementById('typing-row');
