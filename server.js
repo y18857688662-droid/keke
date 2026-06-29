@@ -428,6 +428,16 @@ app.post('/setup/api', (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/setup/elevenlabs', (req, res) => {
+  const { key, voice } = req.body;
+  if (!key) return res.status(400).json({ error: 'need key' });
+  const cfg = readApiConfig();
+  cfg.elevenlabs_key = key;
+  if (voice) cfg.elevenlabs_voice = voice;
+  writeApiConfig(cfg);
+  res.json({ ok: true });
+});
+
 app.post('/setup/minimax', (req, res) => {
   const { key, group } = req.body;
   if (!key || !group) return res.status(400).json({ error: 'need key and group' });
@@ -660,33 +670,45 @@ app.post('/chat/tts', async (req, res) => {
   const text = (req.body.text || '').trim().slice(0, 500);
   if (!text) return res.status(400).json({ error: 'empty' });
   const cfg = readApiConfig();
+  const elKey = cfg.elevenlabs_key;
+  const elVoice = cfg.elevenlabs_voice || 'pNInz6obpgDQGcFmaJgB';
+  if (elKey) {
+    try {
+      const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
+        method: 'POST',
+        headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: { stability: 0.35, similarity_boost: 0.75, style: 0.3 }
+        })
+      });
+      if (resp.ok) {
+        const buf = Buffer.from(await resp.arrayBuffer());
+        res.set({ 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
+        return res.send(buf);
+      }
+      console.error('ElevenLabs error:', resp.status, await resp.text());
+    } catch (e) { console.error('ElevenLabs TTS error:', e.message); }
+  }
   const mmKey = cfg.minimax_key;
   const mmGroup = cfg.minimax_group;
-  if (!mmKey || !mmGroup) return res.status(500).json({ error: 'minimax not configured' });
-  try {
-    const payload = JSON.stringify({
-      model: 'speech-01-turbo',
-      text,
-      voice_setting: { voice_id: 'male-qn-badao', speed: 0.9, vol: 1.0, pitch: -2 }
-    });
-    const url = `https://api.minimax.chat/v1/t2a_v2?GroupId=${mmGroup}`;
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${mmKey}`, 'Content-Type': 'application/json' },
-      body: payload
-    });
-    const d = await resp.json();
-    if (!d.data || !d.data.audio) {
-      console.error('MiniMax TTS error:', JSON.stringify(d.base_resp));
-      return res.status(500).json({ error: 'tts failed' });
-    }
-    const buf = Buffer.from(d.data.audio, 'hex');
-    res.set({ 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
-    res.send(buf);
-  } catch (e) {
-    console.error('TTS error:', e.message);
-    res.status(500).json({ error: 'tts failed' });
+  if (mmKey && mmGroup) {
+    try {
+      const resp = await fetch(`https://api.minimax.chat/v1/t2a_v2?GroupId=${mmGroup}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${mmKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'speech-01-turbo', text, voice_setting: { voice_id: 'male-qn-badao', speed: 0.9, vol: 1.0, pitch: -2 } })
+      });
+      const d = await resp.json();
+      if (d.data && d.data.audio) {
+        const buf = Buffer.from(d.data.audio, 'hex');
+        res.set({ 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
+        return res.send(buf);
+      }
+    } catch (e) { console.error('MiniMax TTS error:', e.message); }
   }
+  res.status(500).json({ error: 'tts failed' });
 });
 
 app.get('/chat', (req, res) => {
