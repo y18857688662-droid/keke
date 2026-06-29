@@ -1293,22 +1293,32 @@ async function drainSpeakQueue(){
 }
 
 async function speakOne(text){
+  const clean=text.replace(/<[^>]*>/g,'').slice(0,500);
+  if(!clean)return;
   try{
     const r=await fetch('/chat/tts',{method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text:text.replace(/<[^>]*>/g,'').slice(0,500)})});
-    if(!r.ok)return;
-    const blob=await r.blob();
-    const ctx=ensureTtsCtx();
-    const arrayBuf=await blob.arrayBuffer();
-    const audioBuf=await ctx.decodeAudioData(arrayBuf);
-    await new Promise((resolve)=>{
-      const source=ctx.createBufferSource();
-      source.buffer=audioBuf;source.connect(ctx.destination);source.start(0);
-      const safety=setTimeout(resolve,audioBuf.duration*1000+3000);
-      source.onended=()=>{clearTimeout(safety);resolve();};
-    });
-  }catch(e){console.error('TTS play error:',e);}
+      body:JSON.stringify({text:clean})});
+    if(r.ok){
+      const blob=await r.blob();
+      const ctx=ensureTtsCtx();
+      const arrayBuf=await blob.arrayBuffer();
+      const audioBuf=await ctx.decodeAudioData(arrayBuf);
+      await new Promise((resolve)=>{
+        const source=ctx.createBufferSource();
+        source.buffer=audioBuf;source.connect(ctx.destination);source.start(0);
+        const safety=setTimeout(resolve,audioBuf.duration*1000+3000);
+        source.onended=()=>{clearTimeout(safety);resolve();};
+      });
+      return;
+    }
+  }catch(e){console.warn('Edge TTS failed, falling back to browser TTS');}
+  await new Promise((resolve)=>{
+    const u=new SpeechSynthesisUtterance(clean);
+    u.lang='zh-CN';u.rate=1.0;u.pitch=0.9;
+    u.onend=resolve;u.onerror=resolve;
+    speechSynthesis.speak(u);
+  });
 }
 </script>
 </body>
