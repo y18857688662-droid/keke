@@ -2101,6 +2101,188 @@ async function summon(){
 </html>`);
 });
 
+// === VPS Auth Relay ===
+let authRelay = { code: '', url: '', ts: 0 };
+
+app.get('/auth', (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VPS 认证助手</title>
+<style>
+body{font-family:system-ui;max-width:600px;margin:0 auto;padding:20px;background:#1a1a2e;color:#e0e0e0}
+h1{color:#ff6b9d;text-align:center}
+.step{background:#16213e;border-radius:12px;padding:16px;margin:16px 0}
+.step h2{color:#64ffda;font-size:1.1em;margin-top:0}
+textarea{width:100%;height:80px;border-radius:8px;border:2px solid #333;padding:10px;font-size:14px;background:#0a0a1a;color:#fff;box-sizing:border-box}
+button{width:100%;padding:14px;background:#ff6b9d;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:bold;margin-top:8px;cursor:pointer}
+button:active{background:#e0527d}
+.status{text-align:center;color:#64ffda;margin:12px 0;font-size:14px}
+#urlLink{word-break:break-all;color:#64ffda}
+</style></head><body>
+<h1>VPS Claude Code 认证</h1>
+<div class="step"><h2>Step 1: 打开认证链接</h2><p>在 VPS 上运行 claude 后，链接会显示在这里：</p><p id="urlArea"><span style="color:#999">等待 VPS 发送链接…</span></p></div>
+<div class="step"><h2>Step 2: 粘贴 Authentication Code</h2><p>打开上面的链接登录后，把页面上的 code 粘贴到这里：</p>
+<textarea id="code" placeholder="把 Authentication Code 粘贴到这里"></textarea>
+<button onclick="submitCode()">提交 Code</button></div>
+<div class="status" id="status"></div>
+<script>
+async function submitCode(){
+  const code=document.getElementById('code').value.trim();
+  if(!code){alert('请先粘贴 code');return}
+  try{
+    await fetch('/auth/code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+    document.getElementById('status').textContent='✅ Code 已提交！VPS 会自动读取';
+  }catch(e){document.getElementById('status').textContent='提交失败，请重试'}
+}
+setInterval(async()=>{
+  try{const r=await fetch('/auth/url');const d=await r.json();
+  if(d.url){document.getElementById('urlArea').innerHTML='<a id="urlLink" href="'+d.url+'" target="_blank">👉 点击打开认证链接</a>'}}catch(e){}
+},3000);
+</script></body></html>`);
+});
+
+app.post('/auth/code', (req, res) => {
+  authRelay.code = (req.body.code || '').trim();
+  authRelay.ts = Date.now();
+  res.json({ ok: true });
+});
+
+app.get('/auth/code', (req, res) => {
+  res.json({ code: authRelay.code });
+});
+
+app.post('/auth/url', (req, res) => {
+  authRelay.url = (req.body.url || '').trim();
+  res.json({ ok: true });
+});
+
+app.get('/auth/url', (req, res) => {
+  res.json({ url: authRelay.url });
+});
+
+app.get('/vps-auth.sh', (req, res) => {
+  res.type('text/plain').send(`#!/bin/bash
+KEKE="https://keke-production.up.railway.app"
+
+# Clear old data
+curl -s -X POST "$KEKE/auth/code" -H 'Content-Type: application/json' -d '{"code":""}' > /dev/null 2>&1
+curl -s -X POST "$KEKE/auth/url" -H 'Content-Type: application/json' -d '{"url":""}' > /dev/null 2>&1
+
+echo "=== Claude Code VPS 认证助手 ==="
+echo ""
+
+# Check for screen/tmux
+if command -v screen &>/dev/null; then
+  TOOL="screen"
+elif command -v tmux &>/dev/null; then
+  TOOL="tmux"
+else
+  echo "Installing screen..."
+  apt-get install -y screen > /dev/null 2>&1
+  TOOL="screen"
+fi
+
+# Create a Python helper that handles the pty
+python3 << 'PYEOF'
+import pty, os, sys, time, select, subprocess, json, re
+
+def get_code():
+    try:
+        r = subprocess.run(['curl', '-s', 'https://keke-production.up.railway.app/auth/code'],
+                          capture_output=True, text=True, timeout=5)
+        d = json.loads(r.stdout)
+        return d.get('code', '')
+    except:
+        return ''
+
+def post_url(url):
+    try:
+        subprocess.run(['curl', '-s', '-X', 'POST',
+                       'https://keke-production.up.railway.app/auth/url',
+                       '-H', 'Content-Type: application/json',
+                       '-d', json.dumps({'url': url})],
+                      capture_output=True, timeout=5)
+    except:
+        pass
+
+print("Starting claude...")
+print("")
+
+master, slave = pty.openpty()
+pid = os.fork()
+
+if pid == 0:
+    os.close(master)
+    os.setsid()
+    os.dup2(slave, 0)
+    os.dup2(slave, 1)
+    os.dup2(slave, 2)
+    os.close(slave)
+    os.execvp('claude', ['claude'])
+    sys.exit(1)
+
+os.close(slave)
+buf = b''
+code_sent = False
+url_sent = False
+
+import termios, tty
+old = termios.tcgetattr(sys.stdin.fileno())
+tty.setraw(sys.stdin.fileno())
+
+try:
+    while True:
+        rlist, _, _ = select.select([master, sys.stdin.fileno()], [], [], 1.0)
+
+        if master in rlist:
+            try:
+                data = os.read(master, 4096)
+                if not data:
+                    break
+                os.write(sys.stdout.fileno(), data)
+                buf += data
+
+                if not url_sent:
+                    text = buf.decode('utf-8', errors='ignore')
+                    m = re.search(r'(https://claude\\.com/\\S+)', text)
+                    if m:
+                        url = m.group(1)
+                        post_url(url)
+                        url_sent = True
+                        os.write(sys.stdout.fileno(), b'\\r\\n>>> URL sent to relay! Open https://keke-production.up.railway.app/auth on phone\\r\\n')
+
+                if not code_sent and b'Paste code' in buf:
+                    os.write(sys.stdout.fileno(), b'\\r\\n>>> Waiting for code from relay...\\r\\n')
+                    for _ in range(300):
+                        code = get_code()
+                        if code:
+                            os.write(master, (code + '\\n').encode())
+                            code_sent = True
+                            os.write(sys.stdout.fileno(), b'\\r\\n>>> Code received and entered!\\r\\n')
+                            break
+                        time.sleep(2)
+                    if not code_sent:
+                        os.write(sys.stdout.fileno(), b'\\r\\n>>> Timeout waiting for code\\r\\n')
+            except OSError:
+                break
+
+        if sys.stdin.fileno() in rlist:
+            try:
+                data = os.read(sys.stdin.fileno(), 1024)
+                if data:
+                    os.write(master, data)
+            except OSError:
+                break
+finally:
+    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old)
+    try:
+        os.kill(pid, 9)
+        os.waitpid(pid, 0)
+    except:
+        pass
+PYEOF
+`);
+});
+
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   let auth = readAuth();
