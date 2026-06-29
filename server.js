@@ -379,6 +379,15 @@ app.get('/auth/refresh-token', (req, res) => {
   }
 });
 
+app.get('/auth/token', (req, res) => {
+  const auth = readAuth();
+  if (auth.access_token) {
+    res.json({ ok: true, token: auth.access_token });
+  } else {
+    res.json({ ok: false, error: 'not authorized' });
+  }
+});
+
 async function callOmbreTool(toolName, args) {
   let auth = readAuth();
   if (!auth.access_token) {
@@ -1600,10 +1609,17 @@ async function summon(){
 
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
-  const auth = readAuth();
+  let auth = readAuth();
+  if (!auth.access_token && process.env.OMBRE_TOKEN) {
+    console.log('Restoring Ombre auth from env var...');
+    writeAuth({ access_token: process.env.OMBRE_TOKEN, ts: Date.now() });
+    auth = readAuth();
+  }
   if (!auth.access_token) {
     console.log('No Ombre auth found, attempting auto-refresh...');
     const ok = await refreshOmbreToken();
     console.log(ok ? 'Ombre auto-connected!' : 'Ombre auto-refresh failed (need manual auth)');
+  } else {
+    console.log('Ombre auth ready');
   }
 });
