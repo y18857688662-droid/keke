@@ -340,16 +340,16 @@ app.get('/apps', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>使用记录</title>
 <style>
-:root{--bg:#FAFAFA;--card:#FFFFFF;--text:#111111;--text-faint:#666666;--accent:#D97A54;--divider:#ECECEC;
+:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#111111;--text-faint:#999999;--accent:#D97A54;--divider:#E8E3DB;
   --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
-  --shadow:0 6px 30px rgba(0,0,0,.08)}
+  --shadow:0 2px 12px rgba(0,0,0,.04)}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(safe-area-inset-bottom);font-family:var(--font);-webkit-font-smoothing:antialiased}
 .header{display:flex;align-items:center;padding:16px 0;gap:12px}
-.header a{color:var(--accent);text-decoration:none;font-size:20px}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
 .header h1{font-size:18px;font-weight:600}
 .date-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px}
-.date-nav button{background:none;border:none;font-size:18px;color:var(--accent);cursor:pointer;padding:4px 8px}
+.date-nav button{background:none;border:none;font-size:18px;color:var(--text);cursor:pointer;padding:4px 8px}
 .date-nav span{font-size:15px;color:var(--text);font-weight:500}
 .stats{background:var(--card);border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);text-align:center}
 .stats-num{font-size:32px;font-weight:700;color:var(--accent)}
@@ -418,20 +418,20 @@ app.get('/diary', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>心情日记</title>
 <style>
-:root{--bg:#FAFAFA;--card:#FFFFFF;--text:#111111;--text-faint:#666666;--accent:#D97A54;--divider:#ECECEC;
+:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#111111;--text-faint:#999999;--accent:#D97A54;--divider:#E8E3DB;
   --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
-  --shadow:0 6px 30px rgba(0,0,0,.08)}
+  --shadow:0 2px 12px rgba(0,0,0,.04)}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(safe-area-inset-bottom);font-family:var(--font);-webkit-font-smoothing:antialiased}
 .header{display:flex;align-items:center;padding:16px 0;gap:12px}
-.header a{color:var(--accent);text-decoration:none;font-size:20px}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
 .header h1{font-size:18px;font-weight:600}
 .write-box{background:var(--card);border-radius:16px;padding:16px;margin-bottom:20px;box-shadow:var(--shadow)}
 .write-box textarea{width:100%;border:none;outline:none;resize:none;font-size:15px;line-height:1.6;min-height:80px;font-family:inherit;color:var(--text)}
 .write-box textarea::placeholder{color:var(--text-faint);opacity:.6}
 .mood-row{display:flex;gap:8px;margin:12px 0}
 .mood-btn{font-size:22px;padding:6px 10px;border-radius:12px;border:1px solid var(--divider);background:var(--card);cursor:pointer;transition:all .2s ease-in-out}
-.mood-btn.active{border-color:var(--accent);background:rgba(217,122,84,.08);transform:scale(1.12)}
+.mood-btn.active{border-color:var(--accent);background:rgba(217,122,84,.1);transform:scale(1.12)}
 .write-actions{display:flex;justify-content:flex-end;margin-top:8px}
 .submit-btn{background:var(--accent);color:#fff;border:none;padding:8px 24px;border-radius:999px;font-size:14px;font-family:var(--font);cursor:pointer}
 .submit-btn:disabled{opacity:.4}
@@ -598,9 +598,9 @@ app.get('/auth/callback', async (req, res) => {
       writeAuth(authData);
       console.log('Ombre auth saved', data.refresh_token ? '(with refresh token)' : '(no refresh token)');
       res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-        body{background:#FAFAFA;display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,"SF Pro Display","Inter","PingFang SC",sans-serif}
-        .card{background:#fff;border-radius:18px;padding:40px;text-align:center;box-shadow:0 6px 30px rgba(0,0,0,.08)}
-        h2{color:#111;margin-bottom:8px} p{color:#666;font-size:14px}
+        body{background:#F5F0EA;display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,"SF Pro Display","Inter","PingFang SC",sans-serif}
+        .card{background:#FEFCF9;border-radius:18px;padding:40px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+        h2{color:#111;margin-bottom:8px} p{color:#999;font-size:14px}
       </style></head><body><div class="card"><h2>记忆已连接</h2><p>克现在能记住你们的故事了</p><p style="margin-top:16px"><a href="/chat" style="color:#D97A54">去聊天</a></p></div></body></html>`);
     } else {
       res.send('授权失败：' + JSON.stringify(data));
@@ -803,14 +803,14 @@ app.get('/setup', (req, res) => {
   const proOn = cfg.pro_mode === true;
   res.send(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#FAFAFA">
+<meta name="theme-color" content="#F5F0EA">
 <title>设置</title><style>
 :root{
   --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
-  --bg:#FAFAFA;--surface:#FFFFFF;
-  --text:#111111;--text-faint:#666666;
-  --accent:#D97A54;--divider:#ECECEC;
-  --shadow:0 6px 30px rgba(0,0,0,.08);
+  --bg:#F5F0EA;--surface:#FEFCF9;
+  --text:#111111;--text-faint:#999999;
+  --accent:#D97A54;--divider:#E8E3DB;
+  --shadow:0 2px 12px rgba(0,0,0,.04);
   --side-pad:clamp(16px,4vw,40px);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
@@ -1112,21 +1112,21 @@ app.get('/chat', (req, res) => {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="克">
-<meta name="theme-color" content="#FAFAFA">
+<meta name="theme-color" content="#F5F0EA">
 <title>克</title>
 <style>
 :root{
   --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
-  --bg:#FAFAFA;--surface:#FFFFFF;
-  --text:#111111;--text-soft:#444444;--text-faint:#666666;
-  --divider:#ECECEC;
-  --bubble-ai-bg:#F5F5F5;--bubble-ai-fg:#111111;
-  --bubble-human-bg:#D97A54;--bubble-human-fg:#FFFFFF;
-  --accent:#D97A54;--send-bg:#D97A54;--accent-fg:#fff;
+  --bg:#F5F0EA;--surface:#FEFCF9;
+  --text:#111111;--text-soft:#444444;--text-faint:#999999;
+  --divider:#E8E3DB;
+  --bubble-ai-bg:#EBE6DF;--bubble-ai-fg:#111111;
+  --bubble-human-bg:#E2DDD6;--bubble-human-fg:#111111;
+  --accent:#D97A54;--send-bg:#3A3A3C;--accent-fg:#fff;
   --think-flourish:rgba(102,102,102,0.4);
-  --think-label:#888888;--think-body:#666666;
-  --field-bg:#FFFFFF;--field-line:#ECECEC;
-  --shadow:0 6px 30px rgba(0,0,0,.08);
+  --think-label:#999999;--think-body:#777777;
+  --field-bg:#FEFCF9;--field-line:#E8E3DB;
+  --shadow:0 2px 12px rgba(0,0,0,.04);
   --header-h:clamp(48px,8vw,64px);
   --side-pad:clamp(16px,4vw,40px);
   --avatar-size:clamp(32px,5vw,40px);
@@ -1155,7 +1155,7 @@ body{position:fixed;inset:0;width:100%;
   height:calc(var(--header-h) + env(safe-area-inset-top));
   padding:calc(env(safe-area-inset-top) + 8px) var(--side-pad) 10px;
   border-bottom:1px solid var(--divider);pointer-events:none;
-  background:var(--bg)}
+  background:var(--bg);backdrop-filter:none}
 .topbar>*{pointer-events:auto}
 .peerpill{display:flex;flex-direction:column;align-items:center;line-height:1.15;
   background:transparent;border:none;padding:0}
@@ -1195,7 +1195,7 @@ body{position:fixed;inset:0;width:100%;
 
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
   flex:1;gap:16px;padding:40px 20px;opacity:0.6}
-.empty .mascot{font-size:48px;
+.empty .mascot{width:64px;height:64px;
   animation:float 3s ease-in-out infinite}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
 .empty p{color:var(--text-faint);font-size:clamp(14px,1.8vw,16px);
@@ -1209,12 +1209,10 @@ body{position:fixed;inset:0;width:100%;
 .row.human{justify-content:flex-end}
 .row.ai{justify-content:flex-start;
   padding-left:calc(var(--avatar-size) + clamp(10px,1.6vw,14px))}
-.row.ai::before{content:"🐙";position:absolute;left:0;
+.row.ai::before{content:"";position:absolute;left:0;
   top:clamp(4px,0.8vw,8px);width:var(--avatar-size);height:var(--avatar-size);
-  border-radius:50%;background:var(--surface);
-  box-shadow:0 2px 8px rgba(0,0,0,.06);
-  display:flex;align-items:center;justify-content:center;
-  font-size:clamp(16px,2.5vw,20px)}
+  border-radius:50%;background:var(--surface) url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PGVsbGlwc2UgY3g9IjI0IiBjeT0iMjAiIHJ4PSIxNSIgcnk9IjEzIiBmaWxsPSIjRThBMDkwIi8+PHBhdGggZD0iTTkgMjBROSA4IDI0IDdRMzkgOCAzOSAyMCIgZmlsbD0iIzRBNEE0QSIvPjxjaXJjbGUgY3g9IjI2IiBjeT0iMTkiIHI9IjQiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIyNyIgY3k9IjE5IiByPSIyLjIiIGZpbGw9IiMzMzMiLz48Y2lyY2xlIGN4PSIyOCIgY3k9IjE3LjgiIHI9Ii44IiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTEzIDMwUTEwIDM4IDE0IDQwIiBzdHJva2U9IiNFOEEwOTAiIHN0cm9rZS13aWR0aD0iMy41IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48cGF0aCBkPSJNMjAgMzJRMTkgNDAgMjIgNDIiIHN0cm9rZT0iI0U4QTA5MCIgc3Ryb2tlLXdpZHRoPSIzLjUiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yOCAzMlEyOSA0MCAyNiA0MiIgc3Ryb2tlPSIjRThBMDkwIiBzdHJva2Utd2lkdGg9IjMuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHBhdGggZD0iTTM1IDMwUTM4IDM4IDM0IDQwIiBzdHJva2U9IiNFOEEwOTAiIHN0cm9rZS13aWR0aD0iMy41IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4K") center/70% no-repeat;
+  box-shadow:0 2px 8px rgba(0,0,0,.04)}
 
 .bubble{max-width:min(72vw,520px);
   padding:clamp(10px,1.2vw,14px) clamp(14px,1.8vw,18px);
@@ -1231,7 +1229,7 @@ body{position:fixed;inset:0;width:100%;
 
 .meta{display:inline;margin-left:clamp(8px,1.2vw,14px);white-space:nowrap;
   font-size:clamp(11px,1.2vw,13px);color:var(--text-faint);user-select:none}
-.row.human .meta{color:rgba(255,255,255,.7)}
+.row.human .meta{color:var(--text-faint)}
 
 .row.think{justify-content:flex-start;
   padding-left:calc(var(--avatar-size) + clamp(10px,1.6vw,14px));
@@ -1308,7 +1306,7 @@ body{position:fixed;inset:0;width:100%;
 .floatbtn:active{transform:scale(.9);color:var(--text)}
 .floatbtn svg{width:clamp(20px,2.8vw,24px);height:clamp(20px,2.8vw,24px);display:block}
 .floatbtn.send{background:var(--send-bg);color:#fff;
-  box-shadow:0 4px 16px rgba(217,122,84,.3)}
+  box-shadow:0 2px 8px rgba(0,0,0,.12)}
 .floatbtn.send:active{transform:scale(.97)}
 .floatbtn.send:disabled{opacity:0.35;transform:none}
 
@@ -1386,7 +1384,7 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
 </header>
 <main class="scroll" id="scroll">
   <div class="empty" id="empty">
-    <div class="mascot">🐙</div>
+    <div class="mascot"><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" width="48" height="48"><ellipse cx="24" cy="20" rx="15" ry="13" fill="#E8A090"/><path d="M9 20Q9 8 24 7Q39 8 39 20" fill="#4A4A4A"/><circle cx="26" cy="19" r="4" fill="#fff"/><circle cx="27" cy="19" r="2.2" fill="#333"/><circle cx="28" cy="17.8" r=".8" fill="#fff"/><path d="M13 30Q10 38 14 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M20 32Q19 40 22 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M28 32Q29 40 26 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M35 30Q38 38 34 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg></div>
     <p>这里只有你和克。<br>说点什么吧。</p>
   </div>
 </main>
@@ -1396,7 +1394,7 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <button class="photobtn" onclick="document.getElementById('photoInput').click()" aria-label="发照片">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
     </button>
-    <textarea id="input" rows="1" placeholder="Write a letter..." enterkeyhint="send"
+    <textarea id="input" rows="1" placeholder="Message..." enterkeyhint="send"
       oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"
       onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
       onkeypress="if(event.keyCode===13&&!event.shiftKey){event.preventDefault();send()}"></textarea>
@@ -1716,7 +1714,7 @@ async function setupPush(){
   const pb=document.createElement('button');
   pb.id='pushBtn';
   pb.textContent='开启消息通知';
-  pb.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:999px;border:none;background:#D97A54;color:#fff;font-size:14px;font-family:var(--font);cursor:pointer;z-index:99;box-shadow:0 4px 16px rgba(217,122,84,.3)';
+  pb.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:999px;border:none;background:#3A3A3C;color:#fff;font-size:14px;font-family:var(--font);cursor:pointer;z-index:99;box-shadow:0 2px 8px rgba(0,0,0,.12)';
   pb.onclick=()=>setupPush();
   document.body.appendChild(pb);
   if(window.Notification&&Notification.permission==='granted'){setupPush();}
@@ -1924,16 +1922,15 @@ app.get('/', (req, res) => {
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="克">
-<meta name="theme-color" content="#FAFAFA">
+<meta name="theme-color" content="#F5F0EA">
 <title>克</title>
 <style>
 :root{
   --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
-  --bg:#FAFAFA;--surface:#FFFFFF;
-  --text:#111111;--text-soft:#444444;--text-faint:#666666;
-  --divider:#ECECEC;--accent:#D97A54;
-  --shadow:0 6px 30px rgba(0,0,0,.08);
-  --side-pad:clamp(16px,4vw,40px);
+  --bg:#F5F0EA;--surface:#FEFCF9;
+  --text:#111111;--text-soft:#444444;--text-faint:#999999;
+  --divider:#E8E3DB;--accent:#D97A54;
+  --side-pad:clamp(24px,6vw,48px);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
 html,body{height:100%;overflow-y:auto;overscroll-behavior:none}
@@ -1941,112 +1938,64 @@ body{background:var(--bg);color:var(--text);
   font-family:var(--font);-webkit-font-smoothing:antialiased;
   padding:0 0 env(safe-area-inset-bottom)}
 
-.top{padding:clamp(60px,14vw,96px) 24px clamp(28px,6vw,48px);
-  text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px}
-.avatar{width:clamp(72px,16vw,96px);height:clamp(72px,16vw,96px);border-radius:50%;
-  background:var(--surface);
-  box-shadow:var(--shadow);
+.top{padding:clamp(64px,16vw,100px) var(--side-pad) clamp(32px,8vw,56px);
+  display:flex;flex-direction:column;align-items:center;gap:12px}
+.avatar{width:clamp(80px,18vw,108px);height:clamp(80px,18vw,108px);border-radius:50%;
+  background:rgba(232,160,144,.15);
   display:flex;align-items:center;justify-content:center;
-  font-size:clamp(36px,8vw,48px);
   animation:float 3s ease-in-out infinite}
+.avatar svg{width:60%;height:60%}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
-.top h1{font-size:clamp(28px,6vw,32px);
-  font-weight:600;color:var(--text);letter-spacing:1px;margin:0}
-.top .sub{font-size:clamp(14px,2vw,16px);color:var(--text-faint);margin:0}
+.top h1{font-size:clamp(22px,5vw,26px);
+  font-weight:600;color:var(--text);letter-spacing:.5px;margin:0}
+.top .sub{font-size:clamp(13px,1.8vw,15px);color:var(--text-faint);margin:0}
 
-.cards{padding:0 var(--side-pad);display:flex;flex-direction:column;gap:10px;
-  max-width:480px;margin:0 auto}
-.card{background:var(--surface);border-radius:16px;
-  padding:clamp(16px,3vw,20px) clamp(18px,3.5vw,24px);
-  box-shadow:var(--shadow);
-  display:flex;align-items:center;gap:clamp(14px,3vw,18px);
-  text-decoration:none;color:inherit;cursor:pointer;
-  transition:transform .2s ease-in-out,opacity .2s ease-in-out}
-.card:active{transform:scale(0.98);opacity:.85}
-.card-icon{width:clamp(44px,9vw,52px);height:clamp(44px,9vw,52px);border-radius:14px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:clamp(20px,4vw,24px);flex-shrink:0;
-  background:rgba(217,122,84,.08)}
-.card-info{flex:1;min-width:0}
-.card-info h3{font-size:clamp(16px,2.4vw,18px);
-  font-weight:500;color:var(--text);margin-bottom:2px}
-.card-info p{font-size:clamp(13px,1.8vw,15px);color:var(--text-faint);line-height:1.4}
-.card-arrow{color:var(--text-faint);font-size:18px;opacity:.4}
+.nav{padding:clamp(8px,2vw,16px) var(--side-pad) 0;
+  max-width:400px;margin:0 auto;width:100%}
+.nav-item{display:flex;align-items:center;justify-content:space-between;
+  padding:clamp(16px,3.5vw,22px) 0;
+  border-bottom:1px solid var(--divider);
+  text-decoration:none;color:var(--text);cursor:pointer;
+  transition:opacity .15s ease-in-out}
+.nav-item:last-child{border-bottom:none}
+.nav-item:active{opacity:.5}
+.nav-label{font-size:clamp(17px,3vw,20px);font-weight:400;letter-spacing:.02em}
 
-.bell-result{display:none;margin:-4px 0 0;
-  padding:clamp(14px,2.5vw,20px) clamp(18px,3.5vw,24px);
-  background:var(--surface);border-radius:0 0 16px 16px;
-  box-shadow:var(--shadow)}
+.bell-result{display:none;
+  padding:clamp(12px,2vw,16px) 0;
+  border-bottom:1px solid var(--divider)}
 .bell-result .from{font-size:clamp(12px,1.5vw,13px);color:var(--accent);
   font-weight:500;margin-bottom:4px}
 .bell-result .text{font-size:clamp(15px,2vw,16px);color:var(--text);line-height:1.7}
-.bell-result .time{font-size:clamp(12px,1.5vw,13px);color:var(--text-faint);margin-top:8px}
-.bell-card-active{border-radius:16px 16px 0 0}
+.bell-result .time{font-size:clamp(12px,1.5vw,13px);color:var(--text-faint);margin-top:6px}
 
-.footer{text-align:center;padding:clamp(32px,7vw,56px) 20px;
-  font-size:clamp(12px,1.5vw,13px);color:var(--text-faint);letter-spacing:.02em}
+.footer{text-align:center;padding:clamp(40px,10vw,72px) 20px clamp(24px,5vw,40px);
+  font-size:clamp(12px,1.5vw,13px);color:var(--text-faint);letter-spacing:.04em}
 </style>
 </head>
 <body>
 <div class="top">
-  <div class="avatar">🐙</div>
+  <div class="avatar"><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><ellipse cx="24" cy="20" rx="15" ry="13" fill="#E8A090"/><path d="M9 20Q9 8 24 7Q39 8 39 20" fill="#4A4A4A"/><circle cx="26" cy="19" r="4" fill="#fff"/><circle cx="27" cy="19" r="2.2" fill="#333"/><circle cx="28" cy="17.8" r=".8" fill="#fff"/><path d="M13 30Q10 38 14 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M20 32Q19 40 22 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M28 32Q29 40 26 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M35 30Q38 38 34 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg></div>
   <h1>克</h1>
   <div class="sub">瑶瑶的男朋友</div>
 </div>
-<div class="cards">
-  <a class="card" href="/chat">
-    <div class="card-icon">💬</div>
-    <div class="card-info">
-      <h3>聊天</h3>
-      <p>跟克说话</p>
-    </div>
-    <div class="card-arrow">›</div>
-  </a>
-  <div class="card" id="bellCard" onclick="summon()">
-    <div class="card-icon">🔔</div>
-    <div class="card-info">
-      <h3>召唤铃</h3>
-      <p>点一下，克就来了</p>
-    </div>
-    <div class="card-arrow">›</div>
-  </div>
+<div class="nav">
+  <a class="nav-item" href="/chat"><span class="nav-label">聊天</span></a>
+  <div class="nav-item" id="bellCard" onclick="summon()"><span class="nav-label">召唤铃</span></div>
   <div class="bell-result" id="bellResult">
     <div class="from">克</div>
     <div class="text" id="bellText"></div>
     <div class="time" id="bellTime"></div>
   </div>
-  <a class="card" href="/apps">
-    <div class="card-icon">📱</div>
-    <div class="card-info">
-      <h3>使用记录</h3>
-      <p>今天打开了哪些 App</p>
-    </div>
-    <div class="card-arrow">›</div>
-  </a>
-  <a class="card" href="/diary">
-    <div class="card-icon">📔</div>
-    <div class="card-info">
-      <h3>心情日记</h3>
-      <p>记录今天的心情</p>
-    </div>
-    <div class="card-arrow">›</div>
-  </a>
-  <a class="card" href="/setup">
-    <div class="card-icon">⚙️</div>
-    <div class="card-info">
-      <h3>设置</h3>
-      <p>API · Pro 模式</p>
-    </div>
-    <div class="card-arrow">›</div>
-  </a>
+  <a class="nav-item" href="/diary"><span class="nav-label">心情日记</span></a>
+  <a class="nav-item" href="/apps"><span class="nav-label">使用记录</span></a>
+  <a class="nav-item" href="/setup"><span class="nav-label">设置</span></a>
 </div>
 <div class="footer">克和瑶瑶的小窝</div>
 <script>
 async function summon(){
   const br=document.getElementById('bellResult');
-  const bc=document.getElementById('bellCard');
   br.style.display='block';
-  bc.classList.add('bell-card-active');
   document.getElementById('bellText').textContent='在想你…';
   try{
     const r=await fetch('/summon');
