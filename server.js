@@ -1223,10 +1223,12 @@ body{position:fixed;inset:0;width:100%;
   animation:msgIn .25s ease-in-out both}
 @keyframes msgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .row.ai .bubble{background:transparent;color:var(--bubble-ai-fg);
-  padding-left:0;padding-right:0;max-width:min(88vw,660px);border-radius:0}
+  padding-left:0;padding-right:0;max-width:min(88vw,660px);border-radius:0;
+  word-break:break-word;overflow-wrap:anywhere}
 .row.human .bubble{background:var(--bubble-human-bg);color:var(--bubble-human-fg);
   padding:clamp(10px,1.2vw,14px) clamp(14px,1.8vw,18px);
-  border-radius:20px;max-width:min(72vw,520px)}
+  border-radius:20px;max-width:min(72vw,520px);
+  word-break:break-word;overflow-wrap:anywhere}
 .row.ai.tail .bubble{border-bottom-left-radius:0}
 .row.human.tail .bubble{border-bottom-right-radius:6px}
 .bubble .txt{white-space:normal}
@@ -1237,46 +1239,38 @@ body{position:fixed;inset:0;width:100%;
 .row.ai .meta{margin-left:0;margin-top:4px;display:block;opacity:.5}
 
 .row.think{justify-content:flex-start;
-  padding-left:calc(var(--avatar-size) + clamp(10px,1.6vw,14px));
-  margin-top:clamp(6px,1vw,10px);margin-bottom:clamp(8px,1.4vw,14px)}
-.row.think.think-open{justify-content:center;padding-left:0;
-  margin-top:clamp(16px,2.8vw,28px);margin-bottom:clamp(14px,2.4vw,22px)}
-.think-block{width:min(72vw,520px);max-width:min(72vw,520px);
+  padding-left:calc(var(--avatar-size) + clamp(12px,1.8vw,16px));
+  margin-top:clamp(6px,1vw,10px);margin-bottom:clamp(4px,0.8vw,8px)}
+.row.think.think-open{justify-content:flex-start;
+  margin-top:clamp(8px,1.4vw,12px);margin-bottom:clamp(6px,1vw,10px)}
+.think-block{width:min(88vw,660px);max-width:min(88vw,660px);
   color:var(--think-body);text-align:left;
-  animation:msgIn .25s ease-in-out both}
-.think-block.open{width:100%;max-width:min(100%,720px);text-align:center}
+  animation:msgIn .25s ease-in-out both;
+  border-left:2px solid var(--divider);padding-left:clamp(12px,1.6vw,16px)}
+.think-block.open{width:min(88vw,660px);max-width:min(88vw,660px);text-align:left}
 .think-toggle{appearance:none;-webkit-appearance:none;width:auto;max-width:100%;
   padding:0;border:0;background:transparent;color:inherit;font:inherit;
-  cursor:pointer;display:inline-flex;align-items:center}
-.think-block.open .think-toggle{width:100%;display:flex;flex-direction:column;
-  align-items:center;gap:clamp(8px,1.6vw,12px)}
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.think-block.open .think-toggle{width:100%;display:flex;flex-direction:row;
+  align-items:center;gap:6px}
 .think-caption{display:inline-flex;align-items:center;justify-content:flex-start;
   gap:6px;color:var(--think-label);
-  font-size:clamp(12px,1.4vw,14px);line-height:1.1;
+  font-size:clamp(12px,1.4vw,13px);line-height:1.1;
   transition:color var(--motion-fast) var(--ease)}
-.think-caption-star,.think-state{color:var(--think-flourish);font-size:1.18em;line-height:1}
-.think-state::before{content:"✧"}
-.think-block.open .think-state::before{content:"✦"}
-.think-block.open .think-caption-star{display:none}
-.think-rule{display:none;position:relative;width:100%;height:1px;color:var(--think-flourish)}
-.think-block.open .think-rule{display:block}
-.think-rule::before{content:"";position:absolute;
-  left:clamp(22px,6vw,64px);right:clamp(22px,6vw,64px);top:0;height:1px;
-  background:linear-gradient(90deg,transparent,var(--divider) 16%,var(--divider) 84%,transparent)}
+.think-chevron{display:inline-flex;width:14px;height:14px;color:var(--think-label);
+  transition:transform .2s var(--ease)}
+.think-block.open .think-chevron{transform:rotate(90deg)}
+.think-caption-star,.think-state{display:none}
+.think-rule{display:none}
 .think-body[hidden]{display:none!important}
-.think-body{margin-top:clamp(10px,2vw,16px)}
+.think-body{margin-top:clamp(8px,1.2vw,12px)}
 .row.narration{justify-content:center;padding:2px 0}
 .row.narration .bubble{background:none;box-shadow:none;font-style:italic;color:var(--text-faint);font-size:0.85em;opacity:0.7;padding:2px 12px}
-.think-text{width:min(82%,520px);margin:0 auto clamp(14px,2.4vw,20px);
+.think-text{width:100%;margin:0 0 clamp(8px,1.2vw,12px);
   color:var(--think-body);
-  font-size:clamp(13px,1.4vw,14px);line-height:1.72;
-  text-align:center;white-space:normal;overflow-wrap:break-word}
-.think-starline{position:relative;width:100%;height:24px;
-  display:flex;align-items:center;justify-content:center;color:var(--think-flourish)}
-.think-starline::before,.think-starline::after{content:"";position:absolute;top:50%;
-  height:1px;background:linear-gradient(90deg,transparent,var(--divider) 15%,var(--divider) 85%,transparent)}
-.think-starline::before{left:0;right:calc(50% + 34px)}
-.think-starline::after{left:calc(50% + 34px);right:0}
+  font-size:clamp(13px,1.4vw,14px);line-height:1.65;
+  text-align:left;white-space:normal;overflow-wrap:break-word}
+.think-starline{display:none}
 
 .composer{position:fixed;left:0;right:0;bottom:0;z-index:100;
   width:min(100vw,760px);margin:0 auto;
@@ -1327,18 +1321,55 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
 .header-actions{position:absolute;
   right:calc(var(--side-pad) - 2px);
   top:calc(env(safe-area-inset-top) + clamp(14px,2.5vw,28px));
-  display:flex;align-items:center;height:36px;
-  border:1px solid var(--divider);border-radius:10px;overflow:hidden;
-  background:var(--surface)}
-.topbtn{width:38px;height:34px;border:0;border-right:1px solid var(--divider);padding:0;
+  display:flex;align-items:center;gap:2px}
+.topbtn{width:34px;height:34px;border:0;padding:0;
   background:transparent;color:var(--text-faint);display:grid;place-items:center;
-  cursor:pointer;transition:background .15s var(--ease)}
-.topbtn:last-child{border-right:none}
-.topbtn:active{background:rgba(0,0,0,.04)}
+  cursor:pointer;transition:background .15s var(--ease),color .15s var(--ease);
+  border-radius:8px}
+.topbtn:active{background:rgba(0,0,0,.04);color:var(--text)}
 .topbtn svg{display:block}
-.toolbar-menu{display:none;position:absolute;right:0;top:42px;
+
+.side-toolbar{position:fixed;left:0;top:0;bottom:0;z-index:50;
+  display:flex;flex-direction:column;
+  pointer-events:none}
+.side-toolbar-toggle{pointer-events:auto;position:absolute;
+  left:clamp(8px,2vw,16px);
+  top:calc(env(safe-area-inset-top) + var(--header-h) + 16px);
+  width:36px;height:36px;border-radius:50%;border:1px solid var(--divider);
+  background:var(--surface);color:var(--text-faint);
+  display:grid;place-items:center;cursor:pointer;
+  box-shadow:0 1px 6px rgba(0,0,0,.06);
+  transition:transform .2s var(--ease),background .15s var(--ease);z-index:51}
+.side-toolbar-toggle:active{transform:scale(.9)}
+.side-toolbar-toggle svg{width:18px;height:18px;display:block;
+  transition:transform .25s var(--ease)}
+.side-toolbar.open .side-toolbar-toggle svg{transform:rotate(180deg)}
+
+.side-toolbar-panel{pointer-events:auto;position:absolute;
+  left:clamp(8px,2vw,16px);
+  top:calc(env(safe-area-inset-top) + var(--header-h) + 60px);
+  display:flex;flex-direction:column;gap:4px;
+  background:var(--surface);border:1px solid var(--divider);border-radius:14px;
+  padding:6px;box-shadow:0 4px 20px rgba(0,0,0,.08);
+  opacity:0;transform:translateX(-8px) scale(.95);
+  transition:opacity .2s var(--ease),transform .2s var(--ease);
+  pointer-events:none}
+.side-toolbar.open .side-toolbar-panel{opacity:1;transform:none;pointer-events:auto}
+
+.side-toolbar-panel .side-btn{width:40px;height:40px;border:0;padding:0;
+  background:transparent;color:var(--text-soft);display:grid;place-items:center;
+  cursor:pointer;border-radius:10px;
+  transition:background .15s var(--ease),color .15s var(--ease)}
+.side-toolbar-panel .side-btn:active{background:rgba(0,0,0,.05)}
+.side-toolbar-panel .side-btn svg{width:20px;height:20px;display:block}
+
+.side-toolbar-panel .side-sep{width:28px;height:1px;margin:2px auto;
+  background:var(--divider)}
+
+.toolbar-menu{display:none;position:absolute;left:54px;top:0;
   background:var(--surface);border:1px solid var(--divider);border-radius:12px;
-  padding:6px 0;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,.08);z-index:20}
+  padding:6px 0;min-width:130px;box-shadow:0 4px 20px rgba(0,0,0,.08);z-index:20;
+  white-space:nowrap}
 .toolbar-menu.open{display:block}
 .toolbar-menu a,.toolbar-menu button{display:block;width:100%;padding:10px 16px;
   border:none;background:none;color:var(--text);font-size:14px;font-family:var(--font);
@@ -1400,20 +1431,34 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <button class="topbtn" id="callBtn" onclick="toggleCall()" aria-label="语音通话" title="语音通话">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
     </button>
-    <button class="topbtn" onclick="copyLast()" aria-label="复制" title="复制最新消息">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-    </button>
-    <button class="topbtn" onclick="toggleMenu()" aria-label="更多" title="更多">
-      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
-    </button>
-    <div class="toolbar-menu" id="toolbarMenu">
-      <button onclick="clearChat()">清空聊天</button>
-      <a href="/diary">心情日记</a>
-      <a href="/setup">设置</a>
-      <a href="/">返回首页</a>
-    </div>
   </div>
 </header>
+<div class="side-toolbar" id="sideToolbar">
+  <button class="side-toolbar-toggle" onclick="toggleSideToolbar()" aria-label="工具栏">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="18" height="18"><polyline points="9 6 15 12 9 18"/></svg>
+  </button>
+  <div class="side-toolbar-panel">
+    <button class="side-btn" onclick="copyLast();closeSideToolbar()" title="复制最新消息">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+    </button>
+    <div class="side-sep"></div>
+    <button class="side-btn" onclick="clearChat();closeSideToolbar()" title="清空聊天">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+    </button>
+    <div class="side-sep"></div>
+    <a class="side-btn" href="/diary" title="心情日记">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    </a>
+    <div class="side-sep"></div>
+    <a class="side-btn" href="/setup" title="设置">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    </a>
+    <div class="side-sep"></div>
+    <a class="side-btn" href="/" title="首页">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </a>
+  </div>
+</div>
 <main class="scroll" id="scroll">
   <div class="empty" id="empty">
     <div class="mascot"><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" width="48" height="48"><ellipse cx="24" cy="20" rx="15" ry="13" fill="#E8A090"/><path d="M9 20Q9 8 24 7Q39 8 39 20" fill="#4A4A4A"/><circle cx="26" cy="19" r="4" fill="#fff"/><circle cx="27" cy="19" r="2.2" fill="#333"/><circle cx="28" cy="17.8" r=".8" fill="#fff"/><path d="M13 30Q10 38 14 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M20 32Q19 40 22 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M28 32Q29 40 26 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M35 30Q38 38 34 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg></div>
@@ -1461,8 +1506,9 @@ let sending=false,thinkId=0,lastMsgCount=0;
 const chatStore=[];
 function saveLocal(){try{localStorage.setItem('ke_chat',JSON.stringify(chatStore.slice(-200)));}catch(e){}}
 function loadLocal(){try{return JSON.parse(localStorage.getItem('ke_chat')||'[]');}catch(e){return[];}}
-function toggleMenu(){document.getElementById('toolbarMenu').classList.toggle('open')}
-document.addEventListener('click',function(e){if(!e.target.closest('.header-actions'))document.getElementById('toolbarMenu').classList.remove('open')});
+function toggleSideToolbar(){document.getElementById('sideToolbar').classList.toggle('open')}
+function closeSideToolbar(){document.getElementById('sideToolbar').classList.remove('open')}
+document.addEventListener('click',function(e){if(!e.target.closest('.side-toolbar'))closeSideToolbar()});
 function copyLast(){var last=chatStore.filter(m=>m.role==='assistant').pop();if(last){var t=last.content.replace(/<think>[\\s\\S]*?<\\/think>/,'').trim();navigator.clipboard.writeText(t).catch(()=>{})}}
 function clearChat(){if(confirm('清空所有聊天记录？')){chatStore.length=0;saveLocal();scroll.innerHTML='';empty.style.display='flex';document.getElementById('toolbarMenu').classList.remove('open')}}
 
@@ -1532,13 +1578,11 @@ function addMsg(role,text,time,noSave){
       const id='tk'+(thinkId++);
       trow.innerHTML=\`<div class="think-block" id="\${id}-block">
         <button class="think-toggle" onclick="var b=document.getElementById('\${id}-block');b.classList.toggle('open');var r=b.closest('.row');r.classList.toggle('think-open');var bd=document.getElementById('\${id}-body');bd.hidden=!bd.hidden">
-          <span class="think-rule"></span>
-          <span class="think-caption"><span class="think-state"></span> 克的想法</span>
-          <span class="think-rule"></span>
+          <span class="think-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="14" height="14"><polyline points="9 6 15 12 9 18"/></svg></span>
+          <span class="think-caption">克的想法</span>
         </button>
         <div class="think-body" id="\${id}-body" hidden>
           <div class="think-text">\${esc(p.think)}</div>
-          <div class="think-starline"><span class="think-star">✦</span></div>
         </div>
       </div>\`;
       scroll.appendChild(trow);
