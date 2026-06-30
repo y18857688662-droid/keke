@@ -4,8 +4,8 @@ self.addEventListener('push', (e) => {
   e.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: '/static/icon.svg',
-      badge: '/static/icon.svg',
+      icon: '/icon.svg',
+      badge: '/icon.svg',
       tag: 'ke-msg-' + Date.now(),
       renotify: true
     })
@@ -25,4 +25,10 @@ self.addEventListener('notificationclick', (e) => {
       return clients.openWindow('/chat');
     })
   );
+});
+
+self.addEventListener('fetch', (e) => {
+  if (e.request.mode === 'navigate') {
+    e.respondWith(fetch(e.request).catch(() => caches.match('/chat')));
+  }
 });
