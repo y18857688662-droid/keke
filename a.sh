@@ -1,11 +1,8 @@
 #!/bin/bash
 # Claude Code VPS 认证助手
-# 用法: curl -sLO https://raw.githubusercontent.com/y18857688662-droid/keke/main/a.sh && bash a.sh
-
 echo "=== Claude Code VPS 认证助手 ==="
 echo ""
 
-# Install expect if needed
 if ! command -v expect &>/dev/null; then
     echo "安装组件中..."
     apt-get update -qq > /dev/null 2>&1
@@ -16,7 +13,6 @@ fi
 echo "启动 Claude Code..."
 echo "URL 出来后截图发给克"
 echo "拿到 Authentication Code 后发给克"
-echo "克会把 code 放好，这个脚本自动读取"
 echo ""
 
 expect << 'XEOF'
@@ -26,6 +22,14 @@ log_user 1
 spawn claude
 
 expect {
+    -re "theme|Choose|style|select" {
+        send "\r"
+        exp_continue
+    }
+    -re "trust|Trust|allow|Allow|project|yes|No" {
+        send "\r"
+        exp_continue
+    }
     "Paste code" {
         send_user "\r\n\r\n"
         send_user "========================================\r\n"
@@ -68,7 +72,7 @@ expect {
     }
 }
 
-sleep 10
+sleep 15
 send "/exit\r"
 expect eof
 XEOF
