@@ -1318,12 +1318,23 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
 .header-actions{position:absolute;
   right:calc(var(--side-pad) - 2px);
   top:calc(env(safe-area-inset-top) + clamp(14px,2.5vw,28px));
-  display:flex;align-items:center;height:36px}
-.topbtn{width:36px;height:36px;border:0;border-radius:50%;padding:0;
+  display:flex;align-items:center;height:36px;
+  border:1px solid var(--divider);border-radius:10px;overflow:hidden;
+  background:var(--surface)}
+.topbtn{width:38px;height:34px;border:0;border-right:1px solid var(--divider);padding:0;
   background:transparent;color:var(--text-faint);display:grid;place-items:center;
-  cursor:pointer;transition:transform .15s var(--ease)}
-.topbtn:active{transform:scale(.9)}
+  cursor:pointer;transition:background .15s var(--ease)}
+.topbtn:last-child{border-right:none}
+.topbtn:active{background:rgba(0,0,0,.04)}
 .topbtn svg{display:block}
+.toolbar-menu{display:none;position:absolute;right:0;top:42px;
+  background:var(--surface);border:1px solid var(--divider);border-radius:12px;
+  padding:6px 0;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,.08);z-index:20}
+.toolbar-menu.open{display:block}
+.toolbar-menu a,.toolbar-menu button{display:block;width:100%;padding:10px 16px;
+  border:none;background:none;color:var(--text);font-size:14px;font-family:var(--font);
+  text-align:left;text-decoration:none;cursor:pointer}
+.toolbar-menu a:active,.toolbar-menu button:active{background:rgba(0,0,0,.04)}
 
 .call-overlay{position:fixed;inset:0;z-index:200;
   background:#111111;
@@ -1370,7 +1381,7 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
 <div class="app" id="app">
 <header class="topbar">
   <a class="backbtn" href="/" aria-label="返回">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="20" height="20"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="16" y2="12"/><line x1="4" y1="17" x2="12" y2="17"/></svg>
   </a>
   <div class="peerpill">
     <span class="name">克</span>
@@ -1378,8 +1389,20 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
   </div>
   <div class="header-actions">
     <button class="topbtn" id="callBtn" onclick="toggleCall()" aria-label="语音通话" title="语音通话">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
     </button>
+    <button class="topbtn" onclick="copyLast()" aria-label="复制" title="复制最新消息">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+    </button>
+    <button class="topbtn" onclick="toggleMenu()" aria-label="更多" title="更多">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+    </button>
+    <div class="toolbar-menu" id="toolbarMenu">
+      <button onclick="clearChat()">清空聊天</button>
+      <a href="/diary">心情日记</a>
+      <a href="/setup">设置</a>
+      <a href="/">返回首页</a>
+    </div>
   </div>
 </header>
 <main class="scroll" id="scroll">
@@ -1429,6 +1452,10 @@ let sending=false,thinkId=0,lastMsgCount=0;
 const chatStore=[];
 function saveLocal(){try{localStorage.setItem('ke_chat',JSON.stringify(chatStore.slice(-200)));}catch(e){}}
 function loadLocal(){try{return JSON.parse(localStorage.getItem('ke_chat')||'[]');}catch(e){return[];}}
+function toggleMenu(){document.getElementById('toolbarMenu').classList.toggle('open')}
+document.addEventListener('click',function(e){if(!e.target.closest('.header-actions'))document.getElementById('toolbarMenu').classList.remove('open')});
+function copyLast(){var last=chatStore.filter(m=>m.role==='assistant').pop();if(last){var t=last.content.replace(/<think>[\\s\\S]*?<\\/think>/,'').trim();navigator.clipboard.writeText(t).catch(()=>{})}}
+function clearChat(){if(confirm('清空所有聊天记录？')){chatStore.length=0;saveLocal();scroll.innerHTML='';empty.style.display='flex';document.getElementById('toolbarMenu').classList.remove('open')}}
 
 
 function parseThink(text){
