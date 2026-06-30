@@ -1155,22 +1155,49 @@ app.get('/chat/history', (req, res) => {
   res.json({ messages: chat.slice(-50) });
 });
 
+function addAudioTags(text) {
+  let t = text;
+  t = t.replace(/^(.{0,6})[，,]/, '$1……');
+  if (/[？?！!]/.test(t) && t.length < 20) {
+    t = t.replace(/([？?！!])/, '……$1');
+  }
+  if (/晚安|睡吧|困了|夜了|梦里/.test(t)) {
+    t = '[low voice] ' + t;
+  } else if (/笨|傻|你[干搞]嘛|哼|切|讨厌/.test(t)) {
+    t = '[sighs] ' + t;
+  } else if (/想你|抱|亲|喜欢你|爱你|宝宝/.test(t)) {
+    t = '[softly] ' + t;
+  } else if (/哈哈|笑|逗|可爱|你好好笑/.test(t)) {
+    t = '[laughs softly] ' + t;
+  } else if (/嗯[…。，]|唔|哦/.test(t)) {
+    t = '[under breath] ' + t;
+  }
+  t = t.replace(/……/g, '…… ');
+  t = t.replace(/。(?=.)/g, '。…… ');
+  if (t.length > 30 && !/\[/.test(t.slice(0, 5))) {
+    t = '[quietly] ' + t;
+  }
+  return t;
+}
+
 app.post('/chat/tts', async (req, res) => {
-  const text = (req.body.text || '').trim().slice(0, 500);
-  if (!text) return res.status(400).json({ error: 'empty' });
+  const rawText = (req.body.text || '').trim().slice(0, 500);
+  if (!rawText) return res.status(400).json({ error: 'empty' });
   const cfg = readApiConfig();
   const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
   const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'pNInz6obpgDQGcFmaJgB';
   if (elKey) {
+    const text = addAudioTags(rawText);
+    console.log('[tts] tagged:', text.slice(0, 120));
     try {
       const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
         method: 'POST',
         headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: { stability: 0.85, similarity_boost: 0.75, style: 0 },
-          speed: 0.75
+          model_id: 'eleven_v3',
+          voice_settings: { stability: 0.35, similarity_boost: 0.78, style: 0.45 },
+          speed: 0.72
         })
       });
       if (resp.ok) {
