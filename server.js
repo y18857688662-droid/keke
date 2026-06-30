@@ -966,7 +966,10 @@ app.post('/chat/send', async (req, res) => {
   }
   try {
     const recent = chat.slice(-20);
+    sseBroadcast({ type: 'memory', action: 'reading' });
     const sysPrompt = await getChatSystem();
+    const memoryLoaded = sysPrompt.includes('记忆');
+    sseBroadcast({ type: 'memory', action: memoryLoaded ? 'read_ok' : 'read_none' });
     let reply;
     const anthropicKey = getAnthropicKey() || directKey;
     if (anthropicKey) {
@@ -1017,7 +1020,22 @@ app.post('/chat/send', async (req, res) => {
         if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
       }
     })().catch(() => {});
-    res.json({ ok: true, reply, time: replyTime });
+    res.json({ ok: true, reply, time: replyTime, memoryLoaded });
+    (async () => {
+      try {
+        const last5 = chat2.slice(-6);
+        const convo = last5.map(m => `${m.role}: ${m.content}`).join('\n');
+        const shouldStore = convo.length > 40 &&
+          (/约定|记住|以后|生日|喜欢|讨厌|重要|答应|纪念|秘密|第一次|新梗|昵称|习惯/).test(convo);
+        if (shouldStore) {
+          const summary = msg.slice(0, 100) + (cleanReply ? ' → ' + cleanReply.slice(0, 100) : '');
+          sseBroadcast({ type: 'memory', action: 'storing' });
+          await storeMemory(summary);
+          sseBroadcast({ type: 'memory', action: 'stored' });
+          console.log('[memory] auto-stored:', summary.slice(0, 60));
+        }
+      } catch (e) { console.error('[memory] auto-store error:', e.message); }
+    })();
   } catch (e) {
     console.error('Chat API error:', e.message);
     return res.json({ ok: true, time, async: true });
@@ -1381,6 +1399,21 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
   text-align:left;text-decoration:none;cursor:pointer}
 .toolbar-menu a:active,.toolbar-menu button:active{background:rgba(0,0,0,.04)}
 
+.memory-toast{position:fixed;top:calc(env(safe-area-inset-top) + var(--header-h) + 8px);
+  left:50%;transform:translateX(-50%) translateY(-8px);z-index:60;
+  display:flex;align-items:center;gap:8px;
+  padding:8px 16px;border-radius:20px;
+  background:var(--surface);border:1px solid var(--divider);
+  box-shadow:0 2px 12px rgba(0,0,0,.06);
+  font-size:13px;color:var(--text-soft);
+  opacity:0;transition:opacity .3s var(--ease),transform .3s var(--ease);
+  pointer-events:none;white-space:nowrap}
+.memory-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.memory-toast .mem-icon{width:16px;height:16px;flex:none}
+.memory-toast .mem-dot{width:6px;height:6px;border-radius:50%;
+  background:var(--accent);animation:memPulse 1s ease-in-out infinite}
+@keyframes memPulse{0%,100%{opacity:.4;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
+
 .call-overlay{position:fixed;inset:0;z-index:200;
   background:#111111;
   display:none;flex-direction:column;align-items:center;justify-content:center;
@@ -1423,6 +1456,10 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
 </style>
 </head>
 <body>
+<div class="memory-toast" id="memToast">
+  <span class="mem-dot"></span>
+  <span class="mem-text"></span>
+</div>
 <div class="app" id="app">
 <header class="topbar">
   <a class="backbtn" href="/" aria-label="返回">
@@ -1696,10 +1733,28 @@ async function sendPhoto(el){
   }
 }
 
+const memToast=document.getElementById('memToast');
+const memText=memToast.querySelector('.mem-text');
+let memTimer=null;
+function showMemory(text,duration){
+  memText.textContent=text;
+  memToast.classList.add('show');
+  clearTimeout(memTimer);
+  if(duration)memTimer=setTimeout(()=>memToast.classList.remove('show'),duration);
+}
+function hideMemory(){memToast.classList.remove('show');clearTimeout(memTimer);}
+
 const sse=new EventSource('/chat/stream');
 sse.onmessage=(e)=>{
   try{
     const d=JSON.parse(e.data);
+    if(d.type==='memory'){
+      if(d.action==='reading')showMemory('正在读取记忆…');
+      else if(d.action==='read_ok')showMemory('记忆已加载',2500);
+      else if(d.action==='read_none')hideMemory();
+      else if(d.action==='storing')showMemory('正在记录新记忆…');
+      else if(d.action==='stored')showMemory('记忆已保存',2500);
+    }
     if(d.type==='message'&&d.role==='assistant'){
       if(callOpen){
         callSpeak(d.content);
