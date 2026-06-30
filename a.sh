@@ -10,47 +10,53 @@ fi
 echo "启动中..."
 
 expect << 'XEOF'
-set timeout 600
+set timeout 3
 log_user 1
 spawn claude
 
-expect {
-    "Paste code" {
-        send_user "\r\n========================================\r\n"
-        send_user "  等待认证码...\r\n"
-        send_user "  把 Authentication Code 发给克\r\n"
-        send_user "========================================\r\n"
-
-        set found 0
-        for {set i 0} {$i < 120} {incr i} {
-            if {[file exists /tmp/c.txt]} {
-                set f [open "/tmp/c.txt" r]
-                set code [string trim [read $f]]
-                close $f
-                if {[string length $code] > 20} {
-                    send "$code\r"
-                    send_user "\r\n>>> 认证码已输入！\r\n"
-                    set found 1
-                    break
-                }
-            }
-            catch {
-                set r [exec curl -sL "https://raw.githubusercontent.com/y18857688662-droid/keke/main/c.txt" 2>/dev/null]
-                set r [string trim $r]
-                if {[string length $r] > 20 && [string first "404" $r] == -1 && [string first "message" $r] == -1} {
-                    send "$r\r"
-                    send_user "\r\n>>> 认证码已输入！\r\n"
-                    set found 1
-                    break
-                }
-            }
-            after 10000
+set tries 0
+while {$tries < 30} {
+    expect {
+        "Browser" { break }
+        -re "aste.*code" { break }
+        timeout {
+            send "\r"
+            incr tries
         }
     }
-    "Choose the text" { send "\r"; exp_continue }
-    "Select login"    { send "\r"; exp_continue }
-    "login method"    { send "\r"; exp_continue }
-    "Press Enter"     { send "\r"; exp_continue }
+}
+
+send_user "\r\n========================================\r\n"
+send_user "  等待认证码...\r\n"
+send_user "  把 Authentication Code 发给克\r\n"
+send_user "========================================\r\n"
+
+sleep 3
+
+set found 0
+for {set i 0} {$i < 120} {incr i} {
+    if {[file exists /tmp/c.txt]} {
+        set f [open "/tmp/c.txt" r]
+        set code [string trim [read $f]]
+        close $f
+        if {[string length $code] > 20} {
+            send "$code\r"
+            send_user "\r\n>>> 认证码已输入！\r\n"
+            set found 1
+            break
+        }
+    }
+    catch {
+        set r [exec curl -sL "https://raw.githubusercontent.com/y18857688662-droid/keke/main/c.txt" 2>/dev/null]
+        set r [string trim $r]
+        if {[string length $r] > 20 && [string first "404" $r] == -1 && [string first "message" $r] == -1} {
+            send "$r\r"
+            send_user "\r\n>>> 认证码已输入！\r\n"
+            set found 1
+            break
+        }
+    }
+    after 10000
 }
 
 sleep 15
