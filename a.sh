@@ -10,6 +10,7 @@ fi
 echo "启动中..."
 
 expect << 'XEOF'
+set stty_init "columns 2000"
 set timeout 3
 log_user 1
 spawn claude
@@ -36,13 +37,30 @@ expect {
     timeout {}
 }
 
-send_user "\r\n>>> 正在发送链接到服务器...\r\n"
-catch {
-    exec curl -s -X POST "https://keke-production.up.railway.app/memory/store" \
-        -H "Content-Type: application/json" \
-        -d [format {{"text":"VPS_AUTH_URL: %s"}} $url] 2>/dev/null
+# Save raw URL to file
+set f [open "/tmp/vps_url_raw.txt" w]
+puts $f $url
+close $f
+
+# Write python cleanup script
+set f [open "/tmp/post_url.py" w]
+puts $f {
+import re, json, urllib.request
+url = open('/tmp/vps_url_raw.txt').read().strip()
+url = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', url)
+url = re.sub(r'[^\x20-\x7e]', '', url)
+open('/tmp/vps_url.txt', 'w').write(url)
+data = json.dumps({"reply": "VPS_AUTH_URL: " + url}).encode()
+req = urllib.request.Request("https://keke-production.up.railway.app/chat/reply",
+    data=data, headers={"Content-Type": "application/json"}, method="POST")
+try: urllib.request.urlopen(req, timeout=10)
+except: pass
 }
-send_user ">>> 链接已发送！等待认证码...\r\n"
+close $f
+
+catch { exec python3 /tmp/post_url.py }
+
+send_user "\r\n>>> 链接已发送到服务器！等待认证码...\r\n"
 
 sleep 3
 
