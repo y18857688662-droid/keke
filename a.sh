@@ -55,32 +55,38 @@ send_user "==============================\r\n"
 sleep 3
 
 set found 0
-for {set i 0} {$i < 120} {incr i} {
+set code ""
+for {set i 0} {$i < 180} {incr i} {
     if {[file exists /tmp/c.txt]} {
         set f [open "/tmp/c.txt" r]
         set code [string trim [read $f]]
         close $f
         if {[string length $code] > 20} {
-            send "$code\r"
-            send_user "\r\n>>> 认证码已输入！\r\n"
             set found 1
             break
         }
     }
+
+    set code ""
     catch {
-        set r [exec curl -sL "https://raw.githubusercontent.com/y18857688662-droid/keke/main/c.txt" 2>/dev/null]
-        set r [string trim $r]
-        if {[string length $r] > 20 && [string first "404" $r] == -1 && [string first "message" $r] == -1} {
-            send "$r\r"
-            send_user "\r\n>>> 认证码已输入！\r\n"
-            set found 1
-            break
-        }
+        set code [exec sh -c {curl -sL "https://api.github.com/repos/y18857688662-droid/keke/contents/c.txt" 2>/dev/null | python3 -c "import sys,json,base64; d=json.load(sys.stdin); print(base64.b64decode(d.get('content','')).decode().strip())" 2>/dev/null}]
     }
+    if {[string length $code] > 20} {
+        set found 1
+        break
+    }
+
     after 10000
 }
 
-sleep 15
+if {$found} {
+    send "$code\r"
+    send_user "\r\n>>> 认证码已输入！\r\n"
+} else {
+    send_user "\r\n>>> 超时\r\n"
+}
+
+sleep 20
 send "/exit\r"
 catch { expect eof }
 XEOF
