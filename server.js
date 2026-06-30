@@ -702,20 +702,82 @@ async function fetchMemories() {
   return mem || '';
 }
 
-async function storeMemory(text) {
-  return callOmbreTool('hold', { content: text });
+const MEMORY_CATEGORIES = ['约定', '喜好', '梗', '重要日期', '日常', '关系', '习惯'];
+
+function classifyByKeyword(text) {
+  if (/约定|答应|承诺|以后要|说好/.test(text)) return '约定';
+  if (/喜欢|讨厌|爱吃|最爱|不喜欢|偏好/.test(text)) return '喜好';
+  if (/哈哈|笑|梗|搞笑|段子|整/.test(text)) return '梗';
+  if (/生日|纪念日|周年|节日|日期/.test(text)) return '重要日期';
+  if (/男朋友|女朋友|恋人|在一起|吵架|和好|亲/.test(text)) return '关系';
+  if (/每天|总是|习惯|一直|经常/.test(text)) return '习惯';
+  return '日常';
+}
+
+async function classifyMemory(text) {
+  const apiKey = getAnthropicKey() || process.env.ANTHROPIC_API_KEY || '';
+  if (!apiKey) return classifyByKeyword(text);
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        system: `你是一个记忆分类器。把用户给的记忆内容分到以下类别之一，只回复类别名称，不要其他内容：${MEMORY_CATEGORIES.join('、')}`,
+        messages: [{ role: 'user', content: text }],
+        max_tokens: 10,
+        temperature: 0
+      })
+    });
+    const data = await r.json();
+    const cat = (data.content?.[0]?.text || '').trim();
+    return MEMORY_CATEGORIES.includes(cat) ? cat : classifyByKeyword(text);
+  } catch (e) {
+    console.error('[classify] error:', e.message);
+    return classifyByKeyword(text);
+  }
+}
+
+async function storeMemory(text, category) {
+  if (!category) category = await classifyMemory(text);
+  const tagged = `【${category}】${text}`;
+  return callOmbreTool('hold', { content: tagged });
+}
+
+function parseMemories(raw) {
+  if (!raw) return {};
+  const groups = {};
+  const lines = raw.split(/\n+/).filter(l => l.trim());
+  for (const line of lines) {
+    const m = line.match(/^【(.+?)】(.+)$/);
+    if (m) {
+      const cat = m[1], content = m[2].trim();
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(content);
+    } else {
+      if (!groups['未分类']) groups['未分类'] = [];
+      groups['未分类'].push(line.trim());
+    }
+  }
+  return groups;
 }
 
 app.post('/memory/store', async (req, res) => {
-  const { text } = req.body;
+  const { text, category } = req.body;
   if (!text) return res.json({ ok: false, error: 'empty' });
-  const result = await storeMemory(text);
-  res.json({ ok: !!result, result });
+  const cat = category || await classifyMemory(text);
+  const result = await storeMemory(text, cat);
+  res.json({ ok: !!result, category: cat, result });
 });
 
 app.get('/memory/read', async (req, res) => {
   const mem = await fetchMemories();
-  res.json({ ok: !!mem, memories: mem || '' });
+  const grouped = parseMemories(mem);
+  res.json({ ok: !!mem, memories: mem || '', grouped });
 });
 
 // === 聊天 ===
@@ -1069,6 +1131,22 @@ app.post('/chat/reply', (req, res) => {
       if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
     }
   })().catch(() => {});
+  (async () => {
+    try {
+      const last5 = chat.slice(-6);
+      const convo = last5.map(m => `${m.role}: ${m.content}`).join('\n');
+      const shouldStore = convo.length > 40 &&
+        (/约定|记住|以后|生日|喜欢|讨厌|重要|答应|纪念|秘密|第一次|新梗|昵称|习惯/).test(convo);
+      if (shouldStore) {
+        const userMsg = chat.filter(m => m.role === 'user').pop();
+        const summary = (userMsg ? userMsg.content.slice(0, 100) : '') + (cleanReply ? ' → ' + cleanReply.slice(0, 100) : '');
+        sseBroadcast({ type: 'memory', action: 'storing' });
+        await storeMemory(summary);
+        sseBroadcast({ type: 'memory', action: 'stored' });
+        console.log('[memory] vps auto-stored:', summary.slice(0, 60));
+      }
+    } catch (e) { console.error('[memory] vps auto-store error:', e.message); }
+  })();
   res.json({ ok: true, time });
 });
 
@@ -1459,6 +1537,19 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
 .mem-panel-save:active{opacity:.7}
 .mem-panel-save:disabled{opacity:.4}
 
+.mem-group{margin-bottom:16px}
+.mem-group:last-child{margin-bottom:0}
+.mem-group-title{display:flex;align-items:center;gap:6px;
+  font-size:13px;font-weight:600;color:var(--text);
+  padding-bottom:8px;border-bottom:1px solid var(--divider);margin-bottom:8px}
+.mem-cat-icon{font-size:15px;line-height:1}
+.mem-count{margin-left:auto;font-size:11px;font-weight:400;
+  color:var(--text-faint);background:var(--bg);
+  padding:1px 8px;border-radius:10px}
+.mem-item{font-size:13px;color:var(--text-soft);line-height:1.6;
+  padding:6px 0;border-bottom:1px solid rgba(0,0,0,.03)}
+.mem-item:last-child{border-bottom:none}
+
 .call-overlay{position:fixed;inset:0;z-index:200;
   background:#111111;
   display:none;flex-direction:column;align-items:center;justify-content:center;
@@ -1813,6 +1904,16 @@ const memContent=document.getElementById('memContent');
 const memInput=document.getElementById('memInput');
 const memSaveBtn=document.getElementById('memSaveBtn');
 
+const catIcons={约定:'&#x1F91D;',喜好:'&#x2764;',梗:'&#x1F602;',重要日期:'&#x1F4C5;',日常:'&#x2615;',关系:'&#x1F495;',习惯:'&#x1F504;',未分类:'&#x1F4DD;'};
+function renderGrouped(grouped){
+  const cats=Object.keys(grouped);
+  if(!cats.length)return '<div class="mem-loading">暂无记忆</div>';
+  return cats.map(cat=>{
+    const icon=catIcons[cat]||'&#x1F4DD;';
+    const items=grouped[cat].map(t=>'<div class="mem-item">'+t.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('');
+    return '<div class="mem-group"><div class="mem-group-title"><span class="mem-cat-icon">'+icon+'</span> '+cat+'<span class="mem-count">'+grouped[cat].length+'</span></div>'+items+'</div>';
+  }).join('');
+}
 async function openMemoryPanel(){
   memPanel.classList.add('open');
   memOverlay.classList.add('open');
@@ -1820,7 +1921,9 @@ async function openMemoryPanel(){
   try{
     const r=await fetch('/memory/read');
     const d=await r.json();
-    if(d.ok&&d.memories){
+    if(d.ok&&d.grouped&&Object.keys(d.grouped).length){
+      memContent.innerHTML=renderGrouped(d.grouped);
+    }else if(d.ok&&d.memories){
       memContent.textContent=d.memories;
     }else{
       memContent.innerHTML='<div class="mem-loading">暂无记忆</div>';
@@ -1837,8 +1940,8 @@ async function saveNewMemory(){
   const text=memInput.value.trim();
   if(!text)return;
   memSaveBtn.disabled=true;
-  memSaveBtn.textContent='保存中…';
-  showMemory('正在记录新记忆…');
+  memSaveBtn.textContent='分类中…';
+  showMemory('正在分类并记录…');
   try{
     const r=await fetch('/memory/store',{method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -1846,9 +1949,8 @@ async function saveNewMemory(){
     const d=await r.json();
     if(d.ok){
       memInput.value='';
-      showMemory('记忆已保存',2500);
-      const old=memContent.textContent||'';
-      memContent.textContent=old+(old?'\n':'')+text;
+      showMemory('记忆已保存 → '+d.category,2500);
+      openMemoryPanel();
     }else{
       showMemory('保存失败',2500);
     }
