@@ -1,0 +1,18 @@
+{
+  "name": "克",
+  "short_name": "克",
+  "description": "和克聊天",
+  "start_url": "/chat",
+  "display": "standalone",
+  "background_color": "#F5F0EA",
+  "theme_color": "#F5F0EA",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
