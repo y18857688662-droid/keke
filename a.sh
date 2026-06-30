@@ -37,12 +37,10 @@ expect {
     timeout {}
 }
 
-# Save raw URL to file
 set f [open "/tmp/vps_url_raw.txt" w]
 puts $f $url
 close $f
 
-# Write python cleanup script
 set f [open "/tmp/post_url.py" w]
 puts $f {
 import re, json, urllib.request
@@ -79,7 +77,18 @@ for {set i 0} {$i < 180} {incr i} {
 
     set code ""
     catch {
-        set code [exec sh -c {curl -sL "https://api.github.com/repos/y18857688662-droid/keke/contents/c.txt" 2>/dev/null | python3 -c "import sys,json,base64; d=json.load(sys.stdin); print(base64.b64decode(d.get('content','')).decode().strip())" 2>/dev/null}]
+        set code [exec python3 -c {
+import json, urllib.request
+req = urllib.request.Request("https://keke-production.up.railway.app/chat/history")
+resp = urllib.request.urlopen(req, timeout=10)
+data = json.loads(resp.read())
+msgs = data.get("messages", [])
+for m in reversed(msgs):
+    c = m.get("content", "")
+    if c.startswith("AUTH_CODE:"):
+        print(c.split(":", 1)[1].strip())
+        break
+}]
     }
     if {[string length $code] > 20} {
         set found 1
