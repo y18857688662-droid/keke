@@ -19,6 +19,7 @@ while {$tries < 30} {
     expect {
         "Browser" { break }
         -re "aste.*code" { break }
+        "Press Enter" { send "\r"; exp_continue }
         timeout {
             send "\r"
             incr tries
@@ -35,22 +36,13 @@ expect {
     timeout {}
 }
 
-set challenge ""
-set state ""
-regexp {code_challenge=([^&]+)} $url -> challenge
-regexp {state=([^&\s\r\n]+)} $url -> state
-
-send_user "\r\n\r\n"
-send_user "==============================\r\n"
-send_user " CHALLENGE:\r\n"
-send_user " $challenge\r\n"
-send_user "==============================\r\n"
-send_user " STATE:\r\n"
-send_user " $state\r\n"
-send_user "==============================\r\n"
-send_user " 截图发给克!\r\n"
-send_user " 等待认证码中...\r\n"
-send_user "==============================\r\n"
+send_user "\r\n>>> 正在发送链接到服务器...\r\n"
+catch {
+    exec curl -s -X POST "https://keke-production.up.railway.app/memory/store" \
+        -H "Content-Type: application/json" \
+        -d [format {{"text":"VPS_AUTH_URL: %s"}} $url] 2>/dev/null
+}
+send_user ">>> 链接已发送！等待认证码...\r\n"
 
 sleep 3
 
