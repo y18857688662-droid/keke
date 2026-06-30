@@ -1,5 +1,4 @@
 #!/bin/bash
-# Claude Code VPS 认证助手
 echo "=== Claude Code VPS 认证助手 ==="
 
 if ! command -v expect &>/dev/null; then
@@ -48,18 +47,10 @@ expect {
             after 10000
         }
     }
-    "Choose" { send "\r"; exp_continue }
-    "Select" { send "\r"; exp_continue }
-    "select" { send "\r"; exp_continue }
-    "method" { send "\r"; exp_continue }
-    "theme"  { send "\r"; exp_continue }
-    "Trust"  { send "\r"; exp_continue }
-    "trust"  { send "\r"; exp_continue }
-    "allow"  { send "\r"; exp_continue }
-    "Allow"  { send "\r"; exp_continue }
-    "yes/no" { send "yes\r"; exp_continue }
-    "Y/n"    { send "Y\r"; exp_continue }
-    "y/N"    { send "y\r"; exp_continue }
+    "Choose the text" { send "\r"; exp_continue }
+    "Select login"    { send "\r"; exp_continue }
+    "login method"    { send "\r"; exp_continue }
+    "Press Enter"     { send "\r"; exp_continue }
 }
 
 sleep 15
