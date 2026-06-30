@@ -1414,6 +1414,51 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
   background:var(--accent);animation:memPulse 1s ease-in-out infinite}
 @keyframes memPulse{0%,100%{opacity:.4;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
 
+.mem-panel-overlay{position:fixed;inset:0;z-index:90;
+  background:rgba(0,0,0,.3);opacity:0;pointer-events:none;
+  transition:opacity .25s var(--ease)}
+.mem-panel-overlay.open{opacity:1;pointer-events:auto}
+
+.mem-panel{position:fixed;left:0;right:0;bottom:0;z-index:95;
+  max-height:75vh;width:min(100vw,520px);margin:0 auto;
+  background:var(--surface);border-radius:20px 20px 0 0;
+  box-shadow:0 -4px 30px rgba(0,0,0,.1);
+  display:flex;flex-direction:column;
+  transform:translateY(100%);transition:transform .3s var(--ease);
+  padding-bottom:env(safe-area-inset-bottom)}
+.mem-panel.open{transform:translateY(0)}
+
+.mem-panel-header{display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px 12px;border-bottom:1px solid var(--divider)}
+.mem-panel-title{font-size:16px;font-weight:600;color:var(--text)}
+.mem-panel-close{width:32px;height:32px;border:none;background:transparent;
+  font-size:22px;color:var(--text-faint);cursor:pointer;
+  display:grid;place-items:center;border-radius:50%}
+.mem-panel-close:active{background:rgba(0,0,0,.04)}
+
+.mem-panel-content{flex:1;overflow-y:auto;padding:16px 20px;
+  font-size:14px;line-height:1.7;color:var(--text-soft);
+  white-space:pre-wrap;word-break:break-word;
+  max-height:45vh;min-height:80px}
+.mem-loading{color:var(--text-faint);text-align:center;padding:20px 0}
+
+.mem-panel-input{display:flex;align-items:flex-end;gap:10px;
+  padding:12px 20px 16px;border-top:1px solid var(--divider)}
+.mem-panel-input textarea{flex:1;border:1px solid var(--field-line);
+  border-radius:12px;padding:10px 14px;resize:none;
+  font-family:var(--font);font-size:14px;line-height:1.4;
+  background:var(--bg);color:var(--text);outline:none;
+  transition:border-color .2s var(--ease)}
+.mem-panel-input textarea:focus{border-color:var(--accent)}
+.mem-panel-input textarea::placeholder{color:var(--text-faint);opacity:.5}
+.mem-panel-save{flex:none;height:38px;padding:0 18px;
+  border:none;border-radius:10px;
+  background:var(--send-bg);color:#fff;
+  font-family:var(--font);font-size:14px;font-weight:500;
+  cursor:pointer;transition:opacity .15s var(--ease)}
+.mem-panel-save:active{opacity:.7}
+.mem-panel-save:disabled{opacity:.4}
+
 .call-overlay{position:fixed;inset:0;z-index:200;
   background:#111111;
   display:none;flex-direction:column;align-items:center;justify-content:center;
@@ -1484,6 +1529,10 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
     </button>
     <div class="side-sep"></div>
+    <button class="side-btn" onclick="openMemoryPanel();closeSideToolbar()" title="记忆库">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 014 4c0 1.95-1.4 3.58-3.25 3.93"/><path d="M8.56 6.22A4 4 0 0112 2"/><circle cx="12" cy="14" r="3"/><path d="M12 17v4"/><path d="M7.5 19.5L9 18"/><path d="M16.5 19.5L15 18"/><path d="M5 10c0 4 3.5 7 7 7s7-3 7-7"/></svg>
+    </button>
+    <div class="side-sep"></div>
     <button class="side-btn" onclick="clearChat();closeSideToolbar()" title="清空聊天">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
     </button>
@@ -1499,6 +1548,20 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <a class="side-btn" href="/" title="首页">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     </a>
+  </div>
+</div>
+<div class="mem-panel-overlay" id="memPanelOverlay" onclick="closeMemoryPanel()"></div>
+<div class="mem-panel" id="memPanel">
+  <div class="mem-panel-header">
+    <span class="mem-panel-title">记忆库</span>
+    <button class="mem-panel-close" onclick="closeMemoryPanel()">&times;</button>
+  </div>
+  <div class="mem-panel-content" id="memContent">
+    <div class="mem-loading">读取中…</div>
+  </div>
+  <div class="mem-panel-input">
+    <textarea id="memInput" rows="2" placeholder="写入新记忆…"></textarea>
+    <button class="mem-panel-save" id="memSaveBtn" onclick="saveNewMemory()">保存</button>
   </div>
 </div>
 <main class="scroll" id="scroll">
@@ -1743,6 +1806,58 @@ function showMemory(text,duration){
   if(duration)memTimer=setTimeout(()=>memToast.classList.remove('show'),duration);
 }
 function hideMemory(){memToast.classList.remove('show');clearTimeout(memTimer);}
+
+const memPanel=document.getElementById('memPanel');
+const memOverlay=document.getElementById('memPanelOverlay');
+const memContent=document.getElementById('memContent');
+const memInput=document.getElementById('memInput');
+const memSaveBtn=document.getElementById('memSaveBtn');
+
+async function openMemoryPanel(){
+  memPanel.classList.add('open');
+  memOverlay.classList.add('open');
+  memContent.innerHTML='<div class="mem-loading">读取记忆中…</div>';
+  try{
+    const r=await fetch('/memory/read');
+    const d=await r.json();
+    if(d.ok&&d.memories){
+      memContent.textContent=d.memories;
+    }else{
+      memContent.innerHTML='<div class="mem-loading">暂无记忆</div>';
+    }
+  }catch(e){
+    memContent.innerHTML='<div class="mem-loading">读取失败</div>';
+  }
+}
+function closeMemoryPanel(){
+  memPanel.classList.remove('open');
+  memOverlay.classList.remove('open');
+}
+async function saveNewMemory(){
+  const text=memInput.value.trim();
+  if(!text)return;
+  memSaveBtn.disabled=true;
+  memSaveBtn.textContent='保存中…';
+  showMemory('正在记录新记忆…');
+  try{
+    const r=await fetch('/memory/store',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text})});
+    const d=await r.json();
+    if(d.ok){
+      memInput.value='';
+      showMemory('记忆已保存',2500);
+      const old=memContent.textContent||'';
+      memContent.textContent=old+(old?'\n':'')+text;
+    }else{
+      showMemory('保存失败',2500);
+    }
+  }catch(e){
+    showMemory('保存失败',2500);
+  }
+  memSaveBtn.disabled=false;
+  memSaveBtn.textContent='保存';
+}
 
 const sse=new EventSource('/chat/stream');
 sse.onmessage=(e)=>{
