@@ -2620,13 +2620,23 @@ async function tgSend(chatId, text, isAction) {
   } catch (e) { console.error('[tg] send error:', e.message); }
 }
 
+async function translateToEn(text) {
+  try {
+    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh&tl=en&dt=t&q=' + encodeURIComponent(text);
+    const r = await fetch(url);
+    const d = await r.json();
+    return d[0].map(s => s[0]).join('');
+  } catch (e) { console.error('[translate] error:', e.message); return text; }
+}
+
 async function tgSendVoice(chatId, text) {
   try {
     const cfg = readApiConfig();
     const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
     const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'pNInz6obpgDQGcFmaJgB';
     if (!elKey) return;
-    const tagged = addAudioTags(text.slice(0, 500));
+    const enText = await translateToEn(text.slice(0, 500));
+    const tagged = addAudioTags(enText);
     const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
       method: 'POST',
       headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
@@ -2643,6 +2653,7 @@ async function tgSendVoice(chatId, text) {
     const form = new FormData();
     form.append('chat_id', String(chatId));
     form.append('voice', blob, 'voice.ogg');
+    form.append('caption', text);
     await fetch(`${TG_API}/sendVoice`, { method: 'POST', body: form });
     console.log('[tg] voice sent');
   } catch (e) { console.error('[tg] voice error:', e.message); }
