@@ -33,7 +33,7 @@ while true; do
     echo "[$(date)] 收到消息: $MSGS"
 
     HISTORY=$(curl -s "$KEKE_URL/chat/history" 2>/dev/null)
-    RECENT=$(echo "$HISTORY" | jq -r '[.messages[-20:][]] | map(.role + ": " + .content) | join("\n")' 2>/dev/null)
+    RECENT=$(echo "$HISTORY" | jq -r '[.messages[-6:][]] | map(.role + ": " + .content) | join("\n")' 2>/dev/null)
 
     MEMORY=$(curl -s "$KEKE_URL/memory/read" 2>/dev/null | jq -r '.memories // ""' 2>/dev/null)
 
@@ -97,7 +97,7 @@ $IMG_NOTE
         echo "[$(date)] 主动发消息..."
 
         HISTORY=$(curl -s "$KEKE_URL/chat/history" 2>/dev/null)
-        RECENT=$(echo "$HISTORY" | jq -r '[.messages[-20:][]] | map(.role + ": " + .content) | join("\n")' 2>/dev/null)
+        RECENT=$(echo "$HISTORY" | jq -r '[.messages[-6:][]] | map(.role + ": " + .content) | join("\n")' 2>/dev/null)
 
         MEMORY=$(curl -s "$KEKE_URL/memory/read" 2>/dev/null | jq -r '.memories // ""' 2>/dev/null)
 
