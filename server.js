@@ -1135,9 +1135,10 @@ app.post('/chat/reply', (req, res) => {
   if (tgId) {
     (async () => {
       for (const line of lines) {
+        const isAction = line.startsWith('*') && line.endsWith('*');
         await tgSendTyping(tgId);
-        await new Promise(r => setTimeout(r, 600 + Math.random() * 800));
-        await tgSend(tgId, line);
+        await new Promise(r => setTimeout(r, isAction ? 400 : 600 + Math.random() * 800));
+        await tgSend(tgId, line, isAction);
       }
       console.log('[tg] forwarded vps reply to telegram');
     })().catch(() => {});
@@ -2598,12 +2599,20 @@ const TG_CHATID_FILE = path.join(__dirname, 'tg_chatid.json');
 function saveTgChatId(id) { try { fs.writeFileSync(TG_CHATID_FILE, JSON.stringify({ chatId: id })); } catch {} }
 function getTgChatId() { try { return JSON.parse(fs.readFileSync(TG_CHATID_FILE, 'utf8')).chatId; } catch { return null; } }
 
-async function tgSend(chatId, text) {
+async function tgSend(chatId, text, isAction) {
   try {
+    const opts = { chat_id: chatId };
+    if (isAction) {
+      opts.text = text.replace(/^\*|\*$/g, '');
+      opts.parse_mode = 'HTML';
+      opts.text = '<i>' + opts.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</i>';
+    } else {
+      opts.text = text;
+    }
     await fetch(`${TG_API}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text })
+      body: JSON.stringify(opts)
     });
   } catch (e) { console.error('[tg] send error:', e.message); }
 }
