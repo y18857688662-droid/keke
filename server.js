@@ -2644,7 +2644,7 @@ app.post('/tg/webhook', async (req, res) => {
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
   const chat = readChat();
-  chat.push({ role: 'user', content: userText, time, source: 'telegram' });
+  chat.push({ role: 'user', content: userText, time, source: 'telegram', pending: true });
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
 
