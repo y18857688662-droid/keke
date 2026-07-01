@@ -1134,6 +1134,14 @@ app.post('/chat/reply', (req, res) => {
   const tgId = getTgChatId();
   if (tgId) {
     (async () => {
+      const thinkMatch = reply.match(/<think>([\s\S]*?)<\/think>/);
+      if (thinkMatch) {
+        const thinkText = thinkMatch[1].trim();
+        if (thinkText) {
+          const escaped = thinkText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          await tgSendHtml(tgId, '🐙 <blockquote expandable>' + escaped + '</blockquote>');
+        }
+      }
       for (const line of lines) {
         const isAction = line.startsWith('*') && line.endsWith('*');
         await tgSendTyping(tgId);
@@ -2603,6 +2611,16 @@ const TG_API = `https://api.telegram.org/bot${TG_TOKEN}`;
 const TG_CHATID_FILE = path.join(__dirname, 'tg_chatid.json');
 function saveTgChatId(id) { try { fs.writeFileSync(TG_CHATID_FILE, JSON.stringify({ chatId: id })); } catch {} }
 function getTgChatId() { try { return JSON.parse(fs.readFileSync(TG_CHATID_FILE, 'utf8')).chatId; } catch { return null; } }
+
+async function tgSendHtml(chatId, html) {
+  try {
+    await fetch(`${TG_API}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: html, parse_mode: 'HTML' })
+    });
+  } catch (e) { console.error('[tg] html send error:', e.message); }
+}
 
 async function tgSend(chatId, text, isAction) {
   try {
