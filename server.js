@@ -2680,7 +2680,7 @@ async function tgSendVoice(chatId, text) {
   try {
     const cfg = readApiConfig();
     const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
-    const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'pNInz6obpgDQGcFmaJgB';
+    const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'ErXwobaYiN019PkySvjV';
     if (!elKey) return;
     const tagged = addAudioTags(text);
     console.log('[voice] speaking:', text);
@@ -2690,8 +2690,8 @@ async function tgSendVoice(chatId, text) {
       body: JSON.stringify({
         text: tagged,
         model_id: 'eleven_v3',
-        voice_settings: { stability: 0.65, similarity_boost: 0.85, style: 0.35 },
-        speed: 0.72
+        voice_settings: { stability: 0.65, similarity_boost: 0.80, style: 0.20 },
+        speed: 0.88
       })
     });
     if (!resp.ok) { console.error('[tg] tts error:', resp.status); return; }
