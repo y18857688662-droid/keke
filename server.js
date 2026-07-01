@@ -1236,7 +1236,7 @@ app.post('/chat/tts', async (req, res) => {
         body: JSON.stringify({
           text,
           model_id: 'eleven_v3',
-          voice_settings: { stability: 0.65, similarity_boost: 0.80, style: 0.20 },
+          voice_settings: { stability: 0.85, similarity_boost: 0.90, style: 0.10 },
           speed: 0.88
         })
       });
