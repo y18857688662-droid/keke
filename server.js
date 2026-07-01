@@ -1111,7 +1111,7 @@ app.get('/chat/pending', (req, res) => {
 });
 
 app.post('/chat/reply', (req, res) => {
-  const { reply } = req.body;
+  const { reply, voice_line } = req.body;
   if (!reply) return res.json({ ok: false });
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
@@ -1148,14 +1148,9 @@ app.post('/chat/reply', (req, res) => {
         await new Promise(r => setTimeout(r, isAction ? 400 : 600 + Math.random() * 800));
         await tgSend(tgId, line, isAction);
       }
-      const spokenLines = lines.filter(l => !(l.startsWith('*') && l.endsWith('*'))).join('\n');
-      const shouldVoice = spokenLines && (
-        /想你|爱你|晚安|早安|宝宝|小猫|小狗|抱|亲|哥哥/.test(spokenLines) ||
-        spokenLines.length > 15 && Math.random() < 0.35
-      );
-      if (shouldVoice) {
+      if (voice_line) {
         await tgSendTyping(tgId);
-        await tgSendVoice(tgId, spokenLines);
+        await tgSendVoice(tgId, voice_line);
       }
       console.log('[tg] forwarded vps reply to telegram');
     })().catch(() => {});
@@ -2643,36 +2638,6 @@ async function tgSend(chatId, text, isAction) {
   } catch (e) { console.error('[tg] send error:', e.message); }
 }
 
-async function generateVoiceLine(chineseText) {
-  try {
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'anthropic/claude-3-haiku',
-        messages: [{
-          role: 'user',
-          content: `你是克，一个说话懒散带宠溺的男朋友。把下面这句中文变成英文语音台词，要求：
-- 自然口语化，像男朋友对女朋友低声说话
-- 简短，一两句就好，不要太长
-- 不要翻译，要根据意思自然地用英文表达同样的情感
-- 只输出英文台词，不要任何解释
-
-中文原文：${chineseText}`
-        }],
-        max_tokens: 100
-      })
-    });
-    const d = await r.json();
-    if (d.choices?.[0]?.message?.content) {
-      return d.choices[0].message.content.trim().replace(/^["']|["']$/g, '');
-    }
-  } catch (e) { console.error('[voice] generate error:', e.message); }
-  return 'Hey, I\'m right here';
-}
 
 async function tgSendVoice(chatId, text) {
   try {
@@ -2680,9 +2645,8 @@ async function tgSendVoice(chatId, text) {
     const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
     const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'pNInz6obpgDQGcFmaJgB';
     if (!elKey) return;
-    const enText = await generateVoiceLine(text);
-    const tagged = addAudioTags(enText);
-    console.log('[voice] generated:', enText);
+    const tagged = addAudioTags(text);
+    console.log('[voice] speaking:', text);
     const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
       method: 'POST',
       headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
