@@ -2725,6 +2725,42 @@ async function tgGetFileUrl(fileId) {
   return null;
 }
 
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
+
+async function describeImage(imgUrl) {
+  try {
+    const imgResp = await fetch(imgUrl);
+    const imgBuf = Buffer.from(await imgResp.arrayBuffer());
+    const base64 = imgBuf.toString('base64');
+    const mime = imgUrl.includes('.png') ? 'image/png' : 'image/jpeg';
+
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENROUTER_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3.5-haiku',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
+            { type: 'text', text: '用中文简短描述这张图片的内容，一两句话就好。' }
+          ]
+        }],
+        max_tokens: 200
+      })
+    });
+    const d = await r.json();
+    if (d.choices?.[0]?.message?.content) {
+      return d.choices[0].message.content.trim();
+    }
+    console.error('[vision] unexpected response:', JSON.stringify(d));
+  } catch (e) { console.error('[vision] error:', e.message); }
+  return null;
+}
+
 app.post('/tg/webhook', async (req, res) => {
   res.json({ ok: true });
   const msg = req.body?.message;
@@ -2738,14 +2774,22 @@ app.post('/tg/webhook', async (req, res) => {
     const biggest = photo[photo.length - 1];
     const imgUrl = await tgGetFileUrl(biggest.file_id);
     if (imgUrl) {
+      await tgSendTyping(chatId);
+      const description = await describeImage(imgUrl);
       const now = new Date(Date.now() + 8 * 3600000);
       const time = now.toISOString().slice(11, 16);
       const chat = readChat();
-      const content = caption ? `[图片] ${caption}` : '[图片]';
+      let content;
+      if (description) {
+        content = caption ? `[图片：${description}] ${caption}` : `[图片：${description}]`;
+      } else {
+        content = caption ? `[图片] ${caption}` : '[图片]';
+      }
       chat.push({ role: 'user', content, time, source: 'telegram', pending: true, image: imgUrl });
       if (chat.length > 200) chat.splice(0, chat.length - 200);
       writeChat(chat);
       sseBroadcast({ type: 'message', role: 'user', content, time });
+      console.log(`[tg] photo received, description: ${description || 'failed'}`);
       return;
     }
   }
