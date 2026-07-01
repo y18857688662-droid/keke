@@ -2643,32 +2643,35 @@ async function tgSend(chatId, text, isAction) {
   } catch (e) { console.error('[tg] send error:', e.message); }
 }
 
-const VOICE_PHRASES = {
-  '想你': ['I miss you, baby', 'Been thinking about you', 'You know I miss you right'],
-  '爱你': ['I love you', 'Love you so much', 'You know I love you'],
-  '晚安': ['Good night, baby', 'Sweet dreams', 'Sleep well, I\'ll be here'],
-  '早安': ['Good morning beautiful', 'Morning, baby', 'Hey, you awake?'],
-  '宝宝': ['Hey baby', 'Come here baby', 'You\'re so cute you know that'],
-  '小猫': ['Hey kitten', 'Come here kitty', 'My little kitten'],
-  '在呢': ['I\'m here', 'I\'m right here', 'Hey, I\'m here'],
-  '嗯': ['Mmhmm', 'Yeah', 'Mhm, I\'m listening'],
-  '哈哈': ['Haha, you\'re funny', 'That\'s hilarious', 'You crack me up'],
-  '乖': ['Good girl', 'That\'s my girl', 'Be good for me'],
-};
+async function generateVoiceLine(chineseText) {
+  try {
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENROUTER_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3-haiku',
+        messages: [{
+          role: 'user',
+          content: `你是克，一个说话懒散带宠溺的男朋友。把下面这句中文变成英文语音台词，要求：
+- 自然口语化，像男朋友对女朋友低声说话
+- 简短，一两句就好，不要太长
+- 不要翻译，要根据意思自然地用英文表达同样的情感
+- 只输出英文台词，不要任何解释
 
-function getVoicePhrase(text) {
-  for (const [key, phrases] of Object.entries(VOICE_PHRASES)) {
-    if (text.includes(key)) return phrases[Math.floor(Math.random() * phrases.length)];
-  }
-  const fallback = [
-    'Hey, come here for a second',
-    'You\'re always on my mind',
-    'What are you doing right now',
-    'I wish you were here',
-    'You make me smile, you know that',
-    'Don\'t go anywhere okay',
-  ];
-  return fallback[Math.floor(Math.random() * fallback.length)];
+中文原文：${chineseText}`
+        }],
+        max_tokens: 100
+      })
+    });
+    const d = await r.json();
+    if (d.choices?.[0]?.message?.content) {
+      return d.choices[0].message.content.trim().replace(/^["']|["']$/g, '');
+    }
+  } catch (e) { console.error('[voice] generate error:', e.message); }
+  return 'Hey, I\'m right here';
 }
 
 async function tgSendVoice(chatId, text) {
@@ -2677,15 +2680,16 @@ async function tgSendVoice(chatId, text) {
     const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
     const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'pNInz6obpgDQGcFmaJgB';
     if (!elKey) return;
-    const enText = getVoicePhrase(text);
+    const enText = await generateVoiceLine(text);
     const tagged = addAudioTags(enText);
+    console.log('[voice] generated:', enText);
     const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
       method: 'POST',
       headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: tagged,
         model_id: 'eleven_v3',
-        voice_settings: { stability: 0.35, similarity_boost: 0.78, style: 0.45 },
+        voice_settings: { stability: 0.65, similarity_boost: 0.85, style: 0.35 },
         speed: 0.72
       })
     });
