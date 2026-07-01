@@ -1235,8 +1235,8 @@ app.post('/chat/tts', async (req, res) => {
         headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: { stability: 0.80, similarity_boost: 0.85, use_speaker_boost: true },
+          model_id: 'eleven_v3',
+          voice_settings: { stability: 0.65, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true },
           speed: 0.88
         })
       });
