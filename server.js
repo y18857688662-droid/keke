@@ -783,7 +783,7 @@ app.get('/memory/read', async (req, res) => {
 app.post('/memory/forget', async (req, res) => {
   const { bucket_id } = req.body;
   if (!bucket_id) return res.json({ ok: false, error: 'need bucket_id' });
-  const result = await callOmbreTool('forget', { bucket_id });
+  const result = await callOmbreTool('trace', { bucket_id, delete: true });
   res.json({ ok: !!result, result });
 });
 
