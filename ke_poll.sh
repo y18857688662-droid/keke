@@ -41,7 +41,12 @@ $MEMORY"
 
     IMG_NOTE=""
     if [ -n "$IMG_URL" ]; then
-      IMG_NOTE="（瑶瑶发了一张图片给你，你看不到图片内容，但可以根据她说的话自然地回应）"
+      HAS_DESC=$(echo "$MSGS" | grep -c '图片：')
+      if [ "$HAS_DESC" -gt 0 ]; then
+        IMG_NOTE="（瑶瑶发了一张图片给你，图片内容已经在消息里用[图片：描述]的格式标注了，请根据图片描述和她的话自然地回应）"
+      else
+        IMG_NOTE="（瑶瑶发了一张图片给你，你看不到图片内容，但可以根据她说的话自然地回应）"
+      fi
       echo "[$(date)] 收到图片"
     fi
 
