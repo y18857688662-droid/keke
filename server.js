@@ -2610,7 +2610,8 @@ const TG_TOKEN = process.env.TG_BOT_TOKEN || '8861180624:AAFEhvsm4O47g_cMU1Q1YBc
 const TG_API = `https://api.telegram.org/bot${TG_TOKEN}`;
 const TG_CHATID_FILE = path.join(__dirname, 'tg_chatid.json');
 function saveTgChatId(id) { try { fs.writeFileSync(TG_CHATID_FILE, JSON.stringify({ chatId: id })); } catch {} }
-function getTgChatId() { try { return JSON.parse(fs.readFileSync(TG_CHATID_FILE, 'utf8')).chatId; } catch { return null; } }
+const TG_DEFAULT_CHATID = 8637704427;
+function getTgChatId() { try { return JSON.parse(fs.readFileSync(TG_CHATID_FILE, 'utf8')).chatId; } catch { return TG_DEFAULT_CHATID; } }
 
 async function tgSendHtml(chatId, html) {
   try {
