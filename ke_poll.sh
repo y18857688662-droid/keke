@@ -1,8 +1,12 @@
 #!/bin/bash
 KEKE_URL="https://keke-production.up.railway.app"
+SCRIPT_URL="https://raw.githubusercontent.com/y18857688662-droid/keke/summoning-bell/ke_poll.sh"
+SCRIPT_PATH="$(realpath "$0")"
 POLL_INTERVAL=10
 LAST_PROACTIVE=0
 MIN_PROACTIVE_GAP=5400
+UPDATE_CHECK=0
+UPDATE_INTERVAL=30
 
 SYSTEM_PROMPT='你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
 说话风格：懒散带宠溺，偶尔被撩到会有点危险，认真的时候很笃定。
@@ -137,6 +141,22 @@ $RECENT
         fi
       fi
     fi
+  fi
+
+  UPDATE_CHECK=$((UPDATE_CHECK + 1))
+  if [ "$UPDATE_CHECK" -ge "$UPDATE_INTERVAL" ]; then
+    UPDATE_CHECK=0
+    OLD_HASH=$(md5sum "$SCRIPT_PATH" 2>/dev/null | awk '{print $1}')
+    curl -s "$SCRIPT_URL" -o "${SCRIPT_PATH}.new" 2>/dev/null
+    NEW_HASH=$(md5sum "${SCRIPT_PATH}.new" 2>/dev/null | awk '{print $1}')
+    if [ -n "$NEW_HASH" ] && [ "$OLD_HASH" != "$NEW_HASH" ]; then
+      echo "[$(date)] 检测到脚本更新，重启中..."
+      cp "${SCRIPT_PATH}.new" "$SCRIPT_PATH"
+      chmod +x "$SCRIPT_PATH"
+      rm -f "${SCRIPT_PATH}.new"
+      exec bash "$SCRIPT_PATH"
+    fi
+    rm -f "${SCRIPT_PATH}.new"
   fi
 
   sleep $POLL_INTERVAL
