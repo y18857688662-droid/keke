@@ -1133,8 +1133,14 @@ app.post('/chat/reply', (req, res) => {
   })().catch(() => {});
   const tgId = getTgChatId();
   if (tgId) {
-    tgSend(tgId, cleanReply).catch(() => {});
-    console.log('[tg] forwarded vps reply to telegram');
+    (async () => {
+      for (const line of lines) {
+        await tgSendTyping(tgId);
+        await new Promise(r => setTimeout(r, 600 + Math.random() * 800));
+        await tgSend(tgId, line);
+      }
+      console.log('[tg] forwarded vps reply to telegram');
+    })().catch(() => {});
   }
   (async () => {
     try {
