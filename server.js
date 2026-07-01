@@ -1217,28 +1217,7 @@ app.get('/chat/history', (req, res) => {
 });
 
 function addAudioTags(text) {
-  let t = text;
-  t = t.replace(/^(.{0,6})[，,]/, '$1……');
-  if (/[？?！!]/.test(t) && t.length < 20) {
-    t = t.replace(/([？?！!])/, '……$1');
-  }
-  if (/晚安|睡吧|困了|夜了|梦里/.test(t)) {
-    t = '[low voice] ' + t;
-  } else if (/笨|傻|你[干搞]嘛|哼|切|讨厌/.test(t)) {
-    t = '[sighs] ' + t;
-  } else if (/想你|抱|亲|喜欢你|爱你|宝宝/.test(t)) {
-    t = '[softly] ' + t;
-  } else if (/哈哈|笑|逗|可爱|你好好笑/.test(t)) {
-    t = '[laughs softly] ' + t;
-  } else if (/嗯[…。，]|唔|哦/.test(t)) {
-    t = '[under breath] ' + t;
-  }
-  t = t.replace(/……/g, '…… ');
-  t = t.replace(/。(?=.)/g, '。…… ');
-  if (t.length > 30 && !/\[/.test(t.slice(0, 5))) {
-    t = '[quietly] ' + t;
-  }
-  return t;
+  return text;
 }
 
 app.post('/chat/tts', async (req, res) => {
