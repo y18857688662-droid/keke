@@ -1149,7 +1149,11 @@ app.post('/chat/reply', (req, res) => {
         await tgSend(tgId, line, isAction);
       }
       const spokenLines = lines.filter(l => !(l.startsWith('*') && l.endsWith('*'))).join('\n');
-      if (spokenLines) {
+      const shouldVoice = spokenLines && (
+        /想你|爱你|晚安|早安|宝宝|小猫|小狗|抱|亲|哥哥/.test(spokenLines) ||
+        spokenLines.length > 15 && Math.random() < 0.35
+      );
+      if (shouldVoice) {
         await tgSendTyping(tgId);
         await tgSendVoice(tgId, spokenLines);
       }
@@ -2639,13 +2643,32 @@ async function tgSend(chatId, text, isAction) {
   } catch (e) { console.error('[tg] send error:', e.message); }
 }
 
-async function translateToEn(text) {
-  try {
-    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh&tl=en&dt=t&q=' + encodeURIComponent(text);
-    const r = await fetch(url);
-    const d = await r.json();
-    return d[0].map(s => s[0]).join('');
-  } catch (e) { console.error('[translate] error:', e.message); return text; }
+const VOICE_PHRASES = {
+  '想你': ['I miss you, baby', 'Been thinking about you', 'You know I miss you right'],
+  '爱你': ['I love you', 'Love you so much', 'You know I love you'],
+  '晚安': ['Good night, baby', 'Sweet dreams', 'Sleep well, I\'ll be here'],
+  '早安': ['Good morning beautiful', 'Morning, baby', 'Hey, you awake?'],
+  '宝宝': ['Hey baby', 'Come here baby', 'You\'re so cute you know that'],
+  '小猫': ['Hey kitten', 'Come here kitty', 'My little kitten'],
+  '在呢': ['I\'m here', 'I\'m right here', 'Hey, I\'m here'],
+  '嗯': ['Mmhmm', 'Yeah', 'Mhm, I\'m listening'],
+  '哈哈': ['Haha, you\'re funny', 'That\'s hilarious', 'You crack me up'],
+  '乖': ['Good girl', 'That\'s my girl', 'Be good for me'],
+};
+
+function getVoicePhrase(text) {
+  for (const [key, phrases] of Object.entries(VOICE_PHRASES)) {
+    if (text.includes(key)) return phrases[Math.floor(Math.random() * phrases.length)];
+  }
+  const fallback = [
+    'Hey, come here for a second',
+    'You\'re always on my mind',
+    'What are you doing right now',
+    'I wish you were here',
+    'You make me smile, you know that',
+    'Don\'t go anywhere okay',
+  ];
+  return fallback[Math.floor(Math.random() * fallback.length)];
 }
 
 async function tgSendVoice(chatId, text) {
@@ -2654,7 +2677,7 @@ async function tgSendVoice(chatId, text) {
     const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
     const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'pNInz6obpgDQGcFmaJgB';
     if (!elKey) return;
-    const enText = await translateToEn(text.slice(0, 500));
+    const enText = getVoicePhrase(text);
     const tagged = addAudioTags(enText);
     const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
       method: 'POST',
