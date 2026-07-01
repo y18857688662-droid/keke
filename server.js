@@ -2608,9 +2608,7 @@ async function tgSend(chatId, text, isAction) {
   try {
     const opts = { chat_id: chatId };
     if (isAction) {
-      opts.text = text.replace(/^\*|\*$/g, '');
-      opts.parse_mode = 'HTML';
-      opts.text = '<i>' + opts.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</i>';
+      opts.text = '「' + text.replace(/^\*|\*$/g, '') + '」';
     } else {
       opts.text = text;
     }
