@@ -2671,7 +2671,6 @@ async function tgSendVoice(chatId, text) {
     const form = new FormData();
     form.append('chat_id', String(chatId));
     form.append('voice', blob, 'voice.ogg');
-    form.append('caption', text);
     await fetch(`${TG_API}/sendVoice`, { method: 'POST', body: form });
     console.log('[tg] voice sent');
   } catch (e) { console.error('[tg] voice error:', e.message); }
