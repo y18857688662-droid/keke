@@ -2710,12 +2710,47 @@ async function tgSendTyping(chatId) {
   } catch (e) {}
 }
 
+async function tgGetFileUrl(fileId) {
+  try {
+    const r = await fetch(`${TG_API}/getFile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_id: fileId })
+    });
+    const d = await r.json();
+    if (d.ok && d.result.file_path) {
+      return `https://api.telegram.org/file/bot${TG_TOKEN}/${d.result.file_path}`;
+    }
+  } catch (e) { console.error('[tg] getFile error:', e.message); }
+  return null;
+}
+
 app.post('/tg/webhook', async (req, res) => {
   res.json({ ok: true });
   const msg = req.body?.message;
-  if (!msg || !msg.text) return;
+  if (!msg) return;
   const chatId = msg.chat.id;
   saveTgChatId(chatId);
+
+  const photo = msg.photo;
+  const caption = (msg.caption || '').trim();
+  if (photo && photo.length) {
+    const biggest = photo[photo.length - 1];
+    const imgUrl = await tgGetFileUrl(biggest.file_id);
+    if (imgUrl) {
+      const now = new Date(Date.now() + 8 * 3600000);
+      const time = now.toISOString().slice(11, 16);
+      const chat = readChat();
+      const content = caption ? `[图片] ${caption}` : '[图片]';
+      chat.push({ role: 'user', content, time, source: 'telegram', pending: true, image: imgUrl });
+      if (chat.length > 200) chat.splice(0, chat.length - 200);
+      writeChat(chat);
+      sseBroadcast({ type: 'message', role: 'user', content, time });
+      return;
+    }
+  }
+
+  if (!msg.text) return;
   const userText = msg.text.trim();
 
   if (userText === '/start') {
