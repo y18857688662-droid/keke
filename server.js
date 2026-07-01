@@ -780,6 +780,13 @@ app.get('/memory/read', async (req, res) => {
   res.json({ ok: !!mem, memories: mem || '', grouped });
 });
 
+app.post('/memory/forget', async (req, res) => {
+  const { bucket_id } = req.body;
+  if (!bucket_id) return res.json({ ok: false, error: 'need bucket_id' });
+  const result = await callOmbreTool('forget', { bucket_id });
+  res.json({ ok: !!result, result });
+});
+
 // === 聊天 ===
 const CHAT_FILE = path.join(__dirname, 'chat.json');
 const CHAT_SYSTEM_BASE = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
