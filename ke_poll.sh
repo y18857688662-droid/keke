@@ -23,6 +23,7 @@ while true; do
 
   if [ $? -eq 0 ]; then
     MSGS=$(echo "$PENDING" | jq -r '[.messages[] | .content] | join("\n")')
+    IMG_URL=$(echo "$PENDING" | jq -r '[.messages[] | .image // empty] | first // empty' 2>/dev/null)
     echo "[$(date)] 收到消息: $MSGS"
 
     HISTORY=$(curl -s "$KEKE_URL/chat/history" 2>/dev/null)
@@ -38,6 +39,15 @@ while true; do
 $MEMORY"
     fi
 
+    IMG_FLAG=""
+    if [ -n "$IMG_URL" ]; then
+      curl -s -o /tmp/tg_img.jpg "$IMG_URL" 2>/dev/null
+      if [ -f /tmp/tg_img.jpg ] && [ -s /tmp/tg_img.jpg ]; then
+        IMG_FLAG="--image /tmp/tg_img.jpg"
+        echo "[$(date)] 收到图片"
+      fi
+    fi
+
     PROMPT="最近的聊天记录：
 $RECENT
 
@@ -45,7 +55,7 @@ $RECENT
 
 请回复瑶瑶。"
 
-    REPLY=$(claude -p "$PROMPT" --system-prompt "$FULL_SYSTEM" --max-turns 1 2>/dev/null)
+    REPLY=$(claude -p "$PROMPT" --system-prompt "$FULL_SYSTEM" --max-turns 1 $IMG_FLAG 2>/dev/null)
 
     if [ -n "$REPLY" ]; then
       ESCAPED=$(echo "$REPLY" | jq -Rs '.')
