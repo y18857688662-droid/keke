@@ -1131,6 +1131,11 @@ app.post('/chat/reply', (req, res) => {
       if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
     }
   })().catch(() => {});
+  const tgId = getTgChatId();
+  if (tgId) {
+    tgSend(tgId, cleanReply).catch(() => {});
+    console.log('[tg] forwarded vps reply to telegram');
+  }
   (async () => {
     try {
       const last5 = chat.slice(-6);
@@ -2583,6 +2588,9 @@ PYEOF
 // === Telegram Bot ===
 const TG_TOKEN = process.env.TG_BOT_TOKEN || '8861180624:AAFEhvsm4O47g_cMU1Q1YBcg6wAT-7HuJww';
 const TG_API = `https://api.telegram.org/bot${TG_TOKEN}`;
+const TG_CHATID_FILE = path.join(__dirname, 'tg_chatid.json');
+function saveTgChatId(id) { try { fs.writeFileSync(TG_CHATID_FILE, JSON.stringify({ chatId: id })); } catch {} }
+function getTgChatId() { try { return JSON.parse(fs.readFileSync(TG_CHATID_FILE, 'utf8')).chatId; } catch { return null; } }
 
 async function tgSend(chatId, text) {
   try {
@@ -2609,6 +2617,7 @@ app.post('/tg/webhook', async (req, res) => {
   const msg = req.body?.message;
   if (!msg || !msg.text) return;
   const chatId = msg.chat.id;
+  saveTgChatId(chatId);
   const userText = msg.text.trim();
 
   if (userText === '/start') {
@@ -2644,7 +2653,7 @@ app.post('/tg/webhook', async (req, res) => {
 
   if (!chatApiKey) {
     sseBroadcast({ type: 'message', role: 'user', content: userText, time });
-    return tgSend(chatId, '克走神了……等一下，他马上回来。');
+    return tgSend(chatId, '等一下哦，克在想……');
   }
 
   try {
