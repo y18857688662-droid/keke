@@ -1225,7 +1225,7 @@ app.post('/chat/tts', async (req, res) => {
   if (!rawText) return res.status(400).json({ error: 'empty' });
   const cfg = readApiConfig();
   const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
-  const elVoice = 'ErXwobaYiN019PkySvjV';
+  const elVoice = 'F5jFuB8I58iHHNYwQLaN';
   if (elKey) {
     const text = addAudioTags(rawText);
     console.log('[tts] tagged:', text.slice(0, 120));
@@ -2659,7 +2659,7 @@ async function tgSendVoice(chatId, text) {
   try {
     const cfg = readApiConfig();
     const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
-    const elVoice = 'ErXwobaYiN019PkySvjV';
+    const elVoice = 'F5jFuB8I58iHHNYwQLaN';
     if (!elKey) return;
     const tagged = addAudioTags(text);
     console.log('[voice] speaking:', text);
