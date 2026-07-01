@@ -1140,6 +1140,11 @@ app.post('/chat/reply', (req, res) => {
         await new Promise(r => setTimeout(r, isAction ? 400 : 600 + Math.random() * 800));
         await tgSend(tgId, line, isAction);
       }
+      const spokenLines = lines.filter(l => !(l.startsWith('*') && l.endsWith('*'))).join('\n');
+      if (spokenLines) {
+        await tgSendTyping(tgId);
+        await tgSendVoice(tgId, spokenLines);
+      }
       console.log('[tg] forwarded vps reply to telegram');
     })().catch(() => {});
   }
@@ -2615,6 +2620,34 @@ async function tgSend(chatId, text, isAction) {
       body: JSON.stringify(opts)
     });
   } catch (e) { console.error('[tg] send error:', e.message); }
+}
+
+async function tgSendVoice(chatId, text) {
+  try {
+    const cfg = readApiConfig();
+    const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
+    const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'pNInz6obpgDQGcFmaJgB';
+    if (!elKey) return;
+    const tagged = addAudioTags(text.slice(0, 500));
+    const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
+      method: 'POST',
+      headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: tagged,
+        model_id: 'eleven_v3',
+        voice_settings: { stability: 0.35, similarity_boost: 0.78, style: 0.45 },
+        speed: 0.72
+      })
+    });
+    if (!resp.ok) { console.error('[tg] tts error:', resp.status); return; }
+    const buf = Buffer.from(await resp.arrayBuffer());
+    const blob = new Blob([buf], { type: 'audio/mpeg' });
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    form.append('voice', blob, 'voice.ogg');
+    await fetch(`${TG_API}/sendVoice`, { method: 'POST', body: form });
+    console.log('[tg] voice sent');
+  } catch (e) { console.error('[tg] voice error:', e.message); }
 }
 
 async function tgSendTyping(chatId) {
