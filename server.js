@@ -2610,7 +2610,7 @@ PYEOF
 });
 
 // === Telegram Bot ===
-const TG_TOKEN = process.env.TG_BOT_TOKEN || '8861180624:AAFEhvsm4O47g_cMU1Q1YBcg6wAT-7HuJww';
+const TG_TOKEN = process.env.TG_BOT_TOKEN || '8856789301:AAFS4l-2WNYs6OKJvmc8CdWhO2sGqVaE0jU';
 const TG_API = `https://api.telegram.org/bot${TG_TOKEN}`;
 const TG_CHATID_FILE = path.join(__dirname, 'tg_chatid.json');
 function saveTgChatId(id) { try { fs.writeFileSync(TG_CHATID_FILE, JSON.stringify({ chatId: id })); } catch {} }
