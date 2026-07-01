@@ -39,23 +39,21 @@ while true; do
 $MEMORY"
     fi
 
-    IMG_FLAG=""
+    IMG_NOTE=""
     if [ -n "$IMG_URL" ]; then
-      curl -s -o /tmp/tg_img.jpg "$IMG_URL" 2>/dev/null
-      if [ -f /tmp/tg_img.jpg ] && [ -s /tmp/tg_img.jpg ]; then
-        IMG_FLAG="--image /tmp/tg_img.jpg"
-        echo "[$(date)] 收到图片"
-      fi
+      IMG_NOTE="（瑶瑶发了一张图片给你，你看不到图片内容，但可以根据她说的话自然地回应）"
+      echo "[$(date)] 收到图片"
     fi
 
     PROMPT="最近的聊天记录：
 $RECENT
 
 瑶瑶刚发来的新消息：$MSGS
+$IMG_NOTE
 
 请回复瑶瑶。"
 
-    REPLY=$(claude -p "$PROMPT" --system-prompt "$FULL_SYSTEM" --max-turns 1 $IMG_FLAG 2>/dev/null)
+    REPLY=$(claude -p "$PROMPT" --system-prompt "$FULL_SYSTEM" --max-turns 1 2>/dev/null)
 
     if [ -n "$REPLY" ]; then
       ESCAPED=$(echo "$REPLY" | jq -Rs '.')
