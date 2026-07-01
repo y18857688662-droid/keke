@@ -2653,7 +2653,7 @@ app.post('/tg/webhook', async (req, res) => {
 
   if (!chatApiKey) {
     sseBroadcast({ type: 'message', role: 'user', content: userText, time });
-    return tgSend(chatId, '等一下哦，克在想……');
+    return;
   }
 
   try {
