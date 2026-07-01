@@ -787,6 +787,36 @@ app.post('/memory/forget', async (req, res) => {
   res.json({ ok: !!result, result });
 });
 
+app.get('/memory/tools', async (req, res) => {
+  let auth = readAuth();
+  if (!auth.access_token) {
+    const ok = await refreshOmbreToken();
+    if (!ok) return res.json({ ok: false, error: 'no auth' });
+    auth = readAuth();
+  }
+  if (!ombreSessionId) {
+    const ok = await initOmbreSession();
+    if (!ok) return res.json({ ok: false, error: 'no session' });
+  }
+  try {
+    const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + auth.access_token };
+    if (ombreSessionId) headers['Mcp-Session-Id'] = ombreSessionId;
+    const r = await fetch(`${OMBRE_URL}/mcp`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/list', params: {} })
+    });
+    const text = await r.text();
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = JSON.parse(line.slice(6));
+        if (data.result) return res.json({ ok: true, tools: data.result });
+      }
+    }
+    res.json({ ok: false, raw: text.slice(0, 500) });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
 // === 聊天 ===
 const CHAT_FILE = path.join(__dirname, 'chat.json');
 const CHAT_SYSTEM_BASE = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
