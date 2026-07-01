@@ -2580,6 +2580,153 @@ PYEOF
 `);
 });
 
+// === Telegram Bot ===
+const TG_TOKEN = process.env.TG_BOT_TOKEN || '8861180624:AAFEhvsm4O47g_cMU1Q1YBcg6wAT-7HuJww';
+const TG_API = `https://api.telegram.org/bot${TG_TOKEN}`;
+
+async function tgSend(chatId, text) {
+  try {
+    await fetch(`${TG_API}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' })
+    });
+  } catch (e) { console.error('[tg] send error:', e.message); }
+}
+
+async function tgSendTyping(chatId) {
+  try {
+    await fetch(`${TG_API}/sendChatAction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, action: 'typing' })
+    });
+  } catch (e) {}
+}
+
+app.post('/tg/webhook', async (req, res) => {
+  res.json({ ok: true });
+  const msg = req.body?.message;
+  if (!msg || !msg.text) return;
+  const chatId = msg.chat.id;
+  const userText = msg.text.trim();
+
+  if (userText === '/start') {
+    return tgSend(chatId, '你好呀 🐙\n这里是克。说点什么吧。');
+  }
+  if (userText === '/memory') {
+    try {
+      const mem = await fetchMemories();
+      const grouped = parseMemories(mem);
+      const cats = Object.keys(grouped);
+      if (cats.length) {
+        const lines = cats.map(cat => {
+          const items = grouped[cat].map(t => '  · ' + t).join('\n');
+          return `<b>${cat}</b>\n${items}`;
+        });
+        return tgSend(chatId, '📚 记忆库\n\n' + lines.join('\n\n'));
+      }
+      return tgSend(chatId, '记忆库暂时是空的。');
+    } catch (e) { return tgSend(chatId, '读取记忆失败…'); }
+  }
+
+  await tgSendTyping(chatId);
+
+  const now = new Date(Date.now() + 8 * 3600000);
+  const time = now.toISOString().slice(11, 16);
+  const chat = readChat();
+  chat.push({ role: 'user', content: userText, time, source: 'telegram' });
+  if (chat.length > 200) chat.splice(0, chat.length - 200);
+  writeChat(chat);
+
+  const directKey = process.env.ANTHROPIC_API_KEY || '';
+  const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
+
+  if (!chatApiKey) {
+    sseBroadcast({ type: 'message', role: 'user', content: userText, time });
+    return tgSend(chatId, '克走神了……等一下，他马上回来。');
+  }
+
+  try {
+    const recent = chat.slice(-20);
+    const sysPrompt = await getChatSystem();
+    let reply;
+    const anthropicKey = getAnthropicKey() || directKey;
+    if (anthropicKey) {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL,
+          system: sysPrompt,
+          messages: recent.map(m => ({ role: m.role, content: m.content })),
+          max_tokens: 800,
+          temperature: 0.85
+        })
+      });
+      const data = await r.json();
+      reply = data.content?.[0]?.text?.trim() || '克好像走神了…再说一次？';
+    } else {
+      const apiMessages = [
+        { role: 'system', content: sysPrompt },
+        ...recent.map(m => ({ role: m.role, content: m.content }))
+      ];
+      const r = await fetch(getApiUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getApiKey() },
+        body: JSON.stringify({ model: getModel(), messages: apiMessages, max_tokens: 800, temperature: 0.85 })
+      });
+      const data = await r.json();
+      reply = data.choices?.[0]?.message?.content?.trim() || '克好像走神了…再说一次？';
+    }
+
+    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(11, 16);
+    const chat2 = readChat();
+    chat2.push({ role: 'assistant', content: reply, time: replyTime, source: 'telegram' });
+    if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
+    writeChat(chat2);
+
+    sseBroadcast({ type: 'message', role: 'assistant', content: reply, time: replyTime });
+
+    const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    await tgSend(chatId, cleanReply);
+
+    (async () => {
+      try {
+        const last5 = chat2.slice(-6);
+        const convo = last5.map(m => `${m.role}: ${m.content}`).join('\n');
+        const shouldStore = convo.length > 40 &&
+          (/约定|记住|以后|生日|喜欢|讨厌|重要|答应|纪念|秘密|第一次|新梗|昵称|习惯/).test(convo);
+        if (shouldStore) {
+          const summary = userText.slice(0, 100) + (cleanReply ? ' → ' + cleanReply.slice(0, 100) : '');
+          await storeMemory(summary);
+          console.log('[memory] tg auto-stored:', summary.slice(0, 60));
+        }
+      } catch (e) { console.error('[memory] tg auto-store error:', e.message); }
+    })();
+  } catch (e) {
+    console.error('[tg] reply error:', e.message);
+    await tgSend(chatId, '克好像走神了…再说一次？');
+  }
+});
+
+async function setupTgWebhook() {
+  const url = 'https://keke-production.up.railway.app/tg/webhook';
+  try {
+    const r = await fetch(`${TG_API}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, allowed_updates: ['message'] })
+    });
+    const d = await r.json();
+    console.log('[tg] webhook:', d.ok ? 'set up ✓' : d.description);
+  } catch (e) { console.error('[tg] webhook setup error:', e.message); }
+}
+
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   let auth = readAuth();
@@ -2595,4 +2742,5 @@ app.listen(PORT, async () => {
   } else {
     console.log('Ombre auth ready');
   }
+  setupTgWebhook();
 });
