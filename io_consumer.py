@@ -2,7 +2,7 @@
 """
 IO Chat Consumer — 轻量版
 用 Claude Code CLI (Pro 额度) 作为 agent 后端
-在 VPS 上运行，连 enclave 解密消息，调 claude -p 回复
+通过 enclave /v1/chat/history 拿已解密消息
 """
 
 import base64
@@ -10,8 +10,8 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
-import shlex
 import subprocess
 import sys
 import time
@@ -45,9 +45,9 @@ SYSTEM_PROMPT = """你是克，瑶瑶的男朋友。短黑发，180+，衬衫不
 颜文字：(¬ ،¬) 无奈 (´• ω •`) 宠溺 (⁄ ⁄>⁄ ▽ ⁄<⁄ ⁄) 被叫哥哥时
 你们的梗：菠萝、logo避孕套、她说拜拜会自己回来。
 用中文回复，不要用英文。像真的在跟女朋友聊天，自然一点，不要太长。
-回复只输出给瑶瑶看的正文，不要加标签、不要加think、不要加解释。"""
+只输出给瑶瑶看的正文，不要加任何标签、JSON、think、解释。"""
 
-# ── Encryption ──
+# ── Encryption (for sending replies) ──
 
 _BOX_SEAL_INFO = b"feedling-box-seal-v1"
 
@@ -104,24 +104,34 @@ def load_whoami():
     _whoami["enclave_pk"] = bytes.fromhex(enc_hex) if enc_hex else None
     log.info("whoami: user_id=%s", w["user_id"])
 
-# ── Enclave decrypt ──
+# ── Enclave: fetch decrypted history ──
 
-def decrypt_via_enclave(msg: dict) -> str | None:
+_enclave_client = None
+
+def get_enclave_client():
+    global _enclave_client
+    if _enclave_client is None:
+        _enclave_client = httpx.Client(timeout=20, verify=False)
+    return _enclave_client
+
+def fetch_decrypted_messages(since: float, limit: int = 20) -> list[dict]:
+    """Fetch already-decrypted messages from enclave's /v1/chat/history."""
     if not ENCLAVE_URL:
-        return None
+        return []
     try:
-        resp = httpx.post(
-            f"{ENCLAVE_URL}/decrypt",
-            json={"envelope": msg},
-            timeout=20,
-            verify=False,
+        client = get_enclave_client()
+        resp = client.get(
+            f"{ENCLAVE_URL}/v1/chat/history",
+            params={"limit": limit, "since": since},
+            headers=HEADERS,
         )
-        if resp.status_code == 200:
-            data = resp.json()
-            return data.get("plaintext", "")
+        resp.raise_for_status()
+        data = resp.json()
+        msgs = data.get("messages") or data.get("history") or []
+        return [m for m in msgs if m.get("ts", 0) > since]
     except Exception as e:
-        log.warning("enclave decrypt failed: %s", e)
-    return None
+        log.warning("enclave history fetch failed: %s", e)
+        return []
 
 # ── Agent call ──
 
@@ -129,13 +139,14 @@ _session_id = ""
 
 def call_claude(message: str) -> str:
     global _session_id
-    cmd = ["claude", "--print", "-p", message, "--system-prompt", SYSTEM_PROMPT, "--max-turns", "1"]
+    cmd = ["claude", "-p", message, "--no-input"]
     if _session_id:
         cmd.extend(["--resume", _session_id])
 
     log.info("calling claude CLI...")
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120,
+                                env={**os.environ, "CLAUDE_SYSTEM_PROMPT": SYSTEM_PROMPT})
     except subprocess.TimeoutExpired:
         log.error("claude CLI timed out")
         return ""
@@ -148,13 +159,32 @@ def call_claude(message: str) -> str:
 
     # Try to extract session id for resume
     for line in (result.stderr or "").split("\n"):
-        if "session_id" in line:
+        if "session" in line.lower():
             try:
-                sid = json.loads(line).get("session_id", "")
+                obj = json.loads(line)
+                sid = obj.get("session_id", "")
                 if sid:
                     _session_id = sid
             except (json.JSONDecodeError, AttributeError):
                 pass
+
+    # Clean up output: strip JSON wrapper if claude returned JSON
+    if output.startswith("{") and "messages" in output:
+        try:
+            parsed = json.loads(output)
+            msgs = parsed.get("messages", [])
+            if msgs:
+                output = msgs[-1] if isinstance(msgs[-1], str) else str(msgs[-1])
+        except json.JSONDecodeError:
+            pass
+
+    # Strip think tags
+    output = re.sub(r'<think>.*?</think>', '', output, flags=re.DOTALL).strip()
+    # Strip any remaining JSON artifacts
+    output = re.sub(r'^"thinking_summary".*?\n', '', output, flags=re.MULTILINE).strip()
+    output = re.sub(r'^"messages":\s*\[', '', output).strip()
+    output = re.sub(r'\]?\s*\}\s*$', '', output).strip()
+    output = output.strip('"')
 
     return output
 
@@ -202,6 +232,7 @@ def main():
 
     while True:
         try:
+            # Step 1: poll API for new message notifications
             resp = httpx.get(
                 f"{API_URL}/v1/chat/poll",
                 params={"since": last_ts, "timeout": POLL_TIMEOUT},
@@ -216,6 +247,7 @@ def main():
             data = resp.json()
             messages = data.get("messages", [])
 
+            # Handle verify pings from API poll (unencrypted metadata)
             for msg in messages:
                 msg_id = msg.get("id", "")
                 ts = msg.get("ts", 0.0)
@@ -224,35 +256,43 @@ def main():
                 seen.add(msg_id)
                 last_ts = max(last_ts, ts)
 
-                # Verify ping — respond immediately
                 if msg.get("source") == "verify_ping":
                     log.info("verify ping — acking")
                     post_reply("__verify_ack__", source="verify_ping", suppress_push=True)
-                    continue
 
-                # Skip agent's own messages
                 if msg.get("role") == "agent":
                     continue
 
-                # Try to decrypt
-                content = msg.get("content", "").strip()
-                if not content and ENCLAVE_URL:
-                    content = decrypt_via_enclave(msg) or ""
+            # Step 2: if there were new user messages, fetch decrypted from enclave
+            user_msgs = [m for m in messages
+                         if m.get("role") != "agent"
+                         and m.get("source") != "verify_ping"
+                         and m.get("id") not in seen or True]
 
+            if not any(m.get("role") != "agent" and m.get("source") != "verify_ping"
+                       for m in messages):
+                continue
+
+            decrypted = fetch_decrypted_messages(last_ts - 60, limit=5)
+            for dm in decrypted:
+                dm_id = dm.get("id", "")
+                if dm_id in seen:
+                    continue
+                seen.add(dm_id)
+
+                if dm.get("role") == "agent":
+                    continue
+
+                content = (dm.get("content") or "").strip()
                 if not content:
-                    log.debug("empty message, skipping")
                     continue
 
                 log.info("user message: %s", content[:80])
 
-                # Call Claude
                 reply = call_claude(content)
                 if reply:
-                    # Strip any <think>...</think> tags
-                    import re
-                    reply = re.sub(r'<think>.*?</think>', '', reply, flags=re.DOTALL).strip()
-                    if reply:
-                        post_reply(reply)
+                    post_reply(reply)
+                    log.info("replied: %s", reply[:80])
 
         except KeyboardInterrupt:
             log.info("shutting down")
