@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """IO Chat Consumer — 直接轮询 enclave history"""
 
-import base64, hashlib, json, logging, os, re, secrets, subprocess, time
+import base64, fcntl, hashlib, json, logging, os, re, secrets, subprocess, sys, time
 import httpx
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
@@ -99,6 +99,12 @@ def call_claude(msg):
     return out.strip(), thinking.strip()
 
 def main():
+    lock_fd = open("/tmp/io_consumer.lock", "w")
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        log.info("another instance running, exiting")
+        sys.exit(0)
     log.info("starting — enclave=%s", ENCLAVE_URL)
     load_whoami()
     seen = set()
