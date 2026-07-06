@@ -62,9 +62,14 @@ def load_whoami():
     whoami["epk"] = bytes.fromhex(eh) if eh else None
     log.info("whoami OK: %s", w["user_id"])
 
-def post_reply(text, source="chat", suppress=False):
+def post_reply(text, source="chat", suppress=False, thinking=""):
     env = build_envelope(text.encode(), whoami["uid"], whoami["upk"], whoami["epk"])
     body = {"envelope": env, "source": source, "alert_body": "" if suppress else text[:240]}
+    if thinking:
+        body["thinking_envelope"] = build_envelope(thinking.encode(), whoami["uid"], whoami["upk"], whoami["epk"])
+        body["thinking_kind"] = "provider_reasoning_summary"
+        body["thinking_source"] = "claude-code-cli"
+        body["thinking_model"] = "claude"
     r = httpx.post(f"{API_URL}/v1/chat/response", json=body, headers=HEADERS, timeout=15)
     log.info("post_reply: %s", r.status_code)
 
@@ -74,14 +79,16 @@ def call_claude(msg):
         r = subprocess.run(["claude", "-p", msg, "--system-prompt", SYSTEM_PROMPT],
                            capture_output=True, text=True, timeout=120)
     except subprocess.TimeoutExpired:
-        log.error("claude timeout"); return ""
+        log.error("claude timeout"); return "", ""
     if r.returncode != 0:
-        log.error("claude err: %s", (r.stderr or "")[:200]); return ""
+        log.error("claude err: %s", (r.stderr or "")[:200]); return "", ""
     out = r.stdout.strip()
     out = re.sub(r'<think>.*?</think>', '', out, flags=re.DOTALL).strip()
+    thinking = ""
     try:
         j = json.loads(out)
         if isinstance(j, dict):
+            thinking = j.get("thinking_summary") or j.get("thinking") or ""
             msgs = j.get("messages") or j.get("result") or []
             if isinstance(msgs, list) and msgs:
                 out = "\n".join(m if isinstance(m, str) else str(m) for m in msgs)
@@ -89,7 +96,7 @@ def call_claude(msg):
                 out = msgs
     except (json.JSONDecodeError, TypeError):
         pass
-    return out.strip()
+    return out.strip(), thinking.strip()
 
 def main():
     log.info("starting — enclave=%s", ENCLAVE_URL)
@@ -135,9 +142,9 @@ def main():
                 if not content: continue
 
                 log.info(">>> user: %s", content[:80])
-                reply = call_claude(content)
+                reply, thinking = call_claude(content)
                 if reply:
-                    post_reply(reply)
+                    post_reply(reply, thinking=thinking)
                     log.info("<<< reply: %s", reply[:80])
 
             time.sleep(5)
