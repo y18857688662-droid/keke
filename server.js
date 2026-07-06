@@ -1062,17 +1062,18 @@ app.post('/chat/tts', async (req, res) => {
   if (!text) return res.status(400).json({ error: 'empty' });
   const cfg = readApiConfig();
   const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
-  const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'pNInz6obpgDQGcFmaJgB';
+  const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'F5jFuB8I58iHHNYwQLaN';
   if (elKey) {
     try {
+      const isEnglish = /^[a-zA-Z\s\d.,!?'";\-:()\[\]]+$/.test(text.replace(/\[.*?\]/g, '').trim());
       const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
         method: 'POST',
         headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: { stability: 0.85, similarity_boost: 0.75, style: 0 },
-          speed: 0.75
+          model_id: 'eleven_v3',
+          language_code: isEnglish ? 'en' : 'zh',
+          voice_settings: { stability: 0.24, similarity_boost: 0.92, style: 0.9, speed: 0.92 }
         })
       });
       if (resp.ok) {
