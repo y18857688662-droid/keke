@@ -119,7 +119,7 @@ def main():
                     post_reply("__verify_ack__", source="verify_ping", suppress=True)
                     continue
 
-                if role == "agent": continue
+                if role != "user": continue
 
                 content = (m.get("content") or "").strip()
                 if not content: continue
