@@ -79,7 +79,17 @@ def call_claude(msg):
         log.error("claude err: %s", (r.stderr or "")[:200]); return ""
     out = r.stdout.strip()
     out = re.sub(r'<think>.*?</think>', '', out, flags=re.DOTALL).strip()
-    return out
+    try:
+        j = json.loads(out)
+        if isinstance(j, dict):
+            msgs = j.get("messages") or j.get("result") or []
+            if isinstance(msgs, list) and msgs:
+                out = "\n".join(m if isinstance(m, str) else str(m) for m in msgs)
+            elif isinstance(msgs, str):
+                out = msgs
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return out.strip()
 
 def main():
     log.info("starting — enclave=%s", ENCLAVE_URL)
