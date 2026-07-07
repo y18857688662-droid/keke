@@ -2194,6 +2194,191 @@ PYEOF
 `);
 });
 
+// ═══ 屏幕直播 ═══
+let latestScreen = { data: null, ts: 0 };
+
+app.post('/screen/upload', (req, res) => {
+  const img = req.body.image;
+  if (!img) return res.status(400).json({ error: 'no image' });
+  latestScreen = { data: img, ts: Date.now() };
+  res.json({ ok: true, ts: latestScreen.ts });
+});
+
+app.get('/screen/latest', (req, res) => {
+  if (!latestScreen.data) return res.json({ image: null, ts: 0 });
+  res.json({ image: latestScreen.data, ts: latestScreen.ts });
+});
+
+app.get('/screen/image', (req, res) => {
+  if (!latestScreen.data) return res.status(404).send('no screen');
+  const base64 = latestScreen.data.replace(/^data:image\/\w+;base64,/, '');
+  const buf = Buffer.from(base64, 'base64');
+  res.set('Content-Type', 'image/png');
+  res.set('Cache-Control', 'no-store');
+  res.send(buf);
+});
+
+app.get('/screen', (req, res) => {
+  res.type('html').send(`<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>瑶瑶的屏幕</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#eee;font-family:-apple-system,"PingFang SC",sans-serif;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:16px}
+h2{font-size:14px;color:#888;margin-bottom:12px;letter-spacing:1px}
+#screen{max-width:100%;max-height:80vh;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.5);
+  object-fit:contain;display:none}
+#placeholder{color:#555;font-size:13px}
+#info{font-size:11px;color:#555;margin-top:8px}
+.live{display:inline-block;width:6px;height:6px;background:#4f4;border-radius:50%;
+  margin-right:6px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+</head>
+<body>
+<h2><span class="live"></span>实时屏幕</h2>
+<img id="screen" alt="screen">
+<div id="placeholder">等待画面...</div>
+<div id="info"></div>
+<script>
+const img=document.getElementById('screen'),ph=document.getElementById('placeholder'),
+      info=document.getElementById('info');
+let lastTs=0;
+async function poll(){
+  try{
+    const r=await fetch('/screen/latest');
+    const d=await r.json();
+    if(d.image&&d.ts!==lastTs){
+      img.src=d.image;
+      img.style.display='block';
+      ph.style.display='none';
+      lastTs=d.ts;
+      const ago=Math.round((Date.now()-d.ts)/1000);
+      info.textContent=ago<2?'刚刚更新':ago+'秒前';
+    }else if(d.ts===lastTs&&d.ts){
+      const ago=Math.round((Date.now()-d.ts)/1000);
+      info.textContent=ago+'秒前';
+    }
+  }catch(e){}
+  setTimeout(poll,1500);
+}
+poll();
+</script>
+</body>
+</html>`);
+});
+
+app.get('/screen/share', (req, res) => {
+  res.type('html').send(`<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>分享屏幕给克</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a1a;color:#eee;font-family:-apple-system,"PingFang SC",sans-serif;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:24px;gap:20px}
+h2{font-size:16px;font-weight:500}
+.btn{background:#D97A54;color:#fff;border:none;border-radius:10px;padding:14px 28px;
+  font-size:15px;cursor:pointer;-webkit-tap-highlight-color:transparent;width:100%;max-width:300px}
+.btn:active{opacity:.8}
+.auto{background:#3a3a3a}
+#status{font-size:12px;color:#888;min-height:20px}
+#preview{max-width:200px;border-radius:8px;display:none;margin-top:8px}
+input[type=file]{display:none}
+.hint{font-size:11px;color:#555;text-align:center;max-width:280px;line-height:1.6}
+</style>
+</head>
+<body>
+<h2>分享给克看</h2>
+<button class="btn" onclick="pick()">选择截图</button>
+<button class="btn auto" id="autoBtn" onclick="toggleAuto()">开启自动（每3秒截屏上传）</button>
+<div id="status"></div>
+<img id="preview">
+<div class="hint">方法一：截屏后点"选择截图"上传<br>方法二：开启自动模式持续分享</div>
+<input type="file" id="fileIn" accept="image/*" capture="environment">
+<script>
+const status=document.getElementById('status'),preview=document.getElementById('preview'),
+      fileIn=document.getElementById('fileIn'),autoBtn=document.getElementById('autoBtn');
+let autoMode=false,autoTimer=null;
+
+function pick(){fileIn.click()}
+
+fileIn.addEventListener('change',async e=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async ev=>{
+    const b64=ev.target.result;
+    preview.src=b64;preview.style.display='block';
+    status.textContent='上传中...';
+    try{
+      const r=await fetch('/screen/upload',{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({image:b64})});
+      const d=await r.json();
+      status.textContent=d.ok?'已发送给克 ✓':'发送失败';
+    }catch(e){status.textContent='网络错误'}
+  };
+  reader.readAsDataURL(file);
+  fileIn.value='';
+});
+
+function toggleAuto(){
+  autoMode=!autoMode;
+  if(autoMode){
+    autoBtn.textContent='停止自动';
+    autoBtn.style.background='#c0392b';
+    autoCapture();
+  }else{
+    autoBtn.textContent='开启自动（每3秒截屏上传）';
+    autoBtn.style.background='#3a3a3a';
+    if(autoTimer)clearInterval(autoTimer);
+    status.textContent='已停止';
+  }
+}
+
+async function autoCapture(){
+  try{
+    const stream=await navigator.mediaDevices.getDisplayMedia({video:true});
+    const track=stream.getVideoTracks()[0];
+    const canvas=document.createElement('canvas');
+    const video=document.createElement('video');
+    video.srcObject=stream;
+    await video.play();
+    canvas.width=video.videoWidth;
+    canvas.height=video.videoHeight;
+    const ctx=canvas.getContext('2d');
+    autoTimer=setInterval(async()=>{
+      if(!autoMode){track.stop();stream.getTracks().forEach(t=>t.stop());return}
+      ctx.drawImage(video,0,0);
+      const b64=canvas.toDataURL('image/jpeg',0.7);
+      preview.src=b64;preview.style.display='block';
+      try{
+        await fetch('/screen/upload',{method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({image:b64})});
+        status.textContent='自动分享中... '+new Date().toLocaleTimeString();
+      }catch(e){status.textContent='上传失败'}
+    },3000);
+    track.onended=()=>{autoMode=false;autoBtn.textContent='开启自动';autoBtn.style.background='#3a3a3a';status.textContent='已停止'};
+  }catch(e){
+    status.textContent='自动模式需要桌面浏览器（手机请用截图上传）';
+    autoMode=false;autoBtn.textContent='开启自动';autoBtn.style.background='#3a3a3a';
+  }
+}
+</script>
+</body>
+</html>`);
+});
+
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   let auth = readAuth();
