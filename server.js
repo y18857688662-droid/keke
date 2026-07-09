@@ -1236,8 +1236,8 @@ app.post('/chat/tts', async (req, res) => {
         body: JSON.stringify({
           text,
           model_id: 'eleven_v3',
-          voice_settings: { stability: 0.28, similarity_boost: 0.92, style: 0.90, speed: 0.80 },
-          previous_text: 'Hey, come here baby, let me tell you something...'
+          language_code: 'en',
+          voice_settings: { stability: 0.28, similarity_boost: 0.92, style: 0.90, speed: 0.80 }
         })
       });
       if (resp.ok) {
