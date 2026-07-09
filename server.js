@@ -3028,6 +3028,7 @@ app.post('/voice/reply', async (req, res) => {
     if (!r.ok) throw new Error('proxy error');
     const data = await r.json();
     res.json(data);
+    callOmbreTool('hold', { text: `[voice] 瑶瑶说：${message} → 克回：${data.text}`, domain: 'romance', tags: 'voice-synth' }).catch(() => {});
   } catch (e) {
     res.status(502).json({ error: 'voice proxy unreachable' });
   }
