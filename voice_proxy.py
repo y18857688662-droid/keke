@@ -72,7 +72,6 @@ class Handler(BaseHTTPRequestHandler):
             prompt = f"{REPLY_PERSONA}{mem_block}\n\nShe said: \"{message}\"\n\nReply:"
 
         text = call_claude(prompt)
-        text = re.sub(r'\[.*?\]', '', text).strip()
 
         if not text:
             self.send_response(500)
