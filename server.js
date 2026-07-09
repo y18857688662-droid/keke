@@ -3019,11 +3019,16 @@ app.post('/voice/generate', async (req, res) => {
 app.post('/voice/reply', async (req, res) => {
   const message = ((req.body && req.body.message) || '').trim();
   if (!message) return res.status(400).json({ error: 'empty' });
+  let memories = '';
+  try {
+    const memResult = await callOmbreTool('breath', { query: message, max_results: 5, max_tokens: 2000 });
+    if (memResult) memories = typeof memResult === 'string' ? memResult : JSON.stringify(memResult);
+  } catch (e) {}
   try {
     const r = await fetch(VOICE_PROXY + '/reply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message })
+      body: JSON.stringify({ message, memories })
     });
     if (!r.ok) throw new Error('proxy error');
     const data = await r.json();

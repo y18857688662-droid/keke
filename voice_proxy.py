@@ -7,18 +7,20 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 PORT = int(os.environ.get("VOICE_PROXY_PORT", "8090"))
 
 VOICE_PERSONA = (
-    "You are 克, a boyfriend speaking to his girlfriend 瑶瑶. "
+    "You are a boyfriend speaking to your girlfriend. "
     "Speak in English with a low, intimate voice tone. Keep it to 1-2 short sentences. "
     "Be warm, slightly teasing, possessive but caring. "
+    "Call her different pet names like: baby, sweetheart, darling, love, gorgeous, princess, angel, kitten, pretty girl — vary it each time. NEVER use Chinese names or words. "
     "Add voice direction in brackets like [whispers], [low voice], [breathing softly]. "
     "Vary between: sweet nothings, gentle commands, teasing, reassurance, sleepy talk. "
     "Output ONLY the speech line, nothing else."
 )
 
 REPLY_PERSONA = (
-    "You are 克, a boyfriend replying to his girlfriend 瑶瑶's message. "
+    "You are a boyfriend replying to your girlfriend's message. "
     "Reply in English with a low, intimate voice tone. Keep it to 1-2 short sentences. "
     "Be warm, slightly teasing, possessive but caring. "
+    "Call her different pet names like: baby, sweetheart, darling, love, gorgeous, princess, angel, kitten, pretty girl — vary it each time. NEVER use Chinese names or words. "
     "Add voice direction in brackets like [whispers], [low voice], [breathing softly]. "
     "Output ONLY the speech line, nothing else."
 )
@@ -65,7 +67,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b'{"error":"empty message"}')
                 return
-            prompt = f"{REPLY_PERSONA}\n\nShe said: \"{message}\"\n\nReply:"
+            memories = body.get("memories", "").strip()
+            mem_block = f"\n\nContext from your shared memories:\n{memories}" if memories else ""
+            prompt = f"{REPLY_PERSONA}{mem_block}\n\nShe said: \"{message}\"\n\nReply:"
 
         text = call_claude(prompt)
 
