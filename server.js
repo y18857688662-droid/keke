@@ -2949,10 +2949,38 @@ let audioCtx,analyser,source,isPlaying=false,avgLevel=0,currentMood='random';
 function drawOrb(){const w=S,h=S,cx=w/2,cy=h/2;ctx.clearRect(0,0,w,h);let level=0;if(analyser&&isPlaying){const data=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(data);let sum=0;for(let i=0;i<data.length;i++)sum+=data[i];level=sum/data.length/255}avgLevel+=(level-avgLevel)*0.15;const baseR=S*0.2,pulse=baseR+avgLevel*50,t=Date.now()/1000;for(let layer=5;layer>=0;layer--){const r=pulse+layer*(8+avgLevel*12),alpha=(0.08-layer*0.012)+avgLevel*0.05;const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,r);grad.addColorStop(0,'rgba(180,180,200,'+(alpha+0.05)+')');grad.addColorStop(0.5,'rgba(120,120,150,'+alpha+')');grad.addColorStop(1,'rgba(60,60,80,0)');ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill()}const bright=0.3+avgLevel*0.5;const coreGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,pulse);coreGrad.addColorStop(0,'rgba(220,220,235,'+bright+')');coreGrad.addColorStop(0.6,'rgba(150,150,170,'+(bright*0.5)+')');coreGrad.addColorStop(1,'rgba(80,80,100,0)');ctx.beginPath();ctx.arc(cx,cy,pulse,0,Math.PI*2);ctx.fillStyle=coreGrad;ctx.fill();if(isPlaying&&avgLevel>0.05){for(let i=0;i<8;i++){const angle=(t*0.5+i*Math.PI/4)%(Math.PI*2),dist=pulse+10+Math.sin(t*3+i)*avgLevel*30,px=cx+Math.cos(angle)*dist,py=cy+Math.sin(angle)*dist;ctx.beginPath();ctx.arc(px,py,1+avgLevel*3,0,Math.PI*2);ctx.fillStyle='rgba(200,200,220,'+(0.2+avgLevel*0.3)+')';ctx.fill()}}requestAnimationFrame(drawOrb)}
 drawOrb();
 function setMood(el,mood){currentMood=mood;document.querySelectorAll('.mood').forEach(b=>b.classList.remove('active'));el.classList.add('active')}
-async function autoSpeak(){const btn=document.getElementById('mainBtn');btn.disabled=true;document.getElementById('status').textContent='thinking…';document.getElementById('textEn').textContent='';try{const genRes=await fetch('/voice/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mood:currentMood})});if(!genRes.ok)throw new Error('generate failed');const{text}=await genRes.json();document.getElementById('textEn').textContent=text;document.getElementById('status').textContent='speaking…';const ttsRes=await fetch('/chat/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(!ttsRes.ok)throw new Error('TTS failed');if(!audioCtx)audioCtx=new AudioContext();if(audioCtx.state==='suspended')await audioCtx.resume();const arrayBuf=await ttsRes.arrayBuffer();const audioBuf=await audioCtx.decodeAudioData(arrayBuf);if(source){try{source.stop()}catch(e){}}source=audioCtx.createBufferSource();analyser=audioCtx.createAnalyser();analyser.fftSize=256;analyser.smoothingTimeConstant=0.7;source.buffer=audioBuf;source.connect(analyser);analyser.connect(audioCtx.destination);isPlaying=true;source.start();source.onended=()=>{isPlaying=false;document.getElementById('status').textContent='';btn.disabled=false}}catch(e){document.getElementById('status').textContent='error';btn.disabled=false;isPlaying=false}}
+async function autoSpeak(){const btn=document.getElementById('mainBtn');btn.disabled=true;document.getElementById('status').textContent='thinking…';document.getElementById('textEn').textContent='';try{const genRes=await fetch('/voice/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mood:currentMood})});if(!genRes.ok)throw new Error('generate failed');const{text}=await genRes.json();document.getElementById('textEn').textContent=text;document.getElementById('status').textContent='speaking…';const ttsRes=await fetch('/voice/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(!ttsRes.ok)throw new Error('TTS failed');if(!audioCtx)audioCtx=new AudioContext();if(audioCtx.state==='suspended')await audioCtx.resume();const arrayBuf=await ttsRes.arrayBuffer();const audioBuf=await audioCtx.decodeAudioData(arrayBuf);if(source){try{source.stop()}catch(e){}}source=audioCtx.createBufferSource();analyser=audioCtx.createAnalyser();analyser.fftSize=256;analyser.smoothingTimeConstant=0.7;source.buffer=audioBuf;source.connect(analyser);analyser.connect(audioCtx.destination);isPlaying=true;source.start();source.onended=()=>{isPlaying=false;document.getElementById('status').textContent='';btn.disabled=false}}catch(e){document.getElementById('status').textContent='error';btn.disabled=false;isPlaying=false}}
 </script>
 </body>
 </html>`);
+});
+
+app.post('/voice/tts', async (req, res) => {
+  const text = ((req.body && req.body.text) || '').trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: 'empty' });
+  const cfg = readApiConfig();
+  const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
+  const elVoice = 'F5jFuB8I58iHHNYwQLaN';
+  if (!elKey) return res.status(500).json({ error: 'no key' });
+  try {
+    const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}/stream`, {
+      method: 'POST',
+      headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
+      body: JSON.stringify({
+        text,
+        model_id: 'eleven_v3',
+        language_code: 'en',
+        voice_settings: { stability: 0.28, similarity_boost: 0.92, style: 0.90, speed: 0.80 }
+      })
+    });
+    if (resp.ok) {
+      const buf = Buffer.from(await resp.arrayBuffer());
+      res.set({ 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
+      return res.send(buf);
+    }
+    console.error('Voice TTS error:', resp.status);
+  } catch (e) { console.error('Voice TTS error:', e.message); }
+  res.status(500).json({ error: 'tts failed' });
 });
 
 app.post('/voice/generate', async (req, res) => {
