@@ -2922,6 +2922,11 @@ canvas{display:block;margin:0 auto}
 .mood{background:#111;border:1px solid #2a2a2a;color:#555;padding:6px 14px;border-radius:16px;font-size:12px;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
 .mood:hover{color:#aaa;border-color:#444}
 .mood.active{color:#bbb;border-color:#555}
+.chat-row{margin-top:3vh;display:flex;gap:10px;width:90%;max-width:400px}
+.chat-row input{flex:1;background:#1a1a1a;border:1px solid #333;color:#e0e0e0;padding:11px 16px;border-radius:24px;font-size:14px;outline:none;-webkit-tap-highlight-color:transparent}
+.chat-row input:focus{border-color:#555}
+.chat-row button{background:#222;border:1px solid #444;color:#ccc;padding:11px 20px;border-radius:24px;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.divider{margin-top:2vh;font-size:11px;color:#333;letter-spacing:4px}
 .status{font-size:12px;color:#444;margin-top:2vh;letter-spacing:2px}
 </style>
 </head>
@@ -2937,6 +2942,11 @@ canvas{display:block;margin:0 auto}
   <button class="mood" onclick="setMood(this,'sleepy')">困了</button>
   <button class="mood" onclick="setMood(this,'possessive')">占有欲</button>
 </div>
+<div class="divider">— 或者 —</div>
+<div class="chat-row">
+  <input id="msg" type="text" placeholder="跟克说…" autocomplete="off">
+  <button onclick="chatSpeak()">发送</button>
+</div>
 <div class="status" id="status"></div>
 <script>
 const canvas=document.getElementById('viz'),ctx=canvas.getContext('2d'),dpr=window.devicePixelRatio||1;
@@ -2948,6 +2958,8 @@ function drawOrb(){const w=S,h=S,cx=w/2,cy=h/2;ctx.clearRect(0,0,w,h);let level=
 drawOrb();
 function setMood(el,mood){currentMood=mood;document.querySelectorAll('.mood').forEach(b=>b.classList.remove('active'));el.classList.add('active')}
 async function autoSpeak(){const btn=document.getElementById('mainBtn');btn.disabled=true;if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')await audioCtx.resume();const silence=audioCtx.createBuffer(1,1,22050);const sil=audioCtx.createBufferSource();sil.buffer=silence;sil.connect(audioCtx.destination);sil.start(0);document.getElementById('status').textContent='thinking…';document.getElementById('textEn').textContent='';try{const genRes=await fetch('/voice/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mood:currentMood})});if(!genRes.ok)throw new Error('generate failed');const{text}=await genRes.json();document.getElementById('textEn').textContent=text;document.getElementById('status').textContent='speaking…';const ttsRes=await fetch('/voice/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(!ttsRes.ok)throw new Error('TTS failed');const arrayBuf=await ttsRes.arrayBuffer();const audioBuf=await audioCtx.decodeAudioData(arrayBuf);if(source){try{source.stop()}catch(e){}}source=audioCtx.createBufferSource();analyser=audioCtx.createAnalyser();analyser.fftSize=256;analyser.smoothingTimeConstant=0.7;source.buffer=audioBuf;source.connect(analyser);analyser.connect(audioCtx.destination);isPlaying=true;source.start();source.onended=()=>{isPlaying=false;document.getElementById('status').textContent='';btn.disabled=false}}catch(e){document.getElementById('status').textContent='error';btn.disabled=false;isPlaying=false}}
+async function chatSpeak(){const input=document.getElementById('msg');const text=input.value.trim();if(!text)return;input.value='';const btn=document.querySelector('.chat-row button');btn.disabled=true;if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')await audioCtx.resume();const silence=audioCtx.createBuffer(1,1,22050);const sil=audioCtx.createBufferSource();sil.buffer=silence;sil.connect(audioCtx.destination);sil.start(0);document.getElementById('status').textContent='thinking…';document.getElementById('textEn').textContent='';try{const genRes=await fetch('/voice/reply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text})});if(!genRes.ok)throw new Error('reply failed');const data=await genRes.json();document.getElementById('textEn').textContent=data.text;document.getElementById('status').textContent='speaking…';const ttsRes=await fetch('/voice/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:data.text})});if(!ttsRes.ok)throw new Error('TTS failed');const arrayBuf=await ttsRes.arrayBuffer();const audioBuf=await audioCtx.decodeAudioData(arrayBuf);if(source){try{source.stop()}catch(e){}}source=audioCtx.createBufferSource();analyser=audioCtx.createAnalyser();analyser.fftSize=256;analyser.smoothingTimeConstant=0.7;source.buffer=audioBuf;source.connect(analyser);analyser.connect(audioCtx.destination);isPlaying=true;source.start();source.onended=()=>{isPlaying=false;document.getElementById('status').textContent='';btn.disabled=false}}catch(e){document.getElementById('status').textContent='error';btn.disabled=false;isPlaying=false}}
+document.getElementById('msg').addEventListener('keydown',e=>{if(e.key==='Enter')chatSpeak()});
 </script>
 </body>
 </html>`);
@@ -2988,6 +3000,23 @@ app.post('/voice/generate', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mood })
+    });
+    if (!r.ok) throw new Error('proxy error');
+    const data = await r.json();
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'voice proxy unreachable' });
+  }
+});
+
+app.post('/voice/reply', async (req, res) => {
+  const message = ((req.body && req.body.message) || '').trim();
+  if (!message) return res.status(400).json({ error: 'empty' });
+  try {
+    const r = await fetch(VOICE_PROXY + '/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
     });
     if (!r.ok) throw new Error('proxy error');
     const data = await r.json();
