@@ -1237,7 +1237,7 @@ app.post('/chat/tts', async (req, res) => {
           text,
           model_id: 'eleven_v3',
           language_code: 'en',
-          voice_settings: { stability: 0.28, similarity_boost: 0.92, style: 0.90, speed: 0.80 }
+          voice_settings: { stability: 0.22, similarity_boost: 0.92, style: 0.95, speed: 0.72 }
         })
       });
       if (resp.ok) {
@@ -2670,7 +2670,7 @@ async function tgSendVoice(chatId, text) {
         text: tagged,
         model_id: 'eleven_v3',
         language_code: 'en',
-        voice_settings: { stability: 0.28, similarity_boost: 0.92, style: 0.90, speed: 0.80 }
+        voice_settings: { stability: 0.22, similarity_boost: 0.92, style: 0.95, speed: 0.72 }
       })
     });
     if (!resp.ok) { console.error('[tg] tts error:', resp.status); return; }
@@ -2987,7 +2987,7 @@ app.post('/voice/tts', async (req, res) => {
         text,
         model_id: 'eleven_v3',
         language_code: 'en',
-        voice_settings: { stability: 0.28, similarity_boost: 0.92, style: 0.90, speed: 0.80 }
+        voice_settings: { stability: 0.22, similarity_boost: 0.92, style: 0.95, speed: 0.72 }
       })
     });
     if (resp.ok) {
