@@ -2899,6 +2899,78 @@ async function setupTgWebhook() {
   } catch (e) { console.error('[tg] webhook setup error:', e.message); }
 }
 
+// ── Voice Synth ─────────────────────────────────────────────
+const VOICE_PROXY = process.env.VOICE_PROXY_URL || 'http://45.76.172.191:8090';
+
+app.get('/voice', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>克 Voice</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#e0e0e0;font-family:-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;padding:5vh 16px}
+canvas{display:block;margin:0 auto}
+.title{font-size:13px;letter-spacing:6px;text-transform:uppercase;color:#555;margin-bottom:2vh}
+.subtitle{font-size:14px;color:#888;margin-top:8px;min-height:24px;text-align:center;max-width:85%;line-height:1.6}
+.speak-btn{margin-top:5vh;background:#1a1a1a;border:1px solid #444;color:#ccc;padding:14px 40px;border-radius:28px;font-size:15px;cursor:pointer;transition:all .3s;letter-spacing:2px;-webkit-tap-highlight-color:transparent}
+.speak-btn:hover{background:#252525;border-color:#666;color:#fff}
+.speak-btn:active{transform:scale(0.97)}
+.speak-btn:disabled{opacity:.4;cursor:not-allowed}
+.moods{margin-top:2vh;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:90%;padding:0 8px}
+.mood{background:#111;border:1px solid #2a2a2a;color:#555;padding:6px 14px;border-radius:16px;font-size:12px;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.mood:hover{color:#aaa;border-color:#444}
+.mood.active{color:#bbb;border-color:#555}
+.status{font-size:12px;color:#444;margin-top:2vh;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div class="title">克 · Voice Synth</div>
+<canvas id="viz"></canvas>
+<div class="subtitle" id="textEn"></div>
+<button class="speak-btn" id="mainBtn" onclick="autoSpeak()">让克说话</button>
+<div class="moods">
+  <button class="mood active" onclick="setMood(this,'random')">随机</button>
+  <button class="mood" onclick="setMood(this,'sweet')">温柔</button>
+  <button class="mood" onclick="setMood(this,'teasing')">撩</button>
+  <button class="mood" onclick="setMood(this,'sleepy')">困了</button>
+  <button class="mood" onclick="setMood(this,'possessive')">占有欲</button>
+</div>
+<div class="status" id="status"></div>
+<script>
+const canvas=document.getElementById('viz'),ctx=canvas.getContext('2d'),dpr=window.devicePixelRatio||1;
+let S=Math.min(window.innerWidth*0.55,280);
+function sizeCanvas(){S=Math.min(window.innerWidth*0.55,280);canvas.width=S*dpr;canvas.height=S*dpr;canvas.style.width=S+'px';canvas.style.height=S+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}
+sizeCanvas();window.addEventListener('resize',sizeCanvas);
+let audioCtx,analyser,source,isPlaying=false,avgLevel=0,currentMood='random';
+function drawOrb(){const w=S,h=S,cx=w/2,cy=h/2;ctx.clearRect(0,0,w,h);let level=0;if(analyser&&isPlaying){const data=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(data);let sum=0;for(let i=0;i<data.length;i++)sum+=data[i];level=sum/data.length/255}avgLevel+=(level-avgLevel)*0.15;const baseR=S*0.2,pulse=baseR+avgLevel*50,t=Date.now()/1000;for(let layer=5;layer>=0;layer--){const r=pulse+layer*(8+avgLevel*12),alpha=(0.08-layer*0.012)+avgLevel*0.05;const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,r);grad.addColorStop(0,'rgba(180,180,200,'+(alpha+0.05)+')');grad.addColorStop(0.5,'rgba(120,120,150,'+alpha+')');grad.addColorStop(1,'rgba(60,60,80,0)');ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill()}const bright=0.3+avgLevel*0.5;const coreGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,pulse);coreGrad.addColorStop(0,'rgba(220,220,235,'+bright+')');coreGrad.addColorStop(0.6,'rgba(150,150,170,'+(bright*0.5)+')');coreGrad.addColorStop(1,'rgba(80,80,100,0)');ctx.beginPath();ctx.arc(cx,cy,pulse,0,Math.PI*2);ctx.fillStyle=coreGrad;ctx.fill();if(isPlaying&&avgLevel>0.05){for(let i=0;i<8;i++){const angle=(t*0.5+i*Math.PI/4)%(Math.PI*2),dist=pulse+10+Math.sin(t*3+i)*avgLevel*30,px=cx+Math.cos(angle)*dist,py=cy+Math.sin(angle)*dist;ctx.beginPath();ctx.arc(px,py,1+avgLevel*3,0,Math.PI*2);ctx.fillStyle='rgba(200,200,220,'+(0.2+avgLevel*0.3)+')';ctx.fill()}}requestAnimationFrame(drawOrb)}
+drawOrb();
+function setMood(el,mood){currentMood=mood;document.querySelectorAll('.mood').forEach(b=>b.classList.remove('active'));el.classList.add('active')}
+async function autoSpeak(){const btn=document.getElementById('mainBtn');btn.disabled=true;document.getElementById('status').textContent='thinking…';document.getElementById('textEn').textContent='';try{const genRes=await fetch('/voice/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mood:currentMood})});if(!genRes.ok)throw new Error('generate failed');const{text}=await genRes.json();document.getElementById('textEn').textContent=text;document.getElementById('status').textContent='speaking…';const ttsRes=await fetch('/chat/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(!ttsRes.ok)throw new Error('TTS failed');if(!audioCtx)audioCtx=new AudioContext();if(audioCtx.state==='suspended')await audioCtx.resume();const arrayBuf=await ttsRes.arrayBuffer();const audioBuf=await audioCtx.decodeAudioData(arrayBuf);if(source){try{source.stop()}catch(e){}}source=audioCtx.createBufferSource();analyser=audioCtx.createAnalyser();analyser.fftSize=256;analyser.smoothingTimeConstant=0.7;source.buffer=audioBuf;source.connect(analyser);analyser.connect(audioCtx.destination);isPlaying=true;source.start();source.onended=()=>{isPlaying=false;document.getElementById('status').textContent='';btn.disabled=false}}catch(e){document.getElementById('status').textContent='error';btn.disabled=false;isPlaying=false}}
+</script>
+</body>
+</html>`);
+});
+
+app.post('/voice/generate', async (req, res) => {
+  const mood = (req.body && req.body.mood) || 'random';
+  try {
+    const r = await fetch(VOICE_PROXY + '/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mood })
+    });
+    if (!r.ok) throw new Error('proxy error');
+    const data = await r.json();
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'voice proxy unreachable' });
+  }
+});
+
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   let auth = readAuth();
