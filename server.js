@@ -2669,9 +2669,8 @@ async function tgSendVoice(chatId, text) {
       body: JSON.stringify({
         text: tagged,
         model_id: 'eleven_v3',
-        voice_settings: { stability: 0.65, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true },
-        speed: 0.88,
-        previous_text: 'Hey, come here baby, let me tell you something...'
+        language_code: 'en',
+        voice_settings: { stability: 0.28, similarity_boost: 0.92, style: 0.90, speed: 0.80 }
       })
     });
     if (!resp.ok) { console.error('[tg] tts error:', resp.status); return; }
