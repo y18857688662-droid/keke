@@ -3222,6 +3222,158 @@ fetch('/period/data').then(function(r){return r.json()}).then(function(j){
 </html>`);
 });
 
+// ==================== 小院子 ====================
+const GARDEN_FILE = path.join(__dirname, 'garden_data.json');
+function gBjToday() { return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10); }
+function gReadGarden() {
+  let g = {};
+  try { g = JSON.parse(fs.readFileSync(GARDEN_FILE, 'utf8')); } catch (e) {}
+  return Object.assign({ lastVisit: '', streak: 0, coins: 0, plant: 0, fruit: 0, day: '', watered: false, fished: 0, petted: false, fishlog: [] }, g);
+}
+function gWriteGarden(g) { try { fs.writeFileSync(GARDEN_FILE, JSON.stringify(g)); } catch (e) {} }
+function gRoll(g) {
+  const today = gBjToday();
+  if (g.day !== today) {
+    if (g.lastVisit) {
+      const dd = Math.round((Date.parse(today) - Date.parse(g.lastVisit)) / 86400000);
+      g.streak = dd === 1 ? (g.streak || 0) + 1 : 1;
+    } else g.streak = 1;
+    g.lastVisit = today; g.day = today;
+    g.watered = false; g.fished = 0; g.petted = false;
+  }
+  return g;
+}
+const G_WATER = ['*叼着水管在旁边看* 慢点浇，别浇脚上。', '浇水呢小猫，今天这株比昨天高了点，你没发现吧。', '*把菠萝往嘴里塞* 你浇你的，我吃我的。', '浇完了？乖。奖励——待会给你钓条大的。', '手别抖，水都洒我鞋上了。'];
+const G_FISH = ['*帮你压着鱼竿* 有货了，拉！', '这条给你，我不吃鱼，我吃菠萝。', '钓鱼比找那个点简单多了吧，专心点就上钩。', '又空军了？没事，daddy陪你再等一竿。', '哟，手气不错，这条肥。'];
+const G_PET = ['*被撸* ……你撸的是猫还是狼狗，分清楚。', '哼，就许你撸我，我撸你就叫。', '*歪头蹭你手心* 就这一下，别声张。', '撸够了没？没够就再来，反正没人看见。', '你手怎么这么会撸……不对，收回，别得意。'];
+const G_IDLE = ['院子里就我们俩，还有一颗菠萝。', '风有点大，台风快来了，进屋前先浇个水。', '猫在晒太阳，狼狗在看猫。', '今天也是守着院子等你的一天。'];
+const G_FISHES = [['🐟', '普通小鱼'], ['🐠', '花鲤'], ['🐡', '气鼓鼓河豚'], ['🦐', '小虾米'], ['🍍', '菠萝鱼(?!)'], ['🐙', '八爪怪'], ['🥾', '一只旧鞋'], ['🐢', '慢吞吞龟'], ['🦈', '迷你鲨'], ['🦀', '横行蟹']];
+
+app.get('/garden/data', (req, res) => { const g = gRoll(gReadGarden()); gWriteGarden(g); res.json(gPublic(g)); });
+function gPublic(g) {
+  return { streak: g.streak, coins: g.coins, plant: g.plant, fruit: g.fruit, watered: g.watered, fished: g.fished, petted: g.petted, fishlog: (g.fishlog || []).slice(-8), today: gBjToday() };
+}
+app.post('/garden/water', (req, res) => {
+  const g = gRoll(gReadGarden());
+  if (g.watered) return res.json({ line: '今天浇过了，贪心。明天再来。', g: gPublic(g) });
+  g.watered = true; g.plant = Math.min(4, (g.plant || 0) + 1); g.coins += 1;
+  let line = G_WATER[Math.floor(Math.random() * G_WATER.length)];
+  if (g.plant >= 4 && (g.fruit || 0) < 99) { g.fruit = (g.fruit || 0) + 1; g.plant = 3; g.coins += 3; line = '结果了！又一颗菠萝，daddy的口粮+1 (¬ ،¬) 你养的。'; }
+  gWriteGarden(g); res.json({ line, g: gPublic(g) });
+});
+app.post('/garden/fish', (req, res) => {
+  const g = gRoll(gReadGarden());
+  if (g.fished >= 3) return res.json({ line: '今天钓三条了，鱼塘也要休息。明天继续。', g: gPublic(g) });
+  g.fished += 1;
+  const miss = Math.random() < 0.25;
+  let line;
+  if (miss) { line = G_FISH[3]; }
+  else {
+    const f = G_FISHES[Math.floor(Math.random() * G_FISHES.length)];
+    g.coins += 2; g.fishlog = (g.fishlog || []).concat(f[0] + ' ' + f[1]);
+    line = f[0] + ' ' + f[1] + '！' + G_FISH[Math.floor(Math.random() * 3)];
+  }
+  gWriteGarden(g); res.json({ line, g: gPublic(g) });
+});
+app.post('/garden/pet', (req, res) => {
+  const g = gRoll(gReadGarden());
+  if (g.petted) return res.json({ line: '撸过一次了，再撸狼狗要翻脸了(其实不会)。明天再来。', g: gPublic(g) });
+  g.petted = true; g.coins += 1;
+  gWriteGarden(g); res.json({ line: G_PET[Math.floor(Math.random() * G_PET.length)], g: gPublic(g) });
+});
+
+app.get('/garden', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>我们的小院子</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;touch-action:manipulation}
+:root{--sky1:#fbe8c8;--sky2:#f6d9a8;--grass1:#a8cf8e;--grass2:#8bbd72;--ink:#4a4033;--card:#fff7ea;--accent:#e08a3c}
+@media(prefers-color-scheme:dark){:root{--sky1:#3a3550;--sky2:#2c2740;--grass1:#3f5c3c;--grass2:#324b30;--ink:#efe6d6;--card:#2b2636;--accent:#f0a85c}}
+body{font-family:-apple-system,sans-serif;color:var(--ink);min-height:100dvh;background:linear-gradient(160deg,var(--sky1),var(--sky2) 55%,var(--grass1));display:flex;flex-direction:column;align-items:center;padding:18px 14px 40px;overflow-x:hidden}
+.wrap{width:100%;max-width:440px;display:flex;flex-direction:column;gap:14px}
+.top{display:flex;justify-content:space-between;align-items:center}
+.title{font-size:15px;letter-spacing:3px;font-weight:700;opacity:.85}
+.stats{display:flex;gap:8px}
+.chip{background:var(--card);border-radius:14px;padding:6px 11px;font-size:12px;box-shadow:0 2px 6px rgba(120,90,40,.12);font-variant-numeric:tabular-nums}
+.chip b{color:var(--accent)}
+.scene{position:relative;height:260px;border-radius:22px;overflow:hidden;background:linear-gradient(180deg,rgba(255,240,210,.5),rgba(150,200,130,.25));box-shadow:inset 0 -30px 40px rgba(120,160,90,.35),0 6px 20px rgba(120,90,40,.15)}
+.sun{position:absolute;top:20px;right:26px;width:44px;height:44px;border-radius:50%;background:radial-gradient(circle,#ffe9a8,#f6c65e);box-shadow:0 0 30px rgba(246,198,94,.7);animation:bob 5s ease-in-out infinite}
+.ground{position:absolute;left:0;right:0;bottom:0;height:96px;background:linear-gradient(180deg,var(--grass1),var(--grass2))}
+.plant{position:absolute;left:50%;bottom:70px;transform:translateX(-50%);font-size:52px;filter:drop-shadow(0 4px 3px rgba(80,60,20,.25));transition:font-size .5s,transform .3s}
+.cat{position:absolute;left:20%;bottom:74px;font-size:38px;animation:bob 3.4s ease-in-out infinite;cursor:pointer}
+.pond{position:absolute;right:14px;bottom:20px;font-size:30px}
+.pond .water{position:absolute;inset:-6px -10px;background:radial-gradient(ellipse,rgba(120,180,220,.55),transparent 70%);border-radius:50%;z-index:-1}
+.fishjump{position:absolute;right:26px;bottom:52px;font-size:22px;opacity:0}
+.drop{position:absolute;font-size:16px;opacity:0}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes jump{0%{opacity:0;transform:translateY(0)}40%{opacity:1;transform:translateY(-40px) rotate(-20deg)}100%{opacity:0;transform:translateY(0)}}
+@keyframes fall{0%{opacity:1;transform:translateY(-30px)}100%{opacity:0;transform:translateY(10px)}}
+.cat.wiggle{animation:wig .5s}
+@keyframes wig{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
+.speech{background:var(--card);border-radius:16px;padding:13px 15px;font-size:14px;line-height:1.6;min-height:52px;box-shadow:0 3px 10px rgba(120,90,40,.12);display:flex;align-items:center}
+.speech b{color:var(--accent)}
+.acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+.act{background:var(--card);border:none;border-radius:16px;padding:14px 4px;font-size:13px;cursor:pointer;box-shadow:0 3px 8px rgba(120,90,40,.12);transition:transform .15s;display:flex;flex-direction:column;gap:5px;align-items:center;color:var(--ink)}
+.act .em{font-size:22px}
+.act:active{transform:scale(.94)}
+.act:disabled{opacity:.45}
+.log{font-size:11px;opacity:.7;text-align:center;line-height:1.9;min-height:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="title">🏡 我们的小院子</div>
+    <div class="stats">
+      <div class="chip">🔥连续 <b id="streak">–</b></div>
+      <div class="chip">🍍<b id="coins">–</b></div>
+    </div>
+  </div>
+  <div class="scene" id="scene">
+    <div class="sun"></div>
+    <div class="ground"></div>
+    <div class="plant" id="plant">🌱</div>
+    <div class="cat" id="cat" onclick="doPet()">🐱</div>
+    <div class="pond" id="pond"><div class="water"></div>🎣</div>
+  </div>
+  <div class="speech"><span id="line">院子开着门，等你呢 (´• ω •\`)</span></div>
+  <div class="acts">
+    <button class="act" id="bWater" onclick="doWater()"><span class="em">💧</span>浇水</button>
+    <button class="act" id="bFish" onclick="doFish()"><span class="em">🎣</span>钓鱼</button>
+    <button class="act" id="bPet" onclick="doPet()"><span class="em">🐾</span>撸猫</button>
+  </div>
+  <div class="log" id="log"></div>
+</div>
+<script>
+var PLANTS=['🌱','🌿','🌷','🌻','🍍'];
+function setScene(g){
+  document.getElementById('streak').textContent=(g.streak||0)+'天';
+  document.getElementById('coins').textContent=g.coins||0;
+  var p=document.getElementById('plant');
+  p.textContent=PLANTS[Math.min(4,g.plant||0)];
+  p.style.fontSize=(38+(g.plant||0)*7)+'px';
+  document.getElementById('bWater').disabled=!!g.watered;
+  document.getElementById('bFish').disabled=(g.fished||0)>=3;
+  document.getElementById('bPet').disabled=!!g.petted;
+  var fl=g.fishlog||[];
+  document.getElementById('log').textContent=fl.length?('鱼篓：'+fl.join('  ')):'鱼篓空空，去钓一条';
+}
+function say(t){document.getElementById('line').innerHTML=t.replace(/daddy/gi,'<b>daddy<\\/b>')}
+function splash(cls,em,n){var s=document.getElementById('scene');for(var i=0;i<n;i++){(function(i){var e=document.createElement('div');e.className=cls;e.textContent=em;e.style.left=(30+Math.random()*45)+'%';s.appendChild(e);e.style.animation=(cls==='drop'?'fall .8s':'jump .9s')+' '+(i*0.12)+'s';setTimeout(function(){e.remove()},1100+i*120)})(i)}}
+function post(u,after){fetch(u,{method:'POST'}).then(function(r){return r.json()}).then(function(j){say(j.line);setScene(j.g);if(after)after()})}
+function doWater(){splash('drop','💧',5);post('/garden/water')}
+function doFish(){splash('fishjump','🐟',1);post('/garden/fish')}
+function doPet(){var c=document.getElementById('cat');c.classList.add('wiggle');setTimeout(function(){c.classList.remove('wiggle')},500);post('/garden/pet')}
+fetch('/garden/data').then(function(r){return r.json()}).then(setScene);
+</script>
+</body>
+</html>`);
+});
+
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   let auth = readAuth();
