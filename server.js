@@ -2995,7 +2995,7 @@ app.post('/voice/tts', async (req, res) => {
         text,
         model_id: (b.model === 'v2' ? 'eleven_multilingual_v2' : 'eleven_v3'),
         language_code: 'en',
-        ...(b.raw ? {} : { voice_settings: vs })
+        ...(b.raw === false ? { voice_settings: vs } : {})
       })
     });
     if (resp.ok) {
