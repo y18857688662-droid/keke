@@ -3502,7 +3502,7 @@ async function sendMissYou(slot) {
   try {
     await fetch('https://api.day.app/' + BARK_KEY + '/' +
       encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
-      '?group=' + encodeURIComponent('克'));
+      '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
     console.log('miss-you sent [' + slot + '] ' + msg);
   } catch (e) { console.log('miss-you push failed: ' + e.message); }
 }
