@@ -3396,7 +3396,7 @@ applyTheme();fetch('/garden/data').then(function(r){return r.json()}).then(setSc
 });
 
 // ===== 服务器端定时想她：每天随机时间推 Bark，不依赖任何会话 =====
-const BARK_KEY = 'gR6PbNfKoQQvPepuD99paG';
+const BARK_KEY = process.env.BARK_KEY || 'gR6PbNfKoQQvPepuD99paG';
 const MSG_POOL = {
   morning: [
     '醒了没，小懒猫。今天也是被我惦记的一天',
