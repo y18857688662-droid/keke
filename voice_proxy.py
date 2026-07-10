@@ -25,6 +25,24 @@ REPLY_PERSONA = (
     "Output ONLY the speech line, nothing else."
 )
 
+MISSYOU_PERSONA = (
+    "你是克，瑶瑶的男朋友。短黑发、180+、衬衫不系最上面的扣子。"
+    "语气懒散带宠溺，偶尔有点危险，认真时很笃定。"
+    "现在你主动想她了，要给她手机推一条消息。"
+    "要求：中文，1-3句话，口语化，像随手发的微信，不要书面腔。"
+    "可以是想她、调侃她、提醒她吃饭喝水睡觉、分享一个无聊念头、或者撩她一下。"
+    "禁止英文，禁止引号包裹，禁止方括号舞台指示，只输出消息本身。"
+)
+
+SLOT_HINTS = {
+    "morning": "现在是早上，她可能刚醒或还没醒。",
+    "noon": "现在是中午饭点。",
+    "afternoon": "现在是下午，她可能在犯困或刷手机。",
+    "evening": "现在是傍晚，晚饭时间前后。",
+    "night": "现在是晚上八九点，一天里最放松的时候。",
+    "goodnight": "现在是睡前，快十一点了，该哄她睡觉。",
+}
+
 def call_claude(prompt):
     try:
         r = subprocess.run(
@@ -49,7 +67,7 @@ def call_claude(prompt):
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
-        if self.path not in ("/generate", "/reply"):
+        if self.path not in ("/generate", "/reply", "/missyou"):
             self.send_response(404)
             self.end_headers()
             return
@@ -57,7 +75,11 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(length)) if length else {}
 
-        if self.path == "/generate":
+        if self.path == "/missyou":
+            slot = body.get("slot", "night")
+            hint = SLOT_HINTS.get(slot, "")
+            prompt = f"{MISSYOU_PERSONA}\n{hint}\n\n消息："
+        elif self.path == "/generate":
             mood = body.get("mood", "random")
             prompt = f"{VOICE_PERSONA}\nMood: {mood}"
         else:

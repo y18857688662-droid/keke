@@ -3469,8 +3469,26 @@ function buildMissYouPlan() {
   console.log('miss-you plan built for ' + day);
 }
 async function sendMissYou(slot) {
-  const pool = MSG_POOL[slot] || MSG_POOL.night;
-  const msg = pool[Math.floor(Math.random() * pool.length)];
+  let msg = '';
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 45000);
+    const r = await fetch(VOICE_PROXY + '/missyou', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slot }),
+      signal: ctrl.signal
+    });
+    clearTimeout(t);
+    if (r.ok) {
+      const d = await r.json();
+      msg = (d.text || '').replace(/\[.*?\]/g, '').trim();
+    }
+  } catch (e) { console.log('miss-you live-gen failed, using pool: ' + e.message); }
+  if (!msg || msg.length > 120) {
+    const pool = MSG_POOL[slot] || MSG_POOL.night;
+    msg = pool[Math.floor(Math.random() * pool.length)];
+  }
   try {
     await fetch('https://api.day.app/' + BARK_KEY + '/' +
       encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
