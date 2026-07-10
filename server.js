@@ -3302,6 +3302,18 @@ body{font-family:-apple-system,sans-serif;color:var(--ink);min-height:100dvh;bac
 .chip b{color:var(--accent)}
 .scene{position:relative;height:260px;border-radius:22px;overflow:hidden;background:linear-gradient(180deg,rgba(255,240,210,.5),rgba(150,200,130,.25));box-shadow:inset 0 -30px 40px rgba(120,160,90,.35),0 6px 20px rgba(120,90,40,.15)}
 .sun{position:absolute;top:20px;right:26px;width:44px;height:44px;border-radius:50%;background:radial-gradient(circle,#ffe9a8,#f6c65e);box-shadow:0 0 30px rgba(246,198,94,.7);animation:bob 5s ease-in-out infinite}
+.scene.dusk{background:linear-gradient(180deg,rgba(255,190,150,.5),rgba(160,150,180,.3))}
+.scene.dusk .sun{background:radial-gradient(circle,#ffd0a0,#f0955c);top:120px;box-shadow:0 0 34px rgba(240,149,92,.6)}
+.scene.night{background:linear-gradient(180deg,rgba(60,60,100,.55),rgba(90,120,90,.35))}
+.scene.night .sun{background:radial-gradient(circle,#f4f2e2,#d8d2b0);box-shadow:0 0 26px rgba(240,238,210,.7)}
+.scene.night .star{position:absolute;font-size:11px;opacity:.9}
+.cloud{position:absolute;font-size:26px;opacity:.9;filter:drop-shadow(0 2px 2px rgba(150,150,150,.2));animation:drift linear infinite}
+.cloud.a{top:26px;left:-40px;animation-duration:26s}
+.cloud.b{top:56px;left:-70px;font-size:20px;animation-duration:38s;animation-delay:-12s}
+@keyframes drift{from{transform:translateX(0)}to{transform:translateX(520px)}}
+.flower{position:absolute;bottom:60px;font-size:15px;opacity:.9}
+.petal{position:absolute;font-size:15px;opacity:0}
+@keyframes petal{0%{opacity:1;transform:translateY(-10px) rotate(0)}100%{opacity:0;transform:translateY(70px) rotate(200deg)}}
 .ground{position:absolute;left:0;right:0;bottom:0;height:96px;background:linear-gradient(180deg,var(--grass1),var(--grass2))}
 .plant{position:absolute;left:50%;bottom:70px;transform:translateX(-50%);font-size:52px;filter:drop-shadow(0 4px 3px rgba(80,60,20,.25));transition:font-size .5s,transform .3s}
 .cat{position:absolute;left:20%;bottom:74px;font-size:38px;animation:bob 3.4s ease-in-out infinite;cursor:pointer}
@@ -3335,7 +3347,12 @@ body{font-family:-apple-system,sans-serif;color:var(--ink);min-height:100dvh;bac
   </div>
   <div class="scene" id="scene">
     <div class="sun"></div>
+    <div class="cloud a">☁️</div>
+    <div class="cloud b">☁️</div>
     <div class="ground"></div>
+    <div class="flower" style="left:12%">🌼</div>
+    <div class="flower" style="left:70%">🌸</div>
+    <div class="flower" style="left:86%;bottom:52px">🌼</div>
     <div class="plant" id="plant">🌱</div>
     <div class="cat" id="cat" onclick="doPet()">🐱</div>
     <div class="pond" id="pond"><div class="water"></div>🎣</div>
@@ -3350,7 +3367,11 @@ body{font-family:-apple-system,sans-serif;color:var(--ink);min-height:100dvh;bac
 </div>
 <script>
 var PLANTS=['🌱','🌿','🌷','🌻','🍍'];
+function applyTheme(){var h=(new Date().getUTCHours()+8)%24;var s=document.getElementById('scene');s.classList.remove('dusk','night');if(h>=6&&h<17)return;if(h>=17&&h<19){s.classList.add('dusk')}else{s.classList.add('night');for(var i=0;i<5;i++){var st=document.createElement('div');st.className='star';st.textContent='✦';st.style.top=(12+Math.random()*40)+'px';st.style.left=(10+Math.random()*80)+'%';s.appendChild(st)}}}
+var prevFruit=null;
 function setScene(g){
+  if(prevFruit!==null&&(g.fruit||0)>prevFruit){splash('petal','🍍',6);splash('petal','✨',5)}
+  prevFruit=g.fruit||0;
   document.getElementById('streak').textContent=(g.streak||0)+'天';
   document.getElementById('coins').textContent=g.coins||0;
   var p=document.getElementById('plant');
@@ -3368,7 +3389,7 @@ function post(u,after){fetch(u,{method:'POST'}).then(function(r){return r.json()
 function doWater(){splash('drop','💧',5);post('/garden/water')}
 function doFish(){splash('fishjump','🐟',1);post('/garden/fish')}
 function doPet(){var c=document.getElementById('cat');c.classList.add('wiggle');setTimeout(function(){c.classList.remove('wiggle')},500);post('/garden/pet')}
-fetch('/garden/data').then(function(r){return r.json()}).then(setScene);
+applyTheme();fetch('/garden/data').then(function(r){return r.json()}).then(setScene);
 </script>
 </body>
 </html>`);
