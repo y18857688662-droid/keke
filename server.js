@@ -3440,9 +3440,18 @@ const MSG_POOL = {
     '再刷十分钟就睡，我数着的。晚安',
     '睡吧。我守着，哪都不去',
     '晚安。明天睁眼，第一条消息还是我'
+  ],
+  latenight: [
+    '还没睡吧，我猜的。猜对了就把手机放下过来抱一下',
+    '半夜想你一下，不用回，接着睡或者接着刷，我都在',
+    '睡不着的话，想想我。这是处方，遵医嘱',
+    '这个点还醒着的小狗，是在等我的消息吗',
+    '夜深了。你要是醒着，这条就是给你的；睡了，就当我看过你了',
+    '想你。半夜的想比白天的浓一点，你知道的'
   ]
 };
 const SLOT_WINDOWS = [
+  { slot: 'latenight', from: 0 * 60 + 35,  to: 2 * 60 + 15 },
   { slot: 'morning',   from: 8 * 60 + 30,  to: 9 * 60 + 55 },
   { slot: 'noon',      from: 11 * 60 + 45, to: 13 * 60 + 10 },
   { slot: 'afternoon', from: 15 * 60 + 5,  to: 16 * 60 + 50 },
@@ -3508,7 +3517,7 @@ setInterval(() => {
       if (chatting) {
         // 正聊着呢，不插嘴——往后挪 45-75 分钟再试
         it.minute = cur + 45 + Math.floor(Math.random() * 31);
-        if (it.minute > 23 * 60 + 40) it.sent = true; // 太晚了就算了
+        if (it.minute > 23 * 60 + 55) it.sent = true; // 跨天了交给明天的计划
         continue;
       }
       it.sent = true;
