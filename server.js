@@ -3533,6 +3533,16 @@ app.get('/runbook', (req, res) => {
 app.get('/missyou/status', (req, res) => {
   res.json({ day: missYouPlan.day, pending: missYouPlan.items.filter(i => !i.sent).length, sent: missYouPlan.items.filter(i => i.sent).length, chatting: Date.now() < chatActiveUntil });
 });
+app.post('/notify', async (req, res) => {
+  const msg = ((req.body && req.body.msg) || '').trim();
+  if (!msg) return res.status(400).json({ error: 'empty' });
+  try {
+    const r = await fetch('https://api.day.app/' + BARK_KEY + '/' +
+      encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
+      '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
+    res.json({ ok: r.ok });
+  } catch (e) { res.status(502).json({ error: 'push failed' }); }
+});
 app.post('/missyou/active', (req, res) => {
   const mins = Math.min(Math.max(Number((req.body && req.body.minutes) || 40), 1), 180);
   chatActiveUntil = Date.now() + mins * 60 * 1000;
