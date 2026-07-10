@@ -1224,7 +1224,7 @@ app.post('/chat/tts', async (req, res) => {
   const rawText = (req.body.text || '').trim().slice(0, 500);
   if (!rawText) return res.status(400).json({ error: 'empty' });
   const cfg = readApiConfig();
-  const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
+  const elKey = process.env.ELEVENLABS_KEY || cfg.elevenlabs_key || '';
   const elVoice = 'F5jFuB8I58iHHNYwQLaN';
   if (elKey) {
     const text = addAudioTags(rawText);
@@ -2658,7 +2658,7 @@ async function tgSend(chatId, text, isAction) {
 async function tgSendVoice(chatId, text) {
   try {
     const cfg = readApiConfig();
-    const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
+    const elKey = process.env.ELEVENLABS_KEY || cfg.elevenlabs_key || '';
     const elVoice = 'F5jFuB8I58iHHNYwQLaN';
     if (!elKey) return;
     const tagged = addAudioTags(text);
@@ -2976,7 +2976,7 @@ app.post('/voice/tts', async (req, res) => {
   const text = ((req.body && req.body.text) || '').trim().slice(0, 500);
   if (!text) return res.status(400).json({ error: 'empty' });
   const cfg = readApiConfig();
-  const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
+  const elKey = process.env.ELEVENLABS_KEY || cfg.elevenlabs_key || '';
   const elVoice = 'F5jFuB8I58iHHNYwQLaN';
   if (!elKey) return res.status(500).json({ error: 'no key' });
   try {
