@@ -3048,11 +3048,12 @@ function bjToday() {
   const d = new Date(Date.now() + 8 * 3600 * 1000);
   return d.toISOString().slice(0, 10);
 }
+function pd2n(s) { return Math.round(Date.parse(s + 'T00:00:00Z') / 86400000); }
 function readPeriods() {
-  let arr = [];
+  let arr = null;
   try { arr = JSON.parse(fs.readFileSync(PERIOD_FILE, 'utf8')); } catch (e) {}
-  const set = new Set([...PERIOD_SEED, ...arr]);
-  return [...set].filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
+  if (!Array.isArray(arr)) arr = [...PERIOD_SEED];
+  return [...new Set(arr)].filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
 }
 function writePeriods(arr) {
   try { fs.writeFileSync(PERIOD_FILE, JSON.stringify([...new Set(arr)].sort())); } catch (e) {}
@@ -3077,16 +3078,29 @@ app.get('/period/data', async (req, res) => {
 app.post('/period/start', (req, res) => {
   const date = ((req.body && req.body.date) || bjToday()).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'bad date' });
-  const periods = readPeriods();
-  if (!periods.includes(date)) {
+  let periods = readPeriods();
+  // 同一次经期内重复点击去重：7天内视为同一次，保留更早的那天
+  const near = periods.find(s => Math.abs(pd2n(date) - pd2n(s)) < 7);
+  if (near) {
+    if (date < near) periods = periods.map(s => (s === near ? date : s));
+  } else {
     periods.push(date);
-    writePeriods(periods);
+  }
+  writePeriods(periods);
+  if (!near || date < near) {
     fetch('http://127.0.0.1:' + PORT + '/memory/store', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: '[PERIOD_LOG] 月经开始 ' + date })
     }).catch(() => {});
   }
   res.json({ ok: true, periods: readPeriods() });
+});
+
+app.post('/period/remove', (req, res) => {
+  const date = ((req.body && req.body.date) || '').slice(0, 10);
+  const periods = readPeriods().filter(s => s !== date);
+  writePeriods(periods);
+  res.json({ ok: true, periods });
 });
 
 app.get('/period', (req, res) => {
@@ -3153,8 +3167,7 @@ function d2n(s){return Math.round(new Date(s+'T00:00:00Z').getTime()/86400000)}
 function n2d(n){return new Date(n*86400000).toISOString().slice(0,10)}
 function avgCycle(){if(P.length<2)return 32;var s=0;for(var i=1;i<P.length;i++)s+=d2n(P[i])-d2n(P[i-1]);var a=Math.round(s/(P.length-1));return Math.max(21,Math.min(45,a))}
 function phaseOf(day,L){var ov=L-14;if(day<=PLEN)return 1;if(Math.abs(day-ov)<=2)return 3;if(day<ov-2)return 2;if(day<=L)return 4;return 0}
-function starts(upTo){var arr=P.slice();var L=avgCycle();var last=d2n(P[P.length-1]);var k=last+L;while(k<=upTo+L){arr.push(n2d(k));k+=L}return arr}
-function dotFor(ds){var L=avgCycle();var n=d2n(ds);var ss=starts(n);var best=-1;for(var i=0;i<ss.length;i++){var sn=d2n(ss[i]);if(sn<=n&&sn>best)best=sn}if(best<0)return 0;var day=n-best+1;var real=P.indexOf(n2d(best))>=0;if(day<=PLEN)return(real||best>d2n(P[P.length-1]))?1:0;if(!real&&P.indexOf(n2d(best))<0&&best<=d2n(P[P.length-1]))return 0;return phaseOf(day,L)}
+function dotFor(ds){if(ds>TODAY)return 0;var L=avgCycle();var n=d2n(ds);var best=-1;for(var i=0;i<P.length;i++){var sn=d2n(P[i]);if(sn<=n&&sn>best)best=sn}if(best<0)return 0;return phaseOf(n-best+1,L)}
 function render(){
   var L=avgCycle(),last=P[P.length-1],cd=d2n(TODAY)-d2n(last)+1,nx=n2d(d2n(last)+L);
   document.getElementById('last').textContent=last.slice(5).replace('-','-');
@@ -3184,13 +3197,20 @@ function drawCal(){
     var el=document.createElement('div');el.className='d'+(ds===TODAY?' today':'');el.textContent=d;
     var ph=dotFor(ds);
     if(ph){var i2=document.createElement('i');i2.className='c'+ph;el.appendChild(i2)}
+    el.onclick=(function(ds){return function(){dayTap(ds)}})(ds);
     g.appendChild(el);
   }
 }
 function move(k){view.m+=k;if(view.m<0){view.m=11;view.y--}if(view.m>11){view.m=0;view.y++}drawCal()}
+function post(url,body){fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}).then(function(r){return r.json()}).then(function(j){P=j.periods;render()})}
 function markStart(){
   if(!confirm('记录今天为经期第一天？'))return;
-  fetch('/period/start',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json()}).then(function(j){P=j.periods;render()});
+  post('/period/start');
+}
+function dayTap(ds){
+  if(P.indexOf(ds)>=0){if(confirm('撤销 '+ds+' 这条经期记录？'))post('/period/remove',{date:ds});return}
+  if(ds>TODAY)return;
+  if(confirm('补记 '+ds+' 为经期第一天？'))post('/period/start',{date:ds});
 }
 fetch('/period/data').then(function(r){return r.json()}).then(function(j){
   P=j.periods;PLEN=j.periodLen;TODAY=j.today;
