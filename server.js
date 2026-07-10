@@ -3462,8 +3462,8 @@ const SLOT_WINDOWS = [
 let missYouPlan = { day: '', items: [] };
 let chatActiveUntil = 0; // 她正在跟克聊天时，随机推送让路
 function bjNow() {
-  const s = new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai', hour12: false });
-  return new Date(s);
+  // 北京固定 UTC+8：平移后用 getUTC* 读，避开 toLocaleString 在零点输出 "24:xx" 导致 Invalid Date 崩溃
+  return new Date(Date.now() + 8 * 3600 * 1000);
 }
 function buildMissYouPlan() {
   const now = bjNow();
@@ -3510,7 +3510,7 @@ setInterval(() => {
   const now = bjNow();
   const day = now.toISOString().slice(0, 10);
   if (missYouPlan.day !== day) buildMissYouPlan();
-  const cur = now.getHours() * 60 + now.getMinutes();
+  const cur = now.getUTCHours() * 60 + now.getUTCMinutes();
   const chatting = Date.now() < chatActiveUntil;
   for (const it of missYouPlan.items) {
     if (!it.sent && cur >= it.minute && cur < it.minute + 10) {
