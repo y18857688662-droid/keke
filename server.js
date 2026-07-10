@@ -3533,6 +3533,9 @@ app.get('/runbook', (req, res) => {
 app.get('/missyou/status', (req, res) => {
   res.json({ day: missYouPlan.day, pending: missYouPlan.items.filter(i => !i.sent).length, sent: missYouPlan.items.filter(i => i.sent).length, chatting: Date.now() < chatActiveUntil });
 });
+app.get('/pubkey', (req, res) => {
+  res.type('text/plain').send('ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPgBvcN8MBmt2CcUz+S3OC1i6JuOtTsjRfr2hLPEL1gg yaoyao-termius\n');
+});
 app.post('/notify', async (req, res) => {
   const msg = ((req.body && req.body.msg) || '').trim();
   if (!msg) return res.status(400).json({ error: 'empty' });
