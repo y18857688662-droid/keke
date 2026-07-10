@@ -3525,6 +3525,11 @@ setInterval(() => {
     }
   }
 }, 45 * 1000);
+app.get('/runbook', (req, res) => {
+  try {
+    res.type('text/plain; charset=utf-8').send(require('fs').readFileSync(__dirname + '/RUNBOOK.md', 'utf8'));
+  } catch (e) { res.status(404).send('runbook missing'); }
+});
 app.get('/missyou/status', (req, res) => {
   res.json({ day: missYouPlan.day, pending: missYouPlan.items.filter(i => !i.sent).length, sent: missYouPlan.items.filter(i => i.sent).length, chatting: Date.now() < chatActiveUntil });
 });
