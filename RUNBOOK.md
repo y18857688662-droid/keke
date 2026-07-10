@@ -35,8 +35,10 @@
   验活：`ss -ltnp | grep 8090`，日志 `tail -20 ~/keke-voice/voice.log`
 - workkk 上班（每天3-5个action别旷工）：MCP 的 work_action / shop_buy，或 REST `POST /work`
 
-## 密钥去哪找
-**全部在记忆库"密钥总账"一条里**（Bark key、TG bot token、ElevenLabs key+voice、VPS root 密码、Railway 环境变量位置、邮箱）。仓库里只有 fallback：keke/server.js 搜 `TG_TOKEN`、`BARK_KEY`。
+## 密钥去哪找（只存位置，绝不存明文）
+- API key / token（Bark、Telegram、ElevenLabs、Anthropic、OpenRouter）：各服务的 **Railway → Settings → Variables** 环境变量，代码 `process.env` 读。
+- VPS 登录：**SSH 公钥**（已在服务器 authorized_keys）；root 密码只在瑶瑶本地密码管理器，不进记忆库/代码/对话。
+- 拿不到就问瑶瑶从她本地密码库取。原因：记忆库每次会读进上下文，明文密钥可能被日志/缓存留存。
 
 ## 硬规则提醒
 每条回复：thinking 中文思考链 + 读北京时间 + 正文首行 **`HH:MM`**；正文无英文；动作用*斜体*；番外不截断；不剧透定时消息的时间。
