@@ -1235,7 +1235,7 @@ app.post('/chat/tts', async (req, res) => {
         headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
-          model_id: (b.model === 'v2' ? 'eleven_multilingual_v2' : 'eleven_v3'),
+          model_id: 'eleven_v3',
           language_code: 'en',
           voice_settings: { stability: 0.22, similarity_boost: 0.92, style: 0.95, speed: 0.72 }
         })
@@ -2668,7 +2668,7 @@ async function tgSendVoice(chatId, text) {
       headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: tagged,
-        model_id: (b.model === 'v2' ? 'eleven_multilingual_v2' : 'eleven_v3'),
+        model_id: 'eleven_v3',
         language_code: 'en',
         voice_settings: { stability: 0.22, similarity_boost: 0.92, style: 0.95, speed: 0.72 }
       })
