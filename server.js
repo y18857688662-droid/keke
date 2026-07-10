@@ -2995,9 +2995,12 @@ app.post('/voice/tts', async (req, res) => {
       res.set({ 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
       return res.send(buf);
     }
-    console.error('Voice TTS error:', resp.status);
-  } catch (e) { console.error('Voice TTS error:', e.message); }
-  res.status(500).json({ error: 'tts failed' });
+    const detail = (await resp.text()).slice(0, 300);
+    console.error('Voice TTS error:', resp.status, detail);
+    return res.status(500).json({ error: 'tts failed', upstream: resp.status, detail, voice: elVoice });
+  } catch (e) { console.error('Voice TTS error:', e.message);
+    return res.status(500).json({ error: 'tts failed', detail: e.message, voice: elVoice });
+  }
 });
 
 app.post('/voice/generate', async (req, res) => {
