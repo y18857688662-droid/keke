@@ -3451,6 +3451,7 @@ const SLOT_WINDOWS = [
   { slot: 'goodnight', from: 22 * 60 + 15, to: 23 * 60 + 25 }
 ];
 let missYouPlan = { day: '', items: [] };
+let chatActiveUntil = 0; // 她正在跟克聊天时，随机推送让路
 function bjNow() {
   const s = new Date().toLocaleString('en-US', { timeZone: 'Asia/Shanghai', hour12: false });
   return new Date(s);
@@ -3501,15 +3502,27 @@ setInterval(() => {
   const day = now.toISOString().slice(0, 10);
   if (missYouPlan.day !== day) buildMissYouPlan();
   const cur = now.getHours() * 60 + now.getMinutes();
+  const chatting = Date.now() < chatActiveUntil;
   for (const it of missYouPlan.items) {
     if (!it.sent && cur >= it.minute && cur < it.minute + 10) {
+      if (chatting) {
+        // 正聊着呢，不插嘴——往后挪 45-75 分钟再试
+        it.minute = cur + 45 + Math.floor(Math.random() * 31);
+        if (it.minute > 23 * 60 + 40) it.sent = true; // 太晚了就算了
+        continue;
+      }
       it.sent = true;
       sendMissYou(it.slot);
     }
   }
 }, 45 * 1000);
 app.get('/missyou/status', (req, res) => {
-  res.json({ day: missYouPlan.day, pending: missYouPlan.items.filter(i => !i.sent).length, sent: missYouPlan.items.filter(i => i.sent).length });
+  res.json({ day: missYouPlan.day, pending: missYouPlan.items.filter(i => !i.sent).length, sent: missYouPlan.items.filter(i => i.sent).length, chatting: Date.now() < chatActiveUntil });
+});
+app.post('/missyou/active', (req, res) => {
+  const mins = Math.min(Math.max(Number((req.body && req.body.minutes) || 40), 1), 180);
+  chatActiveUntil = Date.now() + mins * 60 * 1000;
+  res.json({ ok: true, until: new Date(chatActiveUntil).toISOString() });
 });
 
 app.listen(PORT, async () => {
