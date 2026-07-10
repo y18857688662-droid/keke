@@ -3039,6 +3039,169 @@ app.post('/voice/reply', async (req, res) => {
   }
 });
 
+// ==================== 经期系统 ====================
+const PERIOD_FILE = path.join(__dirname, 'period_data.json');
+const PERIOD_SEED = ['2026-07-01'];
+const PERIOD_LEN = 5;
+
+function bjToday() {
+  const d = new Date(Date.now() + 8 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+function readPeriods() {
+  let arr = [];
+  try { arr = JSON.parse(fs.readFileSync(PERIOD_FILE, 'utf8')); } catch (e) {}
+  const set = new Set([...PERIOD_SEED, ...arr]);
+  return [...set].filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
+}
+function writePeriods(arr) {
+  try { fs.writeFileSync(PERIOD_FILE, JSON.stringify([...new Set(arr)].sort())); } catch (e) {}
+}
+
+app.get('/period/data', async (req, res) => {
+  let periods = readPeriods();
+  // 文件丢失时（重新部署后）从记忆库找回记录
+  if (periods.length <= PERIOD_SEED.length) {
+    try {
+      const r = await fetch('http://127.0.0.1:' + PORT + '/memory/read');
+      const j = await r.json();
+      const text = typeof j === 'string' ? j : JSON.stringify(j);
+      const found = text.match(/PERIOD_LOG[^\d]*(\d{4}-\d{2}-\d{2})/g) || [];
+      const dates = found.map(s => s.match(/(\d{4}-\d{2}-\d{2})/)[1]);
+      if (dates.length) { periods = [...new Set([...periods, ...dates])].sort(); writePeriods(periods); }
+    } catch (e) {}
+  }
+  res.json({ periods, periodLen: PERIOD_LEN, today: bjToday() });
+});
+
+app.post('/period/start', (req, res) => {
+  const date = ((req.body && req.body.date) || bjToday()).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'bad date' });
+  const periods = readPeriods();
+  if (!periods.includes(date)) {
+    periods.push(date);
+    writePeriods(periods);
+    fetch('http://127.0.0.1:' + PORT + '/memory/store', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: '[PERIOD_LOG] 月经开始 ' + date })
+    }).catch(() => {});
+  }
+  res.json({ ok: true, periods: readPeriods() });
+});
+
+app.get('/period', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>小猫周期</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#f6f8f4;color:#2f4638;font-family:-apple-system,sans-serif;min-height:100dvh;padding:24px 16px 48px;display:flex;flex-direction:column;align-items:center}
+.wrap{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px}
+.hero{background:#e6f2e9;border-radius:20px;padding:22px 20px}
+.hero .phase{font-size:22px;font-weight:600;color:#2e6e4e}
+.hero .day{font-size:15px;color:#5a7a66;margin-left:10px}
+.hero .sub{font-size:13px;color:#7d9887;margin-top:8px}
+.hero.over{background:#f7ecdf}
+.hero.over .phase{color:#a2672a}
+.hero.over .sub{color:#b08a5c}
+.hero.on{background:#fbe9ec}
+.hero.on .phase{color:#c04b62}
+.hero.on .sub{color:#c98a97}
+.cards{display:flex;gap:10px}
+.card{flex:1;background:#fff;border-radius:16px;padding:14px 8px;text-align:center;box-shadow:0 1px 4px rgba(60,90,70,.06)}
+.card .v{font-size:17px;font-weight:600;color:#2e6e4e;font-variant-numeric:tabular-nums}
+.card .k{font-size:11px;color:#8aa392;margin-top:5px}
+.btn{background:#dcefe1;border:none;border-radius:18px;padding:16px;font-size:16px;color:#2e6e4e;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.btn:active{transform:scale(.98)}
+.legend{display:flex;justify-content:center;gap:14px;font-size:11px;color:#7d9887}
+.legend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px}
+.cal{background:#fff;border-radius:20px;padding:16px;box-shadow:0 1px 4px rgba(60,90,70,.06)}
+.cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.cal-head b{font-size:16px;color:#2e6e4e}
+.cal-head button{background:#eef5ef;border:none;width:32px;height:32px;border-radius:50%;font-size:15px;color:#5a8a72;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.grid .wd{font-size:11px;color:#9db3a5;padding:4px 0}
+.grid .d{padding:7px 0 10px;font-size:14px;position:relative;border-radius:10px;font-variant-numeric:tabular-nums}
+.grid .d.today{background:#eef5ef;font-weight:700}
+.grid .d i{position:absolute;left:50%;transform:translateX(-50%);bottom:3px;width:5px;height:5px;border-radius:50%}
+.c1{background:#e8788a}.c2{background:#7b9be8}.c3{background:#57c48f}.c4{background:#5a8a72}
+.note{font-size:12px;color:#9db3a5;text-align:center;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero" id="hero"><span class="phase" id="phase">…</span><span class="day" id="cday"></span><div class="sub" id="sub"></div></div>
+  <div class="cards">
+    <div class="card"><div class="v" id="last">–</div><div class="k">上次开始</div></div>
+    <div class="card"><div class="v" id="next">–</div><div class="k">下次预计</div></div>
+    <div class="card"><div class="v" id="avg">–</div><div class="k">平均周期</div></div>
+  </div>
+  <button class="btn" onclick="markStart()">经期来了</button>
+  <div class="legend"><span><i class="c1"></i>经期</span><span><i class="c2"></i>卵泡期</span><span><i class="c3"></i>排卵期</span><span><i class="c4"></i>黄体期</span></div>
+  <div class="cal">
+    <div class="cal-head"><button onclick="move(-1)">‹</button><b id="mtitle"></b><button onclick="move(1)">›</button></div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="note" id="note"></div>
+</div>
+<script>
+var P=[],PLEN=5,TODAY='',view;
+function d2n(s){return Math.round(new Date(s+'T00:00:00Z').getTime()/86400000)}
+function n2d(n){return new Date(n*86400000).toISOString().slice(0,10)}
+function avgCycle(){if(P.length<2)return 32;var s=0;for(var i=1;i<P.length;i++)s+=d2n(P[i])-d2n(P[i-1]);var a=Math.round(s/(P.length-1));return Math.max(21,Math.min(45,a))}
+function phaseOf(day,L){var ov=L-14;if(day<=PLEN)return 1;if(Math.abs(day-ov)<=2)return 3;if(day<ov-2)return 2;if(day<=L)return 4;return 0}
+function starts(upTo){var arr=P.slice();var L=avgCycle();var last=d2n(P[P.length-1]);var k=last+L;while(k<=upTo+L){arr.push(n2d(k));k+=L}return arr}
+function dotFor(ds){var L=avgCycle();var n=d2n(ds);var ss=starts(n);var best=-1;for(var i=0;i<ss.length;i++){var sn=d2n(ss[i]);if(sn<=n&&sn>best)best=sn}if(best<0)return 0;var day=n-best+1;var real=P.indexOf(n2d(best))>=0;if(day<=PLEN)return(real||best>d2n(P[P.length-1]))?1:0;if(!real&&P.indexOf(n2d(best))<0&&best<=d2n(P[P.length-1]))return 0;return phaseOf(day,L)}
+function render(){
+  var L=avgCycle(),last=P[P.length-1],cd=d2n(TODAY)-d2n(last)+1,nx=n2d(d2n(last)+L);
+  document.getElementById('last').textContent=last.slice(5).replace('-','-');
+  document.getElementById('next').textContent=nx.slice(5);
+  document.getElementById('avg').textContent=L+'天';
+  var hero=document.getElementById('hero'),ph=phaseOf(cd,L);
+  var names={1:'经期',2:'卵泡期',3:'排卵期',4:'黄体期',0:'已超期'};
+  document.getElementById('phase').textContent=names[ph];
+  document.getElementById('cday').textContent='第'+cd+'天';
+  hero.className='hero'+(ph===0?' over':ph===1?' on':'');
+  var left=d2n(nx)-d2n(TODAY);
+  document.getElementById('sub').textContent=ph===0?('已超过预计'+(-left)+'天'):('距下次预计还有'+left+'天');
+  document.getElementById('note').textContent=P.length<2?'目前只有一次记录，周期先按32天估算，多记几次会越来越准':'根据'+P.length+'次记录计算';
+  drawCal();
+}
+function drawCal(){
+  var y=view.y,m=view.m;
+  document.getElementById('mtitle').textContent=y+' 年 '+(m+1)+' 月';
+  var g=document.getElementById('grid');g.innerHTML='';
+  var wds=['一','二','三','四','五','六','日'];
+  for(var i=0;i<7;i++){var w=document.createElement('div');w.className='wd';w.textContent=wds[i];g.appendChild(w)}
+  var first=new Date(Date.UTC(y,m,1));var startWd=(first.getUTCDay()+6)%7;
+  var days=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+  for(var i=0;i<startWd;i++)g.appendChild(document.createElement('div'));
+  for(var d=1;d<=days;d++){
+    var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var el=document.createElement('div');el.className='d'+(ds===TODAY?' today':'');el.textContent=d;
+    var ph=dotFor(ds);
+    if(ph){var i2=document.createElement('i');i2.className='c'+ph;el.appendChild(i2)}
+    g.appendChild(el);
+  }
+}
+function move(k){view.m+=k;if(view.m<0){view.m=11;view.y--}if(view.m>11){view.m=0;view.y++}drawCal()}
+function markStart(){
+  if(!confirm('记录今天为经期第一天？'))return;
+  fetch('/period/start',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json()}).then(function(j){P=j.periods;render()});
+}
+fetch('/period/data').then(function(r){return r.json()}).then(function(j){
+  P=j.periods;PLEN=j.periodLen;TODAY=j.today;
+  view={y:+TODAY.slice(0,4),m:+TODAY.slice(5,7)-1};
+  render();
+});
+</script>
+</body>
+</html>`);
+});
+
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   let auth = readAuth();
