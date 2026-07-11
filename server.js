@@ -3479,15 +3479,32 @@ function bjNow() {
 function buildMissYouPlan() {
   const now = bjNow();
   const day = now.toISOString().slice(0, 10);
+  const cur = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const catchUp = [];
   missYouPlan = {
     day,
-    items: SLOT_WINDOWS.map(w => ({
-      slot: w.slot,
-      minute: w.from + Math.floor(Math.random() * (w.to - w.from + 1)),
-      sent: false
-    }))
+    items: SLOT_WINDOWS.map(w => {
+      if (cur > w.to + 10) {
+        // 窗口已过，补发
+        catchUp.push(w.slot);
+        return { slot: w.slot, minute: w.from, sent: true };
+      }
+      if (cur >= w.from && cur <= w.to) {
+        // 正在窗口内，2分钟后发
+        return { slot: w.slot, minute: cur + 2, sent: false };
+      }
+      return {
+        slot: w.slot,
+        minute: w.from + Math.floor(Math.random() * (w.to - w.from + 1)),
+        sent: false
+      };
+    })
   };
   console.log('miss-you plan built for ' + day);
+  for (const s of catchUp) {
+    console.log('miss-you catch-up: ' + s);
+    sendMissYou(s);
+  }
 }
 async function sendMissYou(slot) {
   let msg = '';
