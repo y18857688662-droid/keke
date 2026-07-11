@@ -3594,13 +3594,19 @@ const FORBIDDEN='0000ae00-0000-1000-8000-00805f9b34fb';
 const CAP=180;
 let char=null,dev=null,keepaliveId=null,pollId=null;
 let curPkt=new Uint8Array([0x55,0x04,0x00,0x00,0x00,0x00,0xAA]);
-let lastTs=0;
+let lastTs=0,writing=false,writeQueue=[];
 const $=id=>document.getElementById(id);
 function log(s){const d=$('log');const t=new Date().toLocaleTimeString('zh',{hour12:false});d.textContent=t+' '+s+'\\n'+d.textContent;d.textContent=d.textContent.slice(0,2000)}
 function setStatus(cls,txt){const s=$('st');s.className='status '+cls;s.textContent=txt}
 function pktIntensity(v){v=Math.min(Math.max(v,0),CAP);return new Uint8Array([0x55,0x04,0x00,0x00,0x01,v,0xAA])}
 function pktPattern(m,l){return new Uint8Array([0x55,0x03,0x00,0x00,m,l,0x00])}
 function pktStop(){return new Uint8Array([0x55,0x04,0x00,0x00,0x00,0x00,0xAA])}
+async function writeChar(pkt){
+  if(!char)return;
+  if(writing){return}
+  writing=true;
+  try{await char.writeValueWithoutResponse(pkt)}catch(e){log('写入失败: '+e.message)}finally{writing=false}
+}
 async function doConnect(){
   try{
     log('扫描中…');
@@ -3625,10 +3631,6 @@ function onDisconnect(){
   if(keepaliveId){clearInterval(keepaliveId);keepaliveId=null}
   if(pollId){clearInterval(pollId);pollId=null}
   fetch('/bridge/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({connected:false})});
-}
-async function writeChar(pkt){
-  if(!char)return;
-  try{await char.writeValueWithoutResponse(pkt)}catch(e){log('写入失败: '+e.message)}
 }
 function startKeepalive(){
   if(keepaliveId)clearInterval(keepaliveId);
