@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.os.Handler
 import android.os.HandlerThread
+import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
 
@@ -30,6 +31,7 @@ class ClassicBtManager(private val context: Context, private val listener: Liste
     private val bgHandler = Handler(thread.looper)
     private var socket: BluetoothSocket? = null
     private var out: OutputStream? = null
+    private var inp: InputStream? = null
     private var connected = false
 
     val isConnected get() = connected
@@ -44,12 +46,31 @@ class ClassicBtManager(private val context: Context, private val listener: Liste
                 }
                 listener.onPaiPaiLog("连接拍拍器…")
                 adapter?.cancelDiscovery()
-                socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
-                socket!!.connect()
+                // 先试标准SPP，失败则用反射fallback拿channel 1
+                socket = try {
+                    val s = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                    s.connect()
+                    s
+                } catch (e1: Exception) {
+                    listener.onPaiPaiLog("SPP失败，尝试channel 1…")
+                    try {
+                        val m = device.javaClass.getMethod("createRfcommSocket", Int::class.java)
+                        val s = m.invoke(device, 1) as BluetoothSocket
+                        s.connect()
+                        s
+                    } catch (e2: Exception) {
+                        listener.onPaiPaiLog("channel 1也失败，尝试insecure…")
+                        val s = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
+                        s.connect()
+                        s
+                    }
+                }
                 out = socket!!.outputStream
+                inp = socket!!.inputStream
                 connected = true
                 listener.onPaiPaiConnected(device.name ?: device.address)
                 listener.onPaiPaiLog("拍拍器已连接")
+                startReadLoop()
             } catch (e: Exception) {
                 listener.onPaiPaiLog("拍拍器连接失败: ${e.message}")
                 connected = false
@@ -76,13 +97,30 @@ class ClassicBtManager(private val context: Context, private val listener: Liste
         }
     }
 
+    private fun startReadLoop() {
+        bgHandler.post {
+            val buf = ByteArray(256)
+            while (connected) {
+                try {
+                    val n = inp?.read(buf) ?: break
+                    if (n > 0) {
+                        val hex = buf.take(n).joinToString(" ") { "%02X".format(it) }
+                        listener.onPaiPaiLog("拍拍器收到: $hex")
+                    }
+                } catch (_: Exception) { break }
+            }
+        }
+    }
+
     fun disconnect() {
         connected = false
         bgHandler.post {
             try {
+                inp?.close()
                 out?.close()
                 socket?.close()
             } catch (_: Exception) {}
+            inp = null
             out = null
             socket = null
             listener.onPaiPaiDisconnected()
