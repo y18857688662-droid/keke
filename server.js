@@ -3536,6 +3536,9 @@ setInterval(() => {
     }
   }
 }, 45 * 1000);
+app.get('/scan.py', (req, res) => {
+  res.type('text/plain; charset=utf-8').send(require('fs').readFileSync(__dirname + '/scan.py', 'utf8'));
+});
 app.get('/runbook', (req, res) => {
   try {
     res.type('text/plain; charset=utf-8').send(require('fs').readFileSync(__dirname + '/RUNBOOK.md', 'utf8'));
