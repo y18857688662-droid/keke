@@ -3656,6 +3656,13 @@ async function doStop(){curPkt=pktStop();await writeChar(curPkt);log('手动停�
 </script></body></html>`);
 });
 
+app.get('/bridge.apk', (req, res) => {
+  const fs = require('fs');
+  const p = __dirname + '/bridge.apk';
+  if (!fs.existsSync(p)) return res.status(404).send('apk not found');
+  res.setHeader('Content-Disposition', 'attachment; filename="bridge.apk"');
+  res.type('application/vnd.android.package-archive').send(fs.readFileSync(p));
+});
 app.get('/scan.py', (req, res) => {
   res.type('text/plain; charset=utf-8').send(require('fs').readFileSync(__dirname + '/scan.py', 'utf8'));
 });
