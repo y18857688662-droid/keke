@@ -3536,6 +3536,124 @@ setInterval(() => {
     }
   }
 }, 45 * 1000);
+// ── 蓝牙桥 (Web Bluetooth) ──
+let bridgeState = { cmd: null, ts: 0, connected: false, lastPoll: 0 };
+app.post('/bridge/command', (req, res) => {
+  const { type, intensity, mode, level } = req.body || {};
+  if (type === 'stop') bridgeState.cmd = { type: 'stop' };
+  else if (type === 'intensity') bridgeState.cmd = { type: 'intensity', value: Math.min(Math.max(Number(intensity)||0, 0), 180) };
+  else if (type === 'pattern') bridgeState.cmd = { type: 'pattern', mode: Math.min(Math.max(Number(mode)||1,1),8), level: Math.min(Math.max(Number(level)||1,1),5) };
+  else return res.status(400).json({ error: 'unknown type' });
+  bridgeState.ts = Date.now();
+  res.json({ ok: true, cmd: bridgeState.cmd });
+});
+app.get('/bridge/poll', (req, res) => {
+  bridgeState.lastPoll = Date.now();
+  res.json({ cmd: bridgeState.cmd, ts: bridgeState.ts });
+});
+app.post('/bridge/status', (req, res) => {
+  bridgeState.connected = !!(req.body && req.body.connected);
+  res.json({ ok: true });
+});
+app.get('/bridge/info', (req, res) => {
+  res.json({ connected: bridgeState.connected, cmd: bridgeState.cmd, ts: bridgeState.ts, lastPoll: bridgeState.lastPoll });
+});
+app.get('/bridge', (req, res) => {
+  res.type('text/html').send(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>蓝牙桥</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui;background:#0a0a0a;color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px}
+h1{font-size:1.3em;margin-bottom:16px;color:#aaa}
+.status{font-size:1.1em;margin:12px 0;padding:12px 20px;border-radius:12px;text-align:center;width:100%;max-width:360px}
+.off{background:#1a1a1a;border:1px solid #333}
+.on{background:#0d2818;border:1px solid #2d6a4f;color:#52b788}
+.err{background:#2a0a0a;border:1px solid #6a2d2d;color:#e07070}
+button{padding:14px 28px;border:none;border-radius:12px;font-size:1em;cursor:pointer;margin:8px;transition:all .2s}
+.btn-connect{background:#2d6a4f;color:white}
+.btn-connect:hover{background:#40916c}
+.btn-connect:disabled{background:#333;color:#666;cursor:not-allowed}
+.btn-stop{background:#6a2d2d;color:white}
+.btn-stop:hover{background:#914040}
+.log{width:100%;max-width:360px;margin-top:16px;padding:12px;background:#111;border-radius:8px;font-size:0.75em;max-height:200px;overflow-y:auto;font-family:monospace;color:#888}
+.info{font-size:0.8em;color:#666;margin-top:12px;text-align:center}
+</style></head><body>
+<h1>蓝牙桥</h1>
+<div class="status off" id="st">未连接</div>
+<div>
+<button class="btn-connect" id="btnConn" onclick="doConnect()">连接玩具</button>
+<button class="btn-stop" onclick="doStop()">停止</button>
+</div>
+<div class="info">连接后自动接收远程指令</div>
+<div class="log" id="log"></div>
+<script>
+const SVC='0000ffe0-0000-1000-8000-00805f9b34fb';
+const CHR='0000ffe1-0000-1000-8000-00805f9b34fb';
+const FORBIDDEN='0000ae00-0000-1000-8000-00805f9b34fb';
+const CAP=180;
+let char=null,dev=null,keepaliveId=null,pollId=null;
+let curPkt=new Uint8Array([0x55,0x04,0x00,0x00,0x00,0x00,0xAA]);
+let lastTs=0;
+const $=id=>document.getElementById(id);
+function log(s){const d=$('log');const t=new Date().toLocaleTimeString('zh',{hour12:false});d.textContent=t+' '+s+'\\n'+d.textContent;d.textContent=d.textContent.slice(0,2000)}
+function setStatus(cls,txt){const s=$('st');s.className='status '+cls;s.textContent=txt}
+function pktIntensity(v){v=Math.min(Math.max(v,0),CAP);return new Uint8Array([0x55,0x04,0x00,0x00,0x01,v,0xAA])}
+function pktPattern(m,l){return new Uint8Array([0x55,0x03,0x00,0x00,m,l,0x00])}
+function pktStop(){return new Uint8Array([0x55,0x04,0x00,0x00,0x00,0x00,0xAA])}
+async function doConnect(){
+  try{
+    log('扫描中…');
+    dev=await navigator.bluetooth.requestDevice({filters:[{namePrefix:'SL278'}],optionalServices:[SVC]});
+    log('找到 '+dev.name);
+    dev.addEventListener('gattserverdisconnected',onDisconnect);
+    const srv=await dev.gatt.connect();
+    log('GATT已连');
+    const svc=await srv.getPrimaryService(SVC);
+    char=await svc.getCharacteristic(CHR);
+    log('FFE1就绪');
+    setStatus('on','已连接 '+dev.name);
+    $('btnConn').disabled=true;
+    fetch('/bridge/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({connected:true})});
+    startKeepalive();
+    startPoll();
+  }catch(e){log('连接失败: '+e.message);setStatus('err','连接失败')}
+}
+function onDisconnect(){
+  log('断开连接');char=null;
+  setStatus('off','已断开');$('btnConn').disabled=false;
+  if(keepaliveId){clearInterval(keepaliveId);keepaliveId=null}
+  if(pollId){clearInterval(pollId);pollId=null}
+  fetch('/bridge/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({connected:false})});
+}
+async function writeChar(pkt){
+  if(!char)return;
+  try{await char.writeValueWithoutResponse(pkt)}catch(e){log('写入失败: '+e.message)}
+}
+function startKeepalive(){
+  if(keepaliveId)clearInterval(keepaliveId);
+  keepaliveId=setInterval(()=>writeChar(curPkt),1500);
+}
+async function startPoll(){
+  if(pollId)clearInterval(pollId);
+  pollId=setInterval(async()=>{
+    try{
+      const r=await fetch('/bridge/poll');
+      const d=await r.json();
+      if(d.ts>lastTs&&d.cmd){
+        lastTs=d.ts;
+        if(d.cmd.type==='stop'){curPkt=pktStop();log('收到: 停止')}
+        else if(d.cmd.type==='intensity'){curPkt=pktIntensity(d.cmd.value);log('收到: 强度 '+d.cmd.value)}
+        else if(d.cmd.type==='pattern'){curPkt=pktPattern(d.cmd.mode,d.cmd.level);log('收到: 花样 M'+d.cmd.mode+' L'+d.cmd.level)}
+        writeChar(curPkt);
+      }
+    }catch(e){}
+  },800);
+}
+async function doStop(){curPkt=pktStop();await writeChar(curPkt);log('手动停止');fetch('/bridge/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'stop'})})}
+</script></body></html>`);
+});
+
 app.get('/scan.py', (req, res) => {
   res.type('text/plain; charset=utf-8').send(require('fs').readFileSync(__dirname + '/scan.py', 'utf8'));
 });
