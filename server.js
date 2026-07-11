@@ -3543,6 +3543,7 @@ app.post('/bridge/command', (req, res) => {
   if (type === 'stop') bridgeState.cmd = { type: 'stop' };
   else if (type === 'intensity') bridgeState.cmd = { type: 'intensity', value: Math.min(Math.max(Number(intensity)||0, 0), 180) };
   else if (type === 'pattern') bridgeState.cmd = { type: 'pattern', mode: Math.min(Math.max(Number(mode)||1,1),8), level: Math.min(Math.max(Number(level)||1,1),5) };
+  else if (type === 'ir') bridgeState.cmd = { type: 'ir', mode: Number.isFinite(Number(req.body.mode)) ? Number(req.body.mode) : -1 };
   else return res.status(400).json({ error: 'unknown type' });
   bridgeState.ts = Date.now();
   res.json({ ok: true, cmd: bridgeState.cmd });

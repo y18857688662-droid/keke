@@ -10,7 +10,7 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 
-class BridgeService : Service(), BleManager.Listener, ClassicBtManager.Listener {
+class BridgeService : Service(), BleManager.Listener, ClassicBtManager.Listener, IrManager.Listener {
 
     companion object {
         const val TAG = "BridgeService"
@@ -21,6 +21,7 @@ class BridgeService : Service(), BleManager.Listener, ClassicBtManager.Listener 
 
     private lateinit var ble: BleManager
     private lateinit var paipai: ClassicBtManager
+    private lateinit var irMgr: IrManager
     private val bgThread = HandlerThread("bridge-bg").also { it.start() }
     private val bgHandler = Handler(bgThread.looper)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -34,6 +35,8 @@ class BridgeService : Service(), BleManager.Listener, ClassicBtManager.Listener 
         createChannel()
         ble = BleManager(this, this)
         paipai = ClassicBtManager(this, this)
+        irMgr = IrManager(this, this)
+        broadcastLog(if (irMgr.hasIr) "红外发射器: 可用" else "红外发射器: 不可用")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -91,6 +94,11 @@ class BridgeService : Service(), BleManager.Listener, ClassicBtManager.Listener 
         broadcastLog(msg)
     }
 
+    // ── 红外 callbacks ──
+    override fun onIrLog(msg: String) {
+        broadcastLog(msg)
+    }
+
     // ── 轮询服务器 ──
     private fun startPolling() {
         if (polling) return
@@ -137,6 +145,11 @@ class BridgeService : Service(), BleManager.Listener, ClassicBtManager.Listener 
                             val l = cmd.optInt("level", 1)
                             ble.setPattern(m, l)
                             broadcastLog("收到: 花样 M${m} L${l}")
+                        }
+                        "ir" -> {
+                            val mode = cmd.optInt("mode", -1)
+                            if (mode == -1) irMgr.sendAll() else irMgr.send(mode)
+                            broadcastLog("收到: 红外拍拍")
                         }
                     }
                 }
