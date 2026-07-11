@@ -109,8 +109,29 @@ class MainActivity : Activity() {
 
         root.addView(btnRow, lp().apply { bottomMargin = 24 })
 
+        val linkRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val linkLabel = TextView(this).apply {
+            text = "拍拍器联动"
+            textSize = 14f
+            setTextColor(0xFFAAAAAA.toInt())
+        }
+        linkRow.addView(linkLabel, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        val linkSwitch = Switch(this).apply {
+            isChecked = false
+            setOnCheckedChangeListener { _, on ->
+                val intent = Intent("com.keke.bridge.LINK")
+                intent.putExtra("enabled", on)
+                sendBroadcast(intent)
+            }
+        }
+        linkRow.addView(linkSwitch)
+        root.addView(linkRow, lp().apply { bottomMargin = 16 })
+
         val info = TextView(this).apply {
-            text = "启动后可以关掉这个界面\n桥在后台保持连接"
+            text = "启动后可以关掉这个界面\n桥在后台保持连接\n\n联动开: 拍拍器按键控制玩具\n联动关: 拍拍器正常拍照"
             textSize = 12f
             setTextColor(0xFF666666.toInt())
             gravity = Gravity.CENTER

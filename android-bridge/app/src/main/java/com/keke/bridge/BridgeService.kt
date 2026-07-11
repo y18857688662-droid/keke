@@ -1,7 +1,7 @@
 package com.keke.bridge
 
 import android.app.*
-import android.content.Intent
+import android.content.*
 import android.os.*
 import android.util.Log
 import org.json.JSONObject
@@ -30,13 +30,20 @@ class BridgeService : Service(), BleManager.Listener, ClassicBtManager.Listener,
     private var lastCommandTime = 0L
     private var polling = false
 
+    private val linkReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            val enabled = intent.getBooleanExtra("enabled", false)
+            setLinkMode(enabled)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         createChannel()
         ble = BleManager(this, this)
         paipai = ClassicBtManager(this, this)
         irMgr = IrManager(this, this)
-        broadcastLog(if (irMgr.hasIr) "红外发射器: 可用" else "红外发射器: 不可用")
+        registerReceiver(linkReceiver, IntentFilter("com.keke.bridge.LINK"))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -52,6 +59,7 @@ class BridgeService : Service(), BleManager.Listener, ClassicBtManager.Listener,
 
     override fun onDestroy() {
         polling = false
+        try { unregisterReceiver(linkReceiver) } catch (_: Exception) {}
         ble.disconnect()
         paipai.destroy()
         reportStatus(false)
@@ -82,6 +90,9 @@ class BridgeService : Service(), BleManager.Listener, ClassicBtManager.Listener,
     }
 
     // ── 拍拍器 callbacks ──
+    private var toyOn = false
+    private var currentIntensity = 0
+
     override fun onPaiPaiConnected(name: String) {
         broadcastLog("拍拍器已连接 $name")
     }
@@ -92,6 +103,44 @@ class BridgeService : Service(), BleManager.Listener, ClassicBtManager.Listener,
 
     override fun onPaiPaiLog(msg: String) {
         broadcastLog(msg)
+    }
+
+    override fun onPaiPaiButton(action: String) {
+        if (!ble.isConnected) {
+            broadcastLog("联动: 玩具未连接")
+            return
+        }
+        when (action) {
+            "volume_up", "camera", "enter", "headsethook", "play_pause", "play" -> {
+                if (!toyOn) {
+                    currentIntensity = 30
+                    ble.setIntensity(currentIntensity)
+                    toyOn = true
+                    broadcastLog("联动: 开 强度$currentIntensity")
+                } else {
+                    currentIntensity = (currentIntensity + 20).coerceAtMost(Protocol.INTENSITY_SOFT_CAP)
+                    ble.setIntensity(currentIntensity)
+                    broadcastLog("联动: 加到$currentIntensity")
+                }
+            }
+            "volume_down", "pause" -> {
+                if (toyOn) {
+                    currentIntensity = (currentIntensity - 20).coerceAtLeast(0)
+                    if (currentIntensity == 0) {
+                        ble.stop()
+                        toyOn = false
+                        broadcastLog("联动: 停")
+                    } else {
+                        ble.setIntensity(currentIntensity)
+                        broadcastLog("联动: 减到$currentIntensity")
+                    }
+                }
+            }
+        }
+    }
+
+    fun setLinkMode(enabled: Boolean) {
+        paipai.setLinkEnabled(enabled)
     }
 
     // ── 红外 callbacks ──
