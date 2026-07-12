@@ -3721,19 +3721,25 @@ app.post('/api/xhs-card', async (req, res) => {
     if (!m) return res.status(422).json({ error: 'no __INITIAL_STATE__ found' });
     const raw = m[1].replace(/\\u002F/g, '/').replace(/undefined/g, 'null');
     const state = JSON.parse(raw);
-    const nd = state.note?.noteDetailMap;
+    // 尝试多种路径提取笔记数据（XHS页面结构经常变）
     let note = null;
-    if (nd) {
-      const key = Object.keys(nd)[0];
-      note = nd[key]?.note;
+    const nd1 = state.note?.noteDetailMap;
+    if (nd1) { const k = Object.keys(nd1)[0]; note = nd1[k]?.note; }
+    if (!note) {
+      const nd2 = state.noteData?.data?.noteData;
+      if (nd2?.title) note = nd2;
     }
-    if (!note) return res.status(422).json({ error: 'note data not found' });
+    if (!note) {
+      const npd = state.noteData?.normalNotePreloadData;
+      if (npd) { const k = Object.keys(npd)[0]; note = npd[k]?.note || npd[k]; }
+    }
+    if (!note) return res.status(422).json({ error: 'geo_blocked', msg: '小红书海外IP无法获取笔记内容，截图发给我看吧' });
     const images = (note.imageList || []).map(img => {
       let u = img.urlDefault || img.url || '';
       if (u.startsWith('//')) u = 'https:' + u;
       return u;
     }).filter(Boolean);
-    const comments = (state.comment?.comments || []).slice(0, 15).map(c => ({
+    const comments = (state.comment?.comments || state.noteData?.comments || []).slice(0, 15).map(c => ({
       user: c.userInfo?.nickname || '',
       content: c.content || '',
       ipLocation: c.ipLocation || ''
