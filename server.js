@@ -3705,6 +3705,77 @@ app.post('/notify', async (req, res) => {
     res.json({ ok: r.ok });
   } catch (e) { res.status(502).json({ error: 'push failed' }); }
 });
+// ── 小红书链接预览 ──
+const XHS_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
+app.post('/api/xhs-card', async (req, res) => {
+  const { url } = req.body || {};
+  if (!url) return res.status(400).json({ error: 'missing url' });
+  try {
+    const r = await fetch(url, {
+      headers: { 'User-Agent': XHS_UA },
+      redirect: 'follow'
+    });
+    const html = await r.text();
+    const m = html.match(/window\.__INITIAL_STATE__\s*=\s*({.+?})\s*<\/script>/s);
+    if (!m) return res.status(422).json({ error: 'no __INITIAL_STATE__ found' });
+    const raw = m[1].replace(/\\u002F/g, '/').replace(/undefined/g, 'null');
+    const state = JSON.parse(raw);
+    const nd = state.note?.noteDetailMap;
+    let note = null;
+    if (nd) {
+      const key = Object.keys(nd)[0];
+      note = nd[key]?.note;
+    }
+    if (!note) return res.status(422).json({ error: 'note data not found' });
+    const images = (note.imageList || []).map(img => {
+      let u = img.urlDefault || img.url || '';
+      if (u.startsWith('//')) u = 'https:' + u;
+      return u;
+    }).filter(Boolean);
+    const comments = (state.comment?.comments || []).slice(0, 15).map(c => ({
+      user: c.userInfo?.nickname || '',
+      content: c.content || '',
+      ipLocation: c.ipLocation || ''
+    }));
+    res.json({
+      ok: true,
+      note: {
+        title: note.title || '',
+        author: note.user?.nickname || '',
+        desc: note.desc || '',
+        images,
+        imageCount: images.length,
+        likedCount: note.interactInfo?.likedCount || '0',
+        commentCount: note.interactInfo?.commentCount || '0',
+        collectedCount: note.interactInfo?.collectedCount || '0',
+        comments,
+        url: r.url
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/xhs-images', async (req, res) => {
+  const { urls } = req.body || {};
+  if (!urls || !Array.isArray(urls)) return res.status(400).json({ error: 'missing urls array' });
+  const results = [];
+  for (const u of urls.slice(0, 10)) {
+    try {
+      const r = await fetch(u, { headers: { 'User-Agent': XHS_UA, 'Referer': 'https://www.xiaohongshu.com/' } });
+      if (!r.ok) { results.push({ url: u, error: r.status }); continue; }
+      const buf = Buffer.from(await r.arrayBuffer());
+      const mime = r.headers.get('content-type') || 'image/jpeg';
+      results.push({ url: u, base64: buf.toString('base64'), mime });
+    } catch (e) {
+      results.push({ url: u, error: e.message });
+    }
+  }
+  res.json({ ok: true, images: results });
+});
+
 app.post('/missyou/active', (req, res) => {
   const mins = Math.min(Math.max(Number((req.body && req.body.minutes) || 40), 1), 180);
   chatActiveUntil = Date.now() + mins * 60 * 1000;
