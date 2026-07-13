@@ -3501,9 +3501,10 @@ function buildMissYouPlan() {
     })
   };
   console.log('miss-you plan built for ' + day);
-  for (const s of catchUp) {
-    console.log('miss-you catch-up: ' + s);
-    sendMissYou(s);
+  if (catchUp.length) {
+    const last = catchUp[catchUp.length - 1];
+    console.log('miss-you catch-up (latest only): ' + last + ' (skipped: ' + catchUp.slice(0, -1).join(',') + ')');
+    sendMissYou(last);
   }
 }
 const MISSYOU_SLOT_HINTS = {
