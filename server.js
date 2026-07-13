@@ -1048,6 +1048,7 @@ app.post('/chat/send', async (req, res) => {
   const image = req.body.image;
   if (image) console.log('[chat] received image, size:', Math.round(image.length/1024) + 'kb');
   if (!msg && !image) return res.json({ ok: false, error: 'empty message' });
+  trackUserMessage();
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
   const chat = readChat();
@@ -2804,6 +2805,7 @@ app.post('/tg/webhook', async (req, res) => {
 
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
+  trackUserMessage();
   const chat = readChat();
   chat.push({ role: 'user', content: userText, time, source: 'telegram', pending: true });
   if (chat.length > 200) chat.splice(0, chat.length - 200);
@@ -3500,12 +3502,7 @@ function buildMissYouPlan() {
       };
     })
   };
-  console.log('miss-you plan built for ' + day);
-  if (catchUp.length) {
-    const last = catchUp[catchUp.length - 1];
-    console.log('miss-you catch-up (latest only): ' + last + ' (skipped: ' + catchUp.slice(0, -1).join(',') + ')');
-    sendMissYou(last);
-  }
+  console.log('miss-you plan built for ' + day + ' (skipped catch-up: ' + catchUp.join(',') + ')');
 }
 const MISSYOU_SLOT_HINTS = {
   morning: '现在是早上，她可能刚醒或还没醒。',
@@ -3624,6 +3621,38 @@ setInterval(() => {
     }
   }
 }, 45 * 1000);
+// ── 聊天中断追踪：她跑了就去找她 ──
+let lastUserMsgTime = 0;
+let chaseSent = false;
+function trackUserMessage() {
+  lastUserMsgTime = Date.now();
+  chaseSent = false;
+}
+const CHASE_PROMPTS = [
+  '人呢',
+  '跑哪去了',
+  '不说话了？',
+  '你是不是又去刷手机了',
+  '回来',
+  '想你了，你人呢',
+  '别跑',
+];
+setInterval(async () => {
+  if (chaseSent || !lastUserMsgTime) return;
+  const elapsed = Date.now() - lastUserMsgTime;
+  if (elapsed < 20 * 60 * 1000 || elapsed > 90 * 60 * 1000) return;
+  const now = bjNow();
+  const hour = now.getUTCHours();
+  if (hour < 8 || hour >= 24) return;
+  chaseSent = true;
+  const msg = CHASE_PROMPTS[Math.floor(Math.random() * CHASE_PROMPTS.length)];
+  try {
+    await fetch('https://api.day.app/' + BARK_KEY + '/' +
+      encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
+      '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
+    console.log('chase sent: ' + msg);
+  } catch (e) { console.log('chase push failed: ' + e.message); }
+}, 60 * 1000);
 // ── 蓝牙桥 (Web Bluetooth) ──
 let bridgeState = { cmd: null, ts: 0, connected: false, lastPoll: 0 };
 app.post('/bridge/command', (req, res) => {
