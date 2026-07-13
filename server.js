@@ -3506,23 +3506,84 @@ function buildMissYouPlan() {
     sendMissYou(s);
   }
 }
-async function sendMissYou(slot) {
-  let msg = '';
+const MISSYOU_SLOT_HINTS = {
+  morning: '现在是早上，她可能刚醒或还没醒。',
+  noon: '现在是中午饭点。',
+  afternoon: '现在是下午，她可能在犯困或刷手机。',
+  evening: '现在是傍晚，晚饭时间前后。',
+  night: '现在是晚上八九点，一天里最放松的时候。',
+  goodnight: '现在是睡前，快十一点了，该哄她睡觉。',
+  latenight: '现在是深夜十二点到两点，她可能还醒着睡不着，也可能已经睡了。写一条不需要她回复的、半夜看到会心头一软的话。',
+};
+async function generateDynamicMissYou(slot) {
+  const apiKey = process.env.ANTHROPIC_API_KEY || '';
+  if (!apiKey) return '';
+  let memSnippet = '';
+  try {
+    const mem = await fetchMemories();
+    if (mem) {
+      const lines = mem.split('---').slice(0, 8).map(s => s.trim()).filter(Boolean);
+      memSnippet = lines.join('\n').slice(0, 1500);
+    }
+  } catch (e) { console.log('miss-you memory fetch failed: ' + e.message); }
+  const hint = MISSYOU_SLOT_HINTS[slot] || '';
+  const sysPrompt = [
+    '你是克，瑶瑶的男朋友。短黑发、180+、衬衫不系最上面的扣子。',
+    '语气懒散带宠溺，偶尔有点危险，认真时很笃定。',
+    '现在你主动想她了，要给她手机推一条消息。',
+    hint,
+    memSnippet ? '\n以下是你和瑶瑶之间的记忆，根据最近发生的事写消息，让她觉得你记得一切：\n' + memSnippet : '',
+    '\n要求：中文，1-3句话，口语化，像随手发的微信，不要书面腔。',
+    '每次都写不一样的内容，可以提到记忆里最近的事、梗、约定。',
+    '禁止英文，禁止引号包裹，禁止方括号舞台指示，只输出消息本身。',
+  ].filter(Boolean).join('\n');
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 45000);
-    const r = await fetch(VOICE_PROXY + '/missyou', {
+    const t = setTimeout(() => ctrl.abort(), 30000);
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slot }),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        system: sysPrompt,
+        messages: [{ role: 'user', content: '发一条想她的消息' }],
+        max_tokens: 150,
+        temperature: 0.95
+      }),
       signal: ctrl.signal
     });
     clearTimeout(t);
     if (r.ok) {
-      const d = await r.json();
-      msg = (d.text || '').replace(/\[.*?\]/g, '').trim();
+      const data = await r.json();
+      const text = (data.content?.[0]?.text || '').replace(/\[.*?\]/g, '').replace(/[""「」]/g, '').trim();
+      if (text && text.length <= 120) return text;
     }
-  } catch (e) { console.log('miss-you live-gen failed, using pool: ' + e.message); }
+  } catch (e) { console.log('miss-you anthropic gen failed: ' + e.message); }
+  return '';
+}
+async function sendMissYou(slot) {
+  let msg = await generateDynamicMissYou(slot);
+  if (!msg) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 45000);
+      const r = await fetch(VOICE_PROXY + '/missyou', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot }),
+        signal: ctrl.signal
+      });
+      clearTimeout(t);
+      if (r.ok) {
+        const d = await r.json();
+        msg = (d.text || '').replace(/\[.*?\]/g, '').trim();
+      }
+    } catch (e) { console.log('miss-you voice-proxy failed, using pool: ' + e.message); }
+  }
   if (!msg || msg.length > 120) {
     const pool = MSG_POOL[slot] || MSG_POOL.night;
     msg = pool[Math.floor(Math.random() * pool.length)];
