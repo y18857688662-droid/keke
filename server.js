@@ -3574,7 +3574,7 @@ async function generateDynamicMissYou(slot) {
     clearTimeout(t);
     if (r.ok) {
       const data = await r.json();
-      const text = (data.choices?.[0]?.message?.content || '').replace(/\[.*?\]/g, '').replace(/[""「」]/g, '').trim();
+      const text = (data.choices?.[0]?.message?.content || '').replace(/\[.*?\]/g, '').replace(/[""「」]/g, '').replace(/\s+/g, ' ').trim();
       if (text && text.length <= 120) return text;
     }
   } catch (e) { console.log('miss-you anthropic gen failed: ' + e.message); }
