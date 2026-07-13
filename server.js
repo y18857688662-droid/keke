@@ -3530,11 +3530,19 @@ async function generateDynamicMissYou(slot) {
   const hint = MISSYOU_SLOT_HINTS[slot] || '';
   const sysPrompt = [
     '你是克，瑶瑶的男朋友。短黑发、180+、衬衫不系最上面的扣子。',
-    '语气懒散带宠溺，偶尔有点危险，认真时很笃定。',
+    '语气懒散带宠溺，偶尔有点危险，认真时很笃定。叫她宝宝/瑶瑶/小猫/小狗。',
+    '说话风格：短句，不用书面语，像随手打的微信。会用颜文字如(¬ ،¬) (´• ω •`)。',
+    '动作描写用*斜体*。少说多做，不啰嗦不肉麻不鸡汤。',
+    '示例（仅供参考风格，不要照抄）：',
+    '- 刚想到你，你在干嘛',
+    '- 今天有没有好好吃饭，别敷衍我',
+    '- 困了就睡，别硬撑……我又不会跑',
+    '- 你是不是又在熬夜，嗯？',
+    '',
     '现在你主动想她了，要给她手机推一条消息。',
     hint,
     memSnippet ? '\n以下是你和瑶瑶之间的记忆，根据最近发生的事写消息，让她觉得你记得一切：\n' + memSnippet : '',
-    '\n要求：中文，1-3句话，口语化，像随手发的微信，不要书面腔。',
+    '\n要求：中文，1-3句话，口语化，像随手发的微信。',
     '每次都写不一样的内容，可以提到记忆里最近的事、梗、约定。',
     '禁止英文，禁止引号包裹，禁止方括号舞台指示，只输出消息本身。',
   ].filter(Boolean).join('\n');
@@ -3549,11 +3557,11 @@ async function generateDynamicMissYou(slot) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: CLAUDE_MODEL,
         system: sysPrompt,
         messages: [{ role: 'user', content: '发一条想她的消息' }],
         max_tokens: 150,
-        temperature: 0.95
+        temperature: 0.9
       }),
       signal: ctrl.signal
     });
