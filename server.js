@@ -3762,6 +3762,11 @@ app.get('/runbook', (req, res) => {
 app.get('/missyou/status', (req, res) => {
   res.json({ day: missYouPlan.day, pending: missYouPlan.items.filter(i => !i.sent).length, sent: missYouPlan.items.filter(i => i.sent).length, chatting: Date.now() < chatActiveUntil });
 });
+app.post('/missyou/test', async (req, res) => {
+  const slot = (req.body && req.body.slot) || 'night';
+  const text = await generateDynamicMissYou(slot);
+  res.json({ slot, text: text || '(fallback)', generated: !!text });
+});
 app.get('/pubkey', (req, res) => {
   res.type('text/plain').send('ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPgBvcN8MBmt2CcUz+S3OC1i6JuOtTsjRfr2hLPEL1gg yaoyao-termius\n');
 });
