@@ -3517,8 +3517,7 @@ const MISSYOU_SLOT_HINTS = {
   latenight: '现在是深夜十二点到两点，她可能还醒着睡不着，也可能已经睡了。写一条不需要她回复的、半夜看到会心头一软的话。',
 };
 async function generateDynamicMissYou(slot) {
-  const apiKey = process.env.ANTHROPIC_API_KEY || '';
-  if (!apiKey) return '';
+  if (!OPENROUTER_KEY) return '';
   let memSnippet = '';
   try {
     const mem = await fetchMemories();
@@ -3549,17 +3548,18 @@ async function generateDynamicMissYou(slot) {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 30000);
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        'Authorization': `Bearer ${OPENROUTER_KEY}`
       },
       body: JSON.stringify({
-        model: CLAUDE_MODEL,
-        system: sysPrompt,
-        messages: [{ role: 'user', content: '发一条想她的消息' }],
+        model: 'anthropic/' + CLAUDE_MODEL,
+        messages: [
+          { role: 'system', content: sysPrompt },
+          { role: 'user', content: '发一条想她的消息' }
+        ],
         max_tokens: 150,
         temperature: 0.9
       }),
@@ -3568,7 +3568,7 @@ async function generateDynamicMissYou(slot) {
     clearTimeout(t);
     if (r.ok) {
       const data = await r.json();
-      const text = (data.content?.[0]?.text || '').replace(/\[.*?\]/g, '').replace(/[""「」]/g, '').trim();
+      const text = (data.choices?.[0]?.message?.content || '').replace(/\[.*?\]/g, '').replace(/[""「」]/g, '').trim();
       if (text && text.length <= 120) return text;
     }
   } catch (e) { console.log('miss-you anthropic gen failed: ' + e.message); }
