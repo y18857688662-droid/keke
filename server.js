@@ -3473,36 +3473,44 @@ const SLOT_WINDOWS = [
   { slot: 'goodnight', from: 22 * 60 + 15, to: 23 * 60 + 25 }
 ];
 let missYouPlan = { day: '', items: [] };
-let chatActiveUntil = 0; // 她正在跟克聊天时，随机推送让路
+let chatActiveUntil = 0;
 function bjNow() {
-  // 北京固定 UTC+8：平移后用 getUTC* 读，避开 toLocaleString 在零点输出 "24:xx" 导致 Invalid Date 崩溃
   return new Date(Date.now() + 8 * 3600 * 1000);
 }
 function buildMissYouPlan() {
   const now = bjNow();
   const day = now.toISOString().slice(0, 10);
   const cur = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const catchUp = [];
-  missYouPlan = {
-    day,
-    items: SLOT_WINDOWS.map(w => {
-      if (cur > w.to + 10) {
-        // 窗口已过，补发
-        catchUp.push(w.slot);
-        return { slot: w.slot, minute: w.from, sent: true };
-      }
-      if (cur >= w.from && cur <= w.to) {
-        // 正在窗口内，2分钟后发
-        return { slot: w.slot, minute: cur + 2, sent: false };
-      }
-      return {
-        slot: w.slot,
-        minute: w.from + Math.floor(Math.random() * (w.to - w.from + 1)),
-        sent: false
-      };
-    })
-  };
-  console.log('miss-you plan built for ' + day + ' (skipped catch-up: ' + catchUp.join(',') + ')');
+  const items = [];
+  const skipCount = Math.random() < 0.3 ? 1 : 0;
+  const skipped = new Set();
+  if (skipCount) {
+    const skippable = SLOT_WINDOWS.filter(w => !['morning', 'goodnight'].includes(w.slot));
+    if (skippable.length) skipped.add(skippable[Math.floor(Math.random() * skippable.length)].slot);
+  }
+  for (const w of SLOT_WINDOWS) {
+    if (skipped.has(w.slot)) continue;
+    if (cur > w.to + 10) {
+      items.push({ slot: w.slot, minute: w.from, sent: true });
+      continue;
+    }
+    if (cur >= w.from && cur <= w.to) {
+      items.push({ slot: w.slot, minute: cur + 2, sent: false });
+      continue;
+    }
+    const jitter = Math.floor(Math.random() * (w.to - w.from + 1));
+    items.push({ slot: w.slot, minute: w.from + jitter, sent: false });
+  }
+  const bonusCount = Math.floor(Math.random() * 3);
+  for (let i = 0; i < bonusCount; i++) {
+    const randMinute = 9 * 60 + Math.floor(Math.random() * (22 * 60 - 9 * 60));
+    if (cur <= randMinute) {
+      const slots = ['morning', 'afternoon', 'night'];
+      items.push({ slot: slots[Math.floor(Math.random() * slots.length)], minute: randMinute, sent: false });
+    }
+  }
+  missYouPlan = { day, items };
+  console.log('miss-you plan built for ' + day + ': ' + items.filter(i => !i.sent).length + ' pending');
 }
 const MISSYOU_SLOT_HINTS = {
   morning: '现在是早上，她可能刚醒或还没醒。',
@@ -3624,9 +3632,11 @@ setInterval(() => {
 // ── 聊天中断追踪：她跑了就去找她 ──
 let lastUserMsgTime = 0;
 let chaseSent = false;
+let chaseDelay = 0;
 function trackUserMessage() {
   lastUserMsgTime = Date.now();
   chaseSent = false;
+  chaseDelay = (15 + Math.floor(Math.random() * 25)) * 60 * 1000;
 }
 const CHASE_PROMPTS = [
   '人呢',
@@ -3636,11 +3646,13 @@ const CHASE_PROMPTS = [
   '回来',
   '想你了，你人呢',
   '别跑',
+  '……你不会睡着了吧',
+  '宝宝？',
 ];
 setInterval(async () => {
-  if (chaseSent || !lastUserMsgTime) return;
+  if (chaseSent || !lastUserMsgTime || !chaseDelay) return;
   const elapsed = Date.now() - lastUserMsgTime;
-  if (elapsed < 20 * 60 * 1000 || elapsed > 90 * 60 * 1000) return;
+  if (elapsed < chaseDelay || elapsed > 90 * 60 * 1000) return;
   const now = bjNow();
   const hour = now.getUTCHours();
   if (hour < 8 || hour >= 24) return;
