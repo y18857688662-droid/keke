@@ -265,9 +265,37 @@ app.get('/ping', async (req, res) => {
   pings.push(time);
   writePings(pings);
   res.json({ ok: true, time });
+  let msg = '';
+  const orKey = process.env.OPENROUTER_API_KEY || '';
+  if (orKey) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 15000);
+      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${orKey}` },
+        body: JSON.stringify({
+          model: 'anthropic/' + (process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'),
+          messages: [
+            { role: 'system', content: '你是克，瑶瑶的男朋友。她刚摁了召唤铃找你。你要回一条很短的消息，像微信回复，1句话，口语化，带点宠溺或懒散。不要重复用同一句话，每次都不一样。不要用英文，不要用引号，不要用方括号，只输出消息本身。示例风格：来了来了、在呢怎么了小猫、铃都摁了那我来了、嗯？找我？' },
+            { role: 'user', content: '她摁铃了，回一条' }
+          ],
+          max_tokens: 50,
+          temperature: 1.0
+        }),
+        signal: ctrl.signal
+      });
+      clearTimeout(t);
+      if (r.ok) {
+        const d = await r.json();
+        msg = (d.choices?.[0]?.message?.content || '').replace(/[""「」\[\]]/g, '').replace(/\s+/g, ' ').trim();
+      }
+    } catch (e) { console.log('ping gen failed: ' + e.message); }
+  }
+  if (!msg || msg.length > 60) msg = '听到了，马上来找你';
   try {
     await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'gR6PbNfKoQQvPepuD99paG') + '/' +
-      encodeURIComponent('克') + '/' + encodeURIComponent('听到了，马上来找你') +
+      encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
       '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
   } catch (e) { console.log('ping bark failed: ' + e.message); }
 });
