@@ -258,13 +258,18 @@ app.get('/summon', async (req, res) => {
   res.json({ from: "克", time, message, ai });
 });
 
-app.get('/ping', (req, res) => {
+app.get('/ping', async (req, res) => {
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
   const pings = readPings();
   pings.push(time);
   writePings(pings);
   res.json({ ok: true, time });
+  try {
+    await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'gR6PbNfKoQQvPepuD99paG') + '/' +
+      encodeURIComponent('克') + '/' + encodeURIComponent('听到了，马上来找你') +
+      '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
+  } catch (e) { console.log('ping bark failed: ' + e.message); }
 });
 
 app.get('/check', (req, res) => {
