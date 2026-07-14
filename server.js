@@ -4018,8 +4018,13 @@ let qrSessionCookies = '';
 let qrStatus = { code: 0 };
 let qrPollingTimer = null;
 
+const QR_LOG_FILE = path.join(__dirname, 'qr_debug.json');
+let qrLog = [];
+let qrChecking = false;
+
 function checkQrStatus() {
-  if (!qrKey) return;
+  if (!qrKey || qrChecking) return;
+  qrChecking = true;
   const url = new URL('https://music.163.com/api/login/qrcode/client/login?type=1&key=' + qrKey);
   const hreq = https.request({
     hostname: url.hostname, path: url.pathname + url.search, method: 'GET',
@@ -4028,11 +4033,15 @@ function checkQrStatus() {
     let body = '';
     hres.on('data', c => body += c);
     hres.on('end', () => {
+      qrChecking = false;
       let d;
       try { d = JSON.parse(body); } catch { d = { code: 0 }; }
       const rawCookies = hres.headers['set-cookie'] || [];
       qrStatus = { code: d.code };
-      if (d.code === 803) {
+      qrLog.push({ ts: Date.now(), code: d.code, cookies: rawCookies.length, bodyKeys: Object.keys(d) });
+      try { fs.writeFileSync(QR_LOG_FILE, JSON.stringify(qrLog, null, 2)); } catch {}
+
+      if (d.code === 803 || (d.code !== 801 && d.code !== 802 && d.code !== 800 && rawCookies.some(c => c.includes('MUSIC_U')))) {
         if (qrPollingTimer) { clearInterval(qrPollingTimer); qrPollingTimer = null; }
         let musicU = '';
         for (const c of rawCookies) {
@@ -4048,14 +4057,14 @@ function checkQrStatus() {
           writeNeteaseCred({ music_u: musicU, ts: Date.now() });
           console.log('网易云登录成功，cookie已保存，长度:', musicU.length);
         }
-        lastQrResult = { code: d.code, cookieCount: rawCookies.length, cookieSnippets: rawCookies.map(c => c.substring(0, 80)), bodyKeys: Object.keys(d), hasMusicU: !!musicU };
-      } else if (d.code === 800) {
+        lastQrResult = { code: d.code, cookieCount: rawCookies.length, cookieSnippets: rawCookies.map(c => c.substring(0, 80)), bodyKeys: Object.keys(d), bodySnippet: JSON.stringify(d).substring(0, 300), hasMusicU: !!musicU };
+      } else if (d.code === 800 || d.code === 8821) {
         if (qrPollingTimer) { clearInterval(qrPollingTimer); qrPollingTimer = null; }
-        lastQrResult = { code: d.code };
+        lastQrResult = { code: d.code, log: qrLog };
       }
     });
   });
-  hreq.on('error', () => {});
+  hreq.on('error', () => { qrChecking = false; });
   hreq.end();
 }
 
@@ -4076,7 +4085,8 @@ app.post('/music/qr/create', (req, res) => {
         const setCookies = hres.headers['set-cookie'] || [];
         qrSessionCookies = setCookies.map(c => c.split(';')[0]).join('; ');
         qrStatus = { code: 0 };
-        qrPollingTimer = setInterval(checkQrStatus, 2000);
+        qrLog = [];
+        qrPollingTimer = setInterval(checkQrStatus, 1500);
         const qrUrl = 'https://music.163.com/login?codekey=' + qrKey;
         const qrimg = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
         res.json({ ok: true, qrimg });
