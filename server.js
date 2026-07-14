@@ -4027,6 +4027,472 @@ app.get('/music/qr/check', async (req, res) => {
   } catch (e) { res.json({ code: 0, error: e.message }); }
 });
 
+// ── Serenade 音乐播放器 ──
+const MUSIC_CACHE_DIR = path.join(__dirname, 'music_cache');
+const MUSIC_PLAYLIST_FILE = path.join(__dirname, 'music_playlist.json');
+const MUSIC_REMOTE_FILE = path.join(__dirname, 'music_remote.json');
+if (!fs.existsSync(MUSIC_CACHE_DIR)) fs.mkdirSync(MUSIC_CACHE_DIR, { recursive: true });
+
+function getMusicU() {
+  try {
+    const cred = JSON.parse(fs.readFileSync(NETEASE_CRED_FILE, 'utf8'));
+    return cred.music_u ? `MUSIC_U=${cred.music_u}` : '';
+  } catch { return ''; }
+}
+
+async function neteaseApi(url, postData) {
+  const headers = {
+    'Cookie': getMusicU(),
+    'Referer': 'https://music.163.com',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  };
+  if (postData) headers['Content-Type'] = 'application/x-www-form-urlencoded';
+  const r = await fetch(url, {
+    method: postData ? 'POST' : 'GET',
+    headers,
+    body: postData || undefined,
+  });
+  return r.json();
+}
+
+function loadMusicPlaylist() {
+  try { return JSON.parse(fs.readFileSync(MUSIC_PLAYLIST_FILE, 'utf8')); } catch { return []; }
+}
+function saveMusicPlaylist(songs) {
+  fs.writeFileSync(MUSIC_PLAYLIST_FILE, JSON.stringify(songs, null, 0));
+}
+
+app.get('/api/search', async (req, res) => {
+  const q = req.query.q;
+  if (!q) return res.json({ ok: false, error: 'missing q' });
+  try {
+    const raw = await neteaseApi('https://music.163.com/api/search/get',
+      `s=${encodeURIComponent(q)}&type=1&limit=6&offset=0`);
+    const result = raw.result || {};
+    if (typeof result !== 'object') return res.json({ ok: true, songs: [] });
+    const rawSongs = (result.songs || []).slice(0, 6);
+    const ids = rawSongs.map(s => s.id).filter(Boolean);
+    let covers = {};
+    if (ids.length) {
+      try {
+        const detail = await neteaseApi(`https://music.163.com/api/song/detail?ids=[${ids.join(',')}]`);
+        for (const ds of (detail.songs || [])) {
+          const al = ds.album || {};
+          if (al.picUrl) covers[ds.id] = al.picUrl;
+        }
+      } catch {}
+    }
+    const songs = rawSongs.map(s => {
+      const artists = (s.artists || []).map(a => a.name || '').join(', ');
+      const album = s.album || {};
+      let cover = covers[s.id] || album.picUrl || '';
+      if (cover && !cover.startsWith('http')) cover = 'https:' + cover;
+      return { id: s.id, name: s.name || '', artist: artists, album: album.name || '', cover };
+    });
+    res.json({ ok: true, songs });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/url', async (req, res) => {
+  const id = req.query.id;
+  if (!id) return res.json({ ok: false, error: 'missing id' });
+  const cacheFile = path.join(MUSIC_CACHE_DIR, `${id}.mp3`);
+  if (fs.existsSync(cacheFile) && fs.statSync(cacheFile).size > 0) {
+    return res.json({ ok: true, url: `/api/file/${id}.mp3` });
+  }
+  try {
+    const raw = await neteaseApi(`https://music.163.com/api/song/enhance/player/url?ids=[${id}]&br=128000`);
+    const data = raw.data || [];
+    const audioUrl = data[0]?.url;
+    if (!audioUrl) return res.json({ ok: false, error: '无法获取，可能需要VIP或地区限制' });
+    const downloadAudio = async (dlUrl) => {
+      const r = await fetch(dlUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://music.163.com', 'Cookie': getMusicU() }
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const buf = Buffer.from(await r.arrayBuffer());
+      const tmp = cacheFile + '.tmp';
+      fs.writeFileSync(tmp, buf);
+      fs.renameSync(tmp, cacheFile);
+    };
+    try {
+      await downloadAudio(audioUrl);
+    } catch {
+      const fallback = audioUrl.replace(/m\d+\.music\.126\.net/, 'm701.music.126.net');
+      await downloadAudio(fallback);
+    }
+    res.json({ ok: true, url: `/api/file/${id}.mp3` });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/file/:filename', (req, res) => {
+  const filename = req.params.filename;
+  if (!filename.endsWith('.mp3')) return res.status(404).json({ error: 'not found' });
+  const fp = path.join(MUSIC_CACHE_DIR, filename);
+  if (!fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
+  const stat = fs.statSync(fp);
+  res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': stat.size, 'Access-Control-Allow-Origin': '*' });
+  fs.createReadStream(fp).pipe(res);
+});
+
+app.get('/api/similar', async (req, res) => {
+  const id = req.query.id;
+  if (!id) return res.json({ ok: false, error: 'missing id' });
+  try {
+    const raw = await neteaseApi(`https://music.163.com/api/discovery/simiSong?songid=${id}&offset=0&total=true&limit=6`);
+    const songs = (raw.songs || []).slice(0, 6).map(s => {
+      const artists = (s.artists || []).map(a => a.name || '').join(', ');
+      const album = s.album || {};
+      let cover = album.picUrl || '';
+      if (cover && !cover.startsWith('http')) cover = 'https:' + cover;
+      return { id: s.id, name: s.name || '', artist: artists, album: album.name || '', cover };
+    });
+    res.json({ ok: true, songs });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/lyric', async (req, res) => {
+  const id = req.query.id;
+  if (!id) return res.json({ ok: false, error: 'missing id' });
+  try {
+    const raw = await neteaseApi(`https://music.163.com/api/song/lyric?id=${id}&lv=1&tv=-1`);
+    const lrc = (raw.lrc || {}).lyric || '';
+    const tlyric = (raw.tlyric || {}).lyric || '';
+    res.json({ ok: true, lrc, tlyric });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/playlist', (req, res) => {
+  res.json({ ok: true, songs: loadMusicPlaylist() });
+});
+
+app.post('/api/playlist/add', (req, res) => {
+  const song = req.body?.song;
+  if (!song || !song.songId) return res.json({ ok: false, error: 'missing song' });
+  const playlist = loadMusicPlaylist();
+  if (playlist.some(s => s.songId === song.songId)) return res.json({ ok: true, duplicate: true, songs: playlist });
+  song.addedBy = req.body.by || 'unknown';
+  playlist.push(song);
+  saveMusicPlaylist(playlist);
+  res.json({ ok: true, songs: playlist });
+});
+
+app.post('/api/playlist/remove', (req, res) => {
+  const songId = req.body?.songId;
+  if (!songId) return res.json({ ok: false, error: 'missing songId' });
+  const playlist = loadMusicPlaylist().filter(s => s.songId !== songId);
+  saveMusicPlaylist(playlist);
+  res.json({ ok: true, songs: playlist });
+});
+
+app.get('/api/remote', (req, res) => {
+  try {
+    if (fs.existsSync(MUSIC_REMOTE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(MUSIC_REMOTE_FILE, 'utf8'));
+      fs.unlinkSync(MUSIC_REMOTE_FILE);
+      res.json({ ok: true, song: data });
+    } else {
+      res.json({ ok: false });
+    }
+  } catch { res.json({ ok: false }); }
+});
+
+app.post('/api/remote', (req, res) => {
+  try {
+    fs.writeFileSync(MUSIC_REMOTE_FILE, JSON.stringify(req.body || {}, null, 0));
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/music/player', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Serenade</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0d0d0d; color: #e8e0d6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.app { width: 380px; max-width: 100vw; max-height: 95vh; display: flex; flex-direction: column; background: rgba(30, 26, 22, 0.95); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.np { position: relative; }
+.np-cover { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; cursor: pointer; }
+.np-empty { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 64px; opacity: 0.15; background: #1a1714; }
+.np-info { padding: 14px 20px 6px; }
+.np-name { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-artist { font-size: 12px; color: #a09080; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-progress { margin: 10px 20px 0; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; cursor: pointer; }
+.np-fill { height: 100%; background: #e0a870; border-radius: 2px; transition: width 0.3s linear; }
+.np-time { display: flex; justify-content: space-between; padding: 4px 20px 0; font-size: 10px; color: #a09080; }
+.controls { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 12px; }
+.ctrl { background: none; border: none; color: #e8e0d6; cursor: pointer; opacity: 0.5; padding: 4px; }
+.ctrl:hover, .ctrl.on { opacity: 1; }
+.ctrl.on { color: #e0a870; }
+.play-btn { width: 48px; height: 48px; border-radius: 50%; background: #e0a870; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.play-btn:active { transform: scale(0.93); }
+.play-btn svg { color: #1a1714; }
+.tabs { display: flex; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.tab { flex: 1; text-align: center; padding: 8px; font-size: 12px; color: #a09080; cursor: pointer; }
+.tab.active { color: #e0a870; border-bottom: 2px solid #e0a870; }
+.panel { flex: 1; overflow-y: auto; min-height: 200px; max-height: 300px; }
+.pl-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; cursor: pointer; }
+.pl-item:hover { background: rgba(255,255,255,0.04); }
+.pl-item.active { background: rgba(224,168,112,0.08); }
+.pl-item.active .pl-name { color: #e0a870; }
+.pl-num { width: 20px; font-size: 11px; color: #a09080; text-align: center; flex-shrink: 0; }
+.pl-cover { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.pl-info { flex: 1; min-width: 0; }
+.pl-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-artist { font-size: 11px; color: #a09080; }
+.pl-rm { background: none; border: none; color: #a09080; opacity: 0.3; font-size: 16px; cursor: pointer; }
+.pl-rm:hover { opacity: 0.8; color: #e07070; }
+.pl-empty { text-align: center; padding: 40px; color: #a09080; opacity: 0.4; font-size: 13px; }
+.search-bar { display: flex; gap: 8px; padding: 12px 16px; }
+.search-bar input { flex: 1; padding: 8px 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e8e0d6; font-size: 13px; outline: none; }
+.search-bar button { padding: 8px 16px; background: #e0a870; color: #1a1714; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.sr-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; cursor: pointer; }
+.sr-item:hover { background: rgba(255,255,255,0.04); }
+.sr-cover { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.sr-info { flex: 1; min-width: 0; }
+.sr-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-artist { font-size: 11px; color: #a09080; }
+.sr-add { background: none; border: 1px solid rgba(255,255,255,0.12); color: #a09080; border-radius: 50%; width: 26px; height: 26px; font-size: 14px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.sr-add:hover { border-color: #e0a870; color: #e0a870; }
+.sr-add.done { opacity: 0.3; pointer-events: none; }
+.lyrics { padding: 20px 24px 40px; -webkit-mask-image: linear-gradient(transparent, black 15%, black 85%, transparent); mask-image: linear-gradient(transparent, black 15%, black 85%, transparent); }
+.ly-line { padding: 6px 0; font-size: 14px; color: #e8e0d6; opacity: 0.25; transition: all 0.3s; cursor: pointer; line-height: 1.5; }
+.ly-line.active { opacity: 1; font-size: 16px; font-weight: 600; color: #e0a870; }
+.ly-empty { text-align: center; padding: 40px; color: #a09080; opacity: 0.3; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="np">
+    <div id="coverEmpty" class="np-empty">&#9835;</div>
+    <img id="coverImg" src="" alt="" class="np-cover" style="display:none" onclick="showTab('lyrics')">
+    <div class="np-info">
+      <div class="np-name" id="songName">Serenade</div>
+      <div class="np-artist" id="songArtist">搜索歌曲开始播放</div>
+    </div>
+    <div class="np-progress" id="progressBar"><div class="np-fill" id="progressFill"></div></div>
+    <div class="np-time"><span id="timeNow">0:00</span><span id="timeEnd">0:00</span></div>
+    <div class="controls">
+      <button class="ctrl" onclick="playPrev()"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 6h2v12H6zm12 0v12l-8.5-6z" fill="currentColor"/></svg></button>
+      <div class="play-btn" onclick="togglePlay()">
+        <svg id="playIcon" viewBox="0 0 24 24" width="24" height="24"><polygon points="6,2 22,12 6,22" fill="currentColor"/></svg>
+        <svg id="pauseIcon" viewBox="0 0 24 24" width="24" height="24" style="display:none"><rect x="5" y="3" width="5" height="18" rx="1" fill="currentColor"/><rect x="14" y="3" width="5" height="18" rx="1" fill="currentColor"/></svg>
+      </div>
+      <button class="ctrl" onclick="playNext()"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" fill="currentColor"/></svg></button>
+      <button class="ctrl" id="roamBtn" onclick="toggleRoam()" title="漫游"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M14 12c0-1.1-.9-2-2-2s-2 .9-2 2 .9 2 2 2 2-.9 2-2zm-2-9c1.1 0 2 .9 2 2h2c0-2.2-1.8-4-4-4s-4 1.8-4 4h2c0-1.1.9-2 2-2zm0 14c-1.1 0-2-.9-2-2H8c0 2.2 1.8 4 4 4s4-1.8 4-4h-2c0 1.1-.9 2-2 2zM12 1C5.9 1 1 5.9 1 12s4.9 11 11 11 11-4.9 11-11S18.1 1 12 1zm0 20c-5 0-9-4-9-9s4-9 9-9 9 4 9 9-4 9-9 9z" fill="currentColor"/></svg></button>
+    </div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" id="tabPlaylist" onclick="showTab('playlist')">播放列表</div>
+    <div class="tab" id="tabSearch" onclick="showTab('search')">搜索</div>
+    <div class="tab" id="tabLyrics" onclick="showTab('lyrics')">歌词</div>
+  </div>
+  <div class="panel" id="panelPlaylist"><div id="playlistList"></div></div>
+  <div class="panel" id="panelSearch" style="display:none">
+    <div class="search-bar">
+      <input id="searchInput" placeholder="歌名或歌手..." onkeydown="if(event.key==='Enter')doSearch()">
+      <button onclick="doSearch()" id="searchBtn">搜索</button>
+    </div>
+    <div id="results"></div>
+  </div>
+  <div class="panel lyrics" id="panelLyrics" style="display:none">
+    <div id="lyricsContent"><div class="ly-empty">播放歌曲后显示歌词</div></div>
+  </div>
+</div>
+<script>
+const audio = new Audio();
+audio.preload = 'auto';
+let song = JSON.parse(localStorage.getItem('serenade_song') || 'null');
+let playlist = [];
+let queue = [];
+let history = [];
+let playing = false;
+let ready = false;
+let roaming = JSON.parse(localStorage.getItem('serenade_roam') || 'false');
+let lrcLines = [];
+let currentLrcIdx = -1;
+
+function fmt(s) { const m = Math.floor(s/60), sec = Math.floor(s%60); return m+':'+String(sec).padStart(2,'0'); }
+
+audio.addEventListener('timeupdate', () => {
+  if (audio.duration) {
+    document.getElementById('progressFill').style.width = (audio.currentTime / audio.duration * 100) + '%';
+    document.getElementById('timeNow').textContent = fmt(audio.currentTime);
+    document.getElementById('timeEnd').textContent = fmt(audio.duration);
+    updateLyricHighlight();
+  }
+});
+audio.addEventListener('ended', () => { playing = false; updateUI(); onSongEnd(); });
+audio.addEventListener('canplay', () => { ready = true; updateUI(); });
+
+document.getElementById('progressBar').addEventListener('click', e => {
+  if (!audio.duration) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration;
+});
+
+function updateUI() {
+  document.getElementById('playIcon').style.display = playing ? 'none' : '';
+  document.getElementById('pauseIcon').style.display = playing ? '' : 'none';
+  document.getElementById('roamBtn').classList.toggle('on', roaming);
+  if (song) {
+    document.getElementById('songName').textContent = song.name;
+    document.getElementById('songArtist').textContent = song.artist;
+    if (song.cover) {
+      document.getElementById('coverImg').src = song.cover;
+      document.getElementById('coverImg').style.display = '';
+      document.getElementById('coverEmpty').style.display = 'none';
+    }
+  }
+}
+
+function loadSong(s, autoplay) {
+  if (song) { history.push(song); if (history.length > 50) history.shift(); }
+  song = s;
+  localStorage.setItem('serenade_song', JSON.stringify(s));
+  ready = false;
+  document.getElementById('progressFill').style.width = '0%';
+  lrcLines = []; currentLrcIdx = -1;
+  updateUI();
+  fetchLyrics(s.songId);
+  if (s.songId) {
+    fetch('/api/url?id=' + s.songId).then(r => r.json()).then(d => {
+      if (d.ok && d.url) {
+        audio.src = d.url; audio.load();
+        if (autoplay) audio.addEventListener('canplay', () => { audio.play().catch(()=>{}); playing = true; updateUI(); }, { once: true });
+      }
+    });
+  }
+}
+
+function onSongEnd() {
+  if (queue.length > 0) { loadSong(queue.shift(), true); renderPlaylist(); }
+  else if (roaming && song?.songId) fetchSimilar(song.songId);
+}
+
+function fetchSimilar(id) {
+  fetch('/api/similar?id='+id).then(r=>r.json()).then(d => {
+    if (d.ok && d.songs?.length) {
+      const p = d.songs[Math.floor(Math.random()*d.songs.length)];
+      loadSong({name:p.name,artist:p.artist,album:p.album,cover:p.cover,songId:p.id}, true);
+    }
+  }).catch(()=>{});
+}
+
+function togglePlay() { if (!song||!ready) return; if (playing) { audio.pause(); playing=false; } else { audio.play().catch(()=>{}); playing=true; } updateUI(); }
+function toggleRoam() { roaming=!roaming; localStorage.setItem('serenade_roam', JSON.stringify(roaming)); updateUI(); }
+function playNext() { if (queue.length>0) { loadSong(queue.shift(), true); renderPlaylist(); } else if (roaming&&song?.songId) fetchSimilar(song.songId); }
+function playPrev() { if (history.length>0) { if (song) playlist.unshift(song); const prev=history.pop(); song=null; loadSong(prev, true); history.pop(); renderPlaylist(); } }
+
+function showTab(name) {
+  ['playlist','search','lyrics'].forEach(t => {
+    document.getElementById('panel'+t.charAt(0).toUpperCase()+t.slice(1)).style.display = t===name?'':'none';
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===name);
+  });
+  if (name==='search') setTimeout(()=>document.getElementById('searchInput').focus(), 100);
+}
+
+function fetchPlaylist() {
+  fetch('/api/playlist').then(r=>r.json()).then(d => { if (d.ok) { playlist=d.songs.map(s=>({name:s.name,artist:s.artist,album:s.album,cover:s.cover,songId:s.songId,addedBy:s.addedBy})); renderPlaylist(); } }).catch(()=>{});
+}
+function playFromPlaylist(idx) {
+  const rest = playlist.slice(idx + 1);
+  loadSong(playlist[idx], true);
+  queue = rest.map(s => ({...s}));
+  renderPlaylist();
+}
+function renderPlaylist() {
+  const el = document.getElementById('playlistList');
+  if (playlist.length===0) { el.innerHTML='<div class="pl-empty">播放列表为空，搜索添加歌曲</div>'; return; }
+  el.innerHTML = playlist.map((s,i) => \`<div class="pl-item \${song?.songId===s.songId?'active':''}" onclick="playFromPlaylist(\${i})"><div class="pl-num">\${i+1}</div><img class="pl-cover" src="\${s.cover}" alt=""><div class="pl-info"><div class="pl-name">\${s.name}</div><div class="pl-artist">\${s.artist}</div></div></div>\`).join('');
+}
+
+function doSearch() {
+  const q = document.getElementById('searchInput').value.trim(); if (!q) return;
+  document.getElementById('searchBtn').textContent = '...';
+  fetch('/api/search?q='+encodeURIComponent(q)).then(r=>r.json()).then(d => {
+    document.getElementById('searchBtn').textContent = '搜索';
+    const el = document.getElementById('results'); el.innerHTML = '';
+    (d.songs||[]).forEach(s => {
+      const obj = {name:s.name,artist:s.artist,album:s.album,cover:s.cover,songId:s.id};
+      const div = document.createElement('div'); div.className='sr-item';
+      div.innerHTML = \`<img class="sr-cover" src="\${s.cover}" alt=""><div class="sr-info"><div class="sr-name">\${s.name}</div><div class="sr-artist">\${s.artist}</div></div><button class="sr-add" title="添加到播放列表">+</button>\`;
+      div.querySelector('.sr-info').onclick = () => { loadSong(obj, true); showTab('lyrics'); };
+      div.querySelector('.sr-add').onclick = e => {
+        e.stopPropagation();
+        fetch('/api/playlist/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({song:obj})})
+          .then(r=>r.json()).then(d2 => { if(d2.ok) { playlist=d2.songs; renderPlaylist(); e.target.classList.add('done'); e.target.textContent='\\u2713'; }});
+      };
+      el.appendChild(div);
+    });
+  }).catch(()=>{ document.getElementById('searchBtn').textContent='搜索'; });
+}
+
+function parseLrc(lrc) {
+  const lines = [];
+  for (const line of lrc.split('\\n')) {
+    const m = line.match(/\\[(\\d+):(\\d+)\\.(\\d+)\\](.*)/);
+    if (m) {
+      const time = parseInt(m[1])*60 + parseInt(m[2]) + parseInt(m[3])/(m[3].length===2?100:1000);
+      const text = m[4].trim();
+      if (text) lines.push({time, text});
+    }
+  }
+  return lines.sort((a,b) => a.time - b.time);
+}
+
+function fetchLyrics(id) {
+  if (!id) return;
+  const el = document.getElementById('lyricsContent');
+  el.innerHTML = '<div class="ly-empty">加载中...</div>';
+  fetch('/api/lyric?id='+id).then(r=>r.json()).then(d => {
+    if (d.ok && d.lrc) {
+      lrcLines = parseLrc(d.lrc);
+      if (lrcLines.length === 0) { el.innerHTML = '<div class="ly-empty">暂无歌词</div>'; return; }
+      el.innerHTML = lrcLines.map((l,i) => \`<div class="ly-line" id="ly-\${i}" onclick="audio.currentTime=\${l.time}">\${l.text}</div>\`).join('');
+    } else { el.innerHTML = '<div class="ly-empty">暂无歌词</div>'; }
+  }).catch(() => { el.innerHTML = '<div class="ly-empty">加载失败</div>'; });
+}
+
+function updateLyricHighlight() {
+  if (lrcLines.length === 0) return;
+  const t = audio.currentTime;
+  let idx = -1;
+  for (let i = lrcLines.length-1; i >= 0; i--) { if (t >= lrcLines[i].time) { idx = i; break; } }
+  if (idx === currentLrcIdx) return;
+  if (currentLrcIdx >= 0) { const prev = document.getElementById('ly-'+currentLrcIdx); if (prev) prev.classList.remove('active'); }
+  currentLrcIdx = idx;
+  if (idx >= 0) {
+    const el = document.getElementById('ly-'+idx);
+    if (el) {
+      el.classList.add('active');
+      const panel = document.getElementById('panelLyrics');
+      panel.scrollTo({ top: el.offsetTop - panel.clientHeight/2 + el.clientHeight/2, behavior: 'smooth' });
+    }
+  }
+}
+
+setInterval(() => {
+  fetch('/api/remote').then(r=>r.json()).then(d => {
+    if (d.ok && d.song) { loadSong(d.song, false); audio.addEventListener('canplay', () => { audio.play().catch(()=>{}); playing=true; updateUI(); }, { once: true }); }
+  }).catch(()=>{});
+}, 3000);
+
+updateUI();
+fetchPlaylist();
+if (song?.songId) {
+  fetchLyrics(song.songId);
+  fetch('/api/url?id='+song.songId).then(r=>r.json()).then(d => { if (d.ok && d.url) { audio.src = d.url; audio.load(); } });
+}
+</script>
+</body>
+</html>`);
+});
+
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   buildMissYouPlan();
