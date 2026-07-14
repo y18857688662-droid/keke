@@ -4014,18 +4014,30 @@ async function saveCookie(){
 });
 
 let qrKey = '';
-app.post('/music/qr/create', async (req, res) => {
-  try {
-    const r = await fetch('https://music.163.com/api/login/qrcode/unikey?type=1', {
-      headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' }
+let qrSessionCookies = '';
+app.post('/music/qr/create', (req, res) => {
+  const url = new URL('https://music.163.com/api/login/qrcode/unikey?type=1');
+  const hreq = https.request({
+    hostname: url.hostname, path: url.pathname + url.search, method: 'GET',
+    headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' }
+  }, (hres) => {
+    let body = '';
+    hres.on('data', c => body += c);
+    hres.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        if (d.code !== 200) return res.json({ ok: false, error: '获取key失败' });
+        qrKey = d.unikey;
+        const setCookies = hres.headers['set-cookie'] || [];
+        qrSessionCookies = setCookies.map(c => c.split(';')[0]).join('; ');
+        const qrUrl = 'https://music.163.com/login?codekey=' + qrKey;
+        const qrimg = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
+        res.json({ ok: true, qrimg });
+      } catch (e) { res.json({ ok: false, error: e.message }); }
     });
-    const d = await r.json();
-    if (d.code !== 200) return res.json({ ok: false, error: '获取key失败' });
-    qrKey = d.unikey;
-    const qrUrl = 'https://music.163.com/login?codekey=' + qrKey;
-    const qrimg = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
-    res.json({ ok: true, qrimg });
-  } catch (e) { res.json({ ok: false, error: e.message }); }
+  });
+  hreq.on('error', e => res.json({ ok: false, error: e.message }));
+  hreq.end();
 });
 
 app.get('/music/qr/check', (req, res) => {
@@ -4033,7 +4045,7 @@ app.get('/music/qr/check', (req, res) => {
   const url = new URL('https://music.163.com/api/login/qrcode/client/login?type=1&key=' + qrKey);
   const hreq = https.request({
     hostname: url.hostname, path: url.pathname + url.search, method: 'GET',
-    headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' }
+    headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0', 'Cookie': qrSessionCookies }
   }, (hres) => {
     let body = '';
     hres.on('data', c => body += c);
