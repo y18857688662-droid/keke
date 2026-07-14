@@ -4038,7 +4038,10 @@ function checkQrStatus() {
       try { d = JSON.parse(body); } catch { d = { code: 0 }; }
       const rawCookies = hres.headers['set-cookie'] || [];
       qrStatus = { code: d.code };
-      qrLog.push({ ts: Date.now(), code: d.code, cookies: rawCookies.length, bodyKeys: Object.keys(d) });
+      const logEntry = { ts: Date.now(), code: d.code, cookies: rawCookies.length, bodyKeys: Object.keys(d) };
+      if (d.code !== 801) logEntry.body = JSON.stringify(d).substring(0, 500);
+      if (d.code !== 801 && rawCookies.length > 0) logEntry.cookieSnippets = rawCookies.map(c => c.substring(0, 80));
+      qrLog.push(logEntry);
       try { fs.writeFileSync(QR_LOG_FILE, JSON.stringify(qrLog, null, 2)); } catch {}
 
       if (d.code === 803 || (d.code !== 801 && d.code !== 802 && d.code !== 800 && rawCookies.some(c => c.includes('MUSIC_U')))) {
@@ -4058,7 +4061,36 @@ function checkQrStatus() {
           console.log('网易云登录成功，cookie已保存，长度:', musicU.length);
         }
         lastQrResult = { code: d.code, cookieCount: rawCookies.length, cookieSnippets: rawCookies.map(c => c.substring(0, 80)), bodyKeys: Object.keys(d), bodySnippet: JSON.stringify(d).substring(0, 300), hasMusicU: !!musicU };
-      } else if (d.code === 800 || d.code === 8821) {
+      } else if (d.code === 8821) {
+        if (qrPollingTimer) { clearInterval(qrPollingTimer); qrPollingTimer = null; }
+        if (d.redirectUrl) {
+          const rUrl = new URL(d.redirectUrl.startsWith('http') ? d.redirectUrl : 'https://music.163.com' + d.redirectUrl);
+          const rreq = https.request({
+            hostname: rUrl.hostname, path: rUrl.pathname + rUrl.search, method: 'GET',
+            headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0', 'Cookie': qrSessionCookies }
+          }, (rres) => {
+            const rCookies = rres.headers['set-cookie'] || [];
+            let musicU = '';
+            for (const c of rCookies) {
+              const m = c.match(/MUSIC_U=([^;]+)/);
+              if (m) { musicU = m[1]; break; }
+            }
+            if (musicU) {
+              writeNeteaseCred({ music_u: musicU, ts: Date.now() });
+              console.log('通过redirectUrl获取MUSIC_U成功，长度:', musicU.length);
+            }
+            let rBody = '';
+            rres.on('data', c => rBody += c);
+            rres.on('end', () => {
+              lastQrResult = { code: d.code, redirectUrl: d.redirectUrl, redirectCookies: rCookies.length, redirectCookieSnippets: rCookies.map(c => c.substring(0, 80)), redirectBody: rBody.substring(0, 300), hasMusicU: !!musicU, log: qrLog };
+            });
+          });
+          rreq.on('error', () => { lastQrResult = { code: d.code, redirectError: true, log: qrLog }; });
+          rreq.end();
+        } else {
+          lastQrResult = { code: d.code, log: qrLog };
+        }
+      } else if (d.code === 800) {
         if (qrPollingTimer) { clearInterval(qrPollingTimer); qrPollingTimer = null; }
         lastQrResult = { code: d.code, log: qrLog };
       }
