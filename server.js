@@ -3987,12 +3987,16 @@ async function startQr(){
     const d2=await r2.json();
     if(d2.code===802){st.innerHTML='<span class="warn">已扫描，请在手机上确认</span>'}
     else if(d2.code===803){
-      if(d2._debug && !d2._debug.hasMusicU){
-        st.innerHTML='<span class="warn">扫码成功但cookie未捕获，请用下方手动输入</span>';
-      } else {
-        st.innerHTML='<span class="ok">登录成功 ✓</span>';
-      }
       clearInterval(polling);
+      let mu='';
+      if(d2.cookies){for(const c of d2.cookies){const m=c.match(/MUSIC_U=([^;]+)/);if(m){mu=m[1];break}}}
+      if(!mu&&d2.body){const s=JSON.stringify(d2.body);const m2=s.match(/MUSIC_U[=:]([^";,}\\\\s]+)/);if(m2)mu=m2[1]}
+      if(mu){
+        fetch('/music/cookie',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cookie:mu})})
+          .then(()=>{st.innerHTML='<span class="ok">登录成功 ✓</span>'});
+      } else {
+        st.innerHTML='<span class="warn">扫码成功但cookie未捕获，请用下方手动输入</span>';
+      }
     }
     else if(d2.code===800){st.textContent='二维码已过期，请刷新';clearInterval(polling)}
   },2000);
@@ -4037,7 +4041,6 @@ app.get('/music/qr/check', (req, res) => {
       let d;
       try { d = JSON.parse(body); } catch { d = { code: 0 }; }
       const rawCookies = hres.headers['set-cookie'] || [];
-      console.log('QR check code:', d.code, 'set-cookie count:', rawCookies.length, 'body keys:', Object.keys(d).join(','));
       if (d.code === 803) {
         let musicU = '';
         for (const c of rawCookies) {
@@ -4051,17 +4054,14 @@ app.get('/music/qr/check', (req, res) => {
         }
         if (musicU) {
           writeNeteaseCred({ music_u: musicU, ts: Date.now() });
-          console.log('网易云登录成功，cookie已保存，长度:', musicU.length);
-        } else {
-          console.log('登录803但无MUSIC_U');
-          console.log('set-cookie:', JSON.stringify(rawCookies).substring(0, 500));
-          console.log('body:', JSON.stringify(d).substring(0, 500));
         }
+        res.json({ code: d.code, cookies: rawCookies, body: d });
+      } else {
+        res.json({ code: d.code });
       }
-      res.json({ code: d.code, _debug: d.code === 803 ? { cookieCount: rawCookies.length, bodyKeys: Object.keys(d), hasMusicU: rawCookies.some(c => c.includes('MUSIC_U')) } : undefined });
     });
   });
-  hreq.on('error', e => { console.log('QR check error:', e.message); res.json({ code: 0, error: e.message }); });
+  hreq.on('error', e => res.json({ code: 0, error: e.message }));
   hreq.end();
 });
 
