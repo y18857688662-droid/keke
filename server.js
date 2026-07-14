@@ -304,6 +304,17 @@ app.get('/ping', async (req, res) => {
   } catch (e) { console.log('ping bark failed: ' + e.message); }
 });
 
+app.post('/bark/push', async (req, res) => {
+  const msg = (req.body?.msg || '').trim();
+  if (!msg) return res.json({ ok: false, error: 'missing msg' });
+  try {
+    await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'gR6PbNfKoQQvPepuD99paG') + '/' +
+      encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
+      '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
 app.get('/check', (req, res) => {
   const pings = readPings();
   writePings([]);
