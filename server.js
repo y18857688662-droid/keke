@@ -304,6 +304,15 @@ app.get('/ping', async (req, res) => {
   } catch (e) { console.log('ping bark failed: ' + e.message); }
 });
 
+app.get('/check', (req, res) => {
+  const pings = readPings();
+  writePings([]);
+  res.json({ pings });
+});
+
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+
 app.post('/bark/push', async (req, res) => {
   const msg = (req.body?.msg || '').trim();
   if (!msg) return res.json({ ok: false, error: 'missing msg' });
@@ -314,15 +323,6 @@ app.post('/bark/push', async (req, res) => {
     res.json({ ok: true });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
-
-app.get('/check', (req, res) => {
-  const pings = readPings();
-  writePings([]);
-  res.json({ pings });
-});
-
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 app.post('/app', (req, res) => {
   const appName = req.body.app || req.query.app;
