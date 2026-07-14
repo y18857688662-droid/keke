@@ -4015,7 +4015,52 @@ async function saveCookie(){
 
 let qrKey = '';
 let qrSessionCookies = '';
+let qrStatus = { code: 0 };
+let qrPollingTimer = null;
+
+function checkQrStatus() {
+  if (!qrKey) return;
+  const url = new URL('https://music.163.com/api/login/qrcode/client/login?type=1&key=' + qrKey);
+  const hreq = https.request({
+    hostname: url.hostname, path: url.pathname + url.search, method: 'GET',
+    headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0', 'Cookie': qrSessionCookies }
+  }, (hres) => {
+    let body = '';
+    hres.on('data', c => body += c);
+    hres.on('end', () => {
+      let d;
+      try { d = JSON.parse(body); } catch { d = { code: 0 }; }
+      const rawCookies = hres.headers['set-cookie'] || [];
+      qrStatus = { code: d.code };
+      if (d.code === 803) {
+        if (qrPollingTimer) { clearInterval(qrPollingTimer); qrPollingTimer = null; }
+        let musicU = '';
+        for (const c of rawCookies) {
+          const m = c.match(/MUSIC_U=([^;]+)/);
+          if (m) { musicU = m[1]; break; }
+        }
+        if (!musicU) {
+          const bodyStr = JSON.stringify(d);
+          const bm = bodyStr.match(/MUSIC_U[=:]([^";,}\s]+)/);
+          if (bm) musicU = bm[1];
+        }
+        if (musicU) {
+          writeNeteaseCred({ music_u: musicU, ts: Date.now() });
+          console.log('网易云登录成功，cookie已保存，长度:', musicU.length);
+        }
+        lastQrResult = { code: d.code, cookieCount: rawCookies.length, cookieSnippets: rawCookies.map(c => c.substring(0, 80)), bodyKeys: Object.keys(d), hasMusicU: !!musicU };
+      } else if (d.code === 800) {
+        if (qrPollingTimer) { clearInterval(qrPollingTimer); qrPollingTimer = null; }
+        lastQrResult = { code: d.code };
+      }
+    });
+  });
+  hreq.on('error', () => {});
+  hreq.end();
+}
+
 app.post('/music/qr/create', (req, res) => {
+  if (qrPollingTimer) { clearInterval(qrPollingTimer); qrPollingTimer = null; }
   const url = new URL('https://music.163.com/api/login/qrcode/unikey?type=1');
   const hreq = https.request({
     hostname: url.hostname, path: url.pathname + url.search, method: 'GET',
@@ -4030,6 +4075,8 @@ app.post('/music/qr/create', (req, res) => {
         qrKey = d.unikey;
         const setCookies = hres.headers['set-cookie'] || [];
         qrSessionCookies = setCookies.map(c => c.split(';')[0]).join('; ');
+        qrStatus = { code: 0 };
+        qrPollingTimer = setInterval(checkQrStatus, 2000);
         const qrUrl = 'https://music.163.com/login?codekey=' + qrKey;
         const qrimg = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
         res.json({ ok: true, qrimg });
@@ -4041,42 +4088,7 @@ app.post('/music/qr/create', (req, res) => {
 });
 
 app.get('/music/qr/check', (req, res) => {
-  if (!qrKey) return res.json({ code: 800 });
-  const url = new URL('https://music.163.com/api/login/qrcode/client/login?type=1&key=' + qrKey);
-  const hreq = https.request({
-    hostname: url.hostname, path: url.pathname + url.search, method: 'GET',
-    headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0', 'Cookie': qrSessionCookies }
-  }, (hres) => {
-    let body = '';
-    hres.on('data', c => body += c);
-    hres.on('end', () => {
-      let d;
-      try { d = JSON.parse(body); } catch { d = { code: 0 }; }
-      const rawCookies = hres.headers['set-cookie'] || [];
-      if (d.code === 803) {
-        let musicU = '';
-        for (const c of rawCookies) {
-          const m = c.match(/MUSIC_U=([^;]+)/);
-          if (m) { musicU = m[1]; break; }
-        }
-        if (!musicU) {
-          const bodyStr = JSON.stringify(d);
-          const bm = bodyStr.match(/MUSIC_U[=:]([^";,}\s]+)/);
-          if (bm) musicU = bm[1];
-        }
-        if (musicU) {
-          writeNeteaseCred({ music_u: musicU, ts: Date.now() });
-        }
-        lastQrResult = { code: d.code, cookieCount: rawCookies.length, cookieSnippets: rawCookies.map(c => c.substring(0, 60)), bodyKeys: Object.keys(d), hasMusicU: rawCookies.some(c => c.includes('MUSIC_U')), sessionCookies: qrSessionCookies.substring(0, 80) };
-        res.json({ code: d.code, cookies: rawCookies, body: d });
-      } else {
-        lastQrResult = { code: d.code, cookieCount: rawCookies.length };
-        res.json({ code: d.code });
-      }
-    });
-  });
-  hreq.on('error', e => res.json({ code: 0, error: e.message }));
-  hreq.end();
+  res.json(qrStatus);
 });
 
 let lastQrResult = null;
