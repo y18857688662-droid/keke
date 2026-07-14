@@ -4067,14 +4067,21 @@ app.get('/music/qr/check', (req, res) => {
         if (musicU) {
           writeNeteaseCred({ music_u: musicU, ts: Date.now() });
         }
+        lastQrResult = { code: d.code, cookieCount: rawCookies.length, cookieSnippets: rawCookies.map(c => c.substring(0, 60)), bodyKeys: Object.keys(d), hasMusicU: rawCookies.some(c => c.includes('MUSIC_U')), sessionCookies: qrSessionCookies.substring(0, 80) };
         res.json({ code: d.code, cookies: rawCookies, body: d });
       } else {
+        lastQrResult = { code: d.code, cookieCount: rawCookies.length };
         res.json({ code: d.code });
       }
     });
   });
   hreq.on('error', e => res.json({ code: 0, error: e.message }));
   hreq.end();
+});
+
+let lastQrResult = null;
+app.get('/music/qr/lastresult', (req, res) => {
+  res.json(lastQrResult || { msg: 'no result yet' });
 });
 
 app.post('/music/cookie', (req, res) => {
