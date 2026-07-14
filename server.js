@@ -3942,6 +3942,96 @@ app.post('/missyou/active', (req, res) => {
   res.json({ ok: true, until: new Date(chatActiveUntil).toISOString() });
 });
 
+// ── 网易云登录（获取 MUSIC_U cookie）──
+const NETEASE_CRED_FILE = path.join(__dirname, 'netease_cred.json');
+function readNeteaseCred() { try { return JSON.parse(fs.readFileSync(NETEASE_CRED_FILE, 'utf8')); } catch { return {}; } }
+function writeNeteaseCred(data) { fs.writeFileSync(NETEASE_CRED_FILE, JSON.stringify(data)); }
+
+app.get('/music/login', (req, res) => {
+  const cred = readNeteaseCred();
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>网易云登录</title><style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui;background:#111;color:#eee;display:flex;justify-content:center;padding:40px 16px}
+.card{background:#1a1a1a;border-radius:16px;padding:28px;max-width:360px;width:100%}
+h2{font-size:18px;margin-bottom:20px;text-align:center}
+input{width:100%;padding:12px;border-radius:8px;border:1px solid #333;background:#222;color:#eee;font-size:16px;margin-bottom:12px}
+button{width:100%;padding:12px;border-radius:8px;border:none;background:#e44;color:#fff;font-size:16px;cursor:pointer;margin-bottom:8px}
+button:disabled{opacity:0.5}.row{display:flex;gap:8px}.row input{flex:1}.row button{width:auto;flex-shrink:0;padding:12px 16px}
+#status{text-align:center;margin-top:12px;font-size:14px;color:#888}
+.ok{color:#4c4}
+</style></head><body><div class="card">
+<h2>网易云登录</h2>
+${cred.music_u ? '<p class="ok" style="text-align:center;margin-bottom:16px">已登录 ✓</p>' : ''}
+<input id="phone" type="tel" placeholder="手机号" maxlength="11">
+<div class="row"><input id="code" type="tel" placeholder="验证码" maxlength="6">
+<button id="sendBtn" onclick="sendSms()">发送</button></div>
+<button onclick="login()">登录</button>
+<div id="status"></div>
+</div><script>
+const st=document.getElementById('status');
+async function sendSms(){
+  const phone=document.getElementById('phone').value.trim();
+  if(!phone){st.textContent='请输入手机号';return}
+  document.getElementById('sendBtn').disabled=true;
+  st.textContent='发送中...';
+  const r=await fetch('/music/sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+  const d=await r.json();
+  st.textContent=d.ok?'验证码已发送':'发送失败: '+(d.error||'未知错误');
+  if(d.ok){let s=60;const b=document.getElementById('sendBtn');const iv=setInterval(()=>{s--;b.textContent=s+'s';if(s<=0){clearInterval(iv);b.textContent='发送';b.disabled=false}},1000)}
+  else{document.getElementById('sendBtn').disabled=false}
+}
+async function login(){
+  const phone=document.getElementById('phone').value.trim();
+  const code=document.getElementById('code').value.trim();
+  if(!phone||!code){st.textContent='请填写手机号和验证码';return}
+  st.textContent='登录中...';
+  const r=await fetch('/music/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,code})});
+  const d=await r.json();
+  if(d.ok){st.innerHTML='<span class="ok">登录成功 ✓</span>'}
+  else{st.textContent='登录失败: '+(d.error||'未知错误')}
+}
+</script></body></html>`);
+});
+
+app.post('/music/sms', async (req, res) => {
+  const phone = (req.body && req.body.phone || '').trim();
+  if (!phone) return res.json({ ok: false, error: '缺少手机号' });
+  try {
+    const r = await fetch('https://music.163.com/api/sms/captcha/sent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' },
+      body: 'cellphone=' + encodeURIComponent(phone) + '&ctcode=86'
+    });
+    const d = await r.json();
+    res.json({ ok: d.code === 200, error: d.message });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.post('/music/verify', async (req, res) => {
+  const { phone, code } = req.body || {};
+  if (!phone || !code) return res.json({ ok: false, error: '缺少参数' });
+  try {
+    const r = await fetch('https://music.163.com/api/login/cellphone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' },
+      body: 'phone=' + encodeURIComponent(phone) + '&captcha=' + encodeURIComponent(code) + '&ctcode=86&rememberLogin=true'
+    });
+    const cookies = r.headers.getSetCookie ? r.headers.getSetCookie() : (r.headers.raw?.()?.['set-cookie'] || []);
+    let musicU = '';
+    for (const c of cookies) {
+      const m = c.match(/MUSIC_U=([^;]+)/);
+      if (m) { musicU = m[1]; break; }
+    }
+    const d = await r.json();
+    if (d.code === 200 && musicU) {
+      writeNeteaseCred({ music_u: musicU, phone, ts: Date.now() });
+      res.json({ ok: true });
+    } else {
+      res.json({ ok: false, error: d.message || '登录失败' });
+    }
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   buildMissYouPlan();
