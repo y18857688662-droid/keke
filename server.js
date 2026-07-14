@@ -3966,6 +3966,11 @@ ${cred.music_u ? '<p class="ok" style="margin-bottom:16px">已登录 ✓</p>' : 
 <div id="qr"><img id="qrImg"></div>
 <div id="status">加载中...</div>
 <button onclick="startQr()">刷新二维码</button>
+<div style="margin-top:24px;border-top:1px solid #333;padding-top:16px">
+<p style="font-size:12px;color:#555;margin-bottom:8px">扫码无效？手动粘贴MUSIC_U：</p>
+<textarea id="cookieInput" rows="3" style="width:100%;padding:8px;background:#222;border:1px solid #333;border-radius:8px;color:#eee;font-size:12px;resize:none" placeholder="粘贴MUSIC_U的值..."></textarea>
+<button onclick="saveCookie()" style="margin-top:8px;background:#666;font-size:14px">保存Cookie</button>
+</div>
 </div><script>
 const st=document.getElementById('status');
 let polling=null;
@@ -3981,11 +3986,26 @@ async function startQr(){
     const r2=await fetch('/music/qr/check');
     const d2=await r2.json();
     if(d2.code===802){st.innerHTML='<span class="warn">已扫描，请在手机上确认</span>'}
-    else if(d2.code===803){st.innerHTML='<span class="ok">登录成功 ✓</span>';clearInterval(polling)}
+    else if(d2.code===803){
+      if(d2._debug && !d2._debug.hasMusicU){
+        st.innerHTML='<span class="warn">扫码成功但cookie未捕获，请用下方手动输入</span>';
+      } else {
+        st.innerHTML='<span class="ok">登录成功 ✓</span>';
+      }
+      clearInterval(polling);
+    }
     else if(d2.code===800){st.textContent='二维码已过期，请刷新';clearInterval(polling)}
   },2000);
 }
 startQr();
+async function saveCookie(){
+  const v=document.getElementById('cookieInput').value.trim();
+  if(!v){return}
+  const r=await fetch('/music/cookie',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cookie:v})});
+  const d=await r.json();
+  if(d.ok){st.innerHTML='<span class="ok">Cookie已保存 ✓</span>'}
+  else{st.textContent='保存失败: '+d.error}
+}
 </script></body></html>`);
 });
 
@@ -4017,25 +4037,39 @@ app.get('/music/qr/check', (req, res) => {
       let d;
       try { d = JSON.parse(body); } catch { d = { code: 0 }; }
       const rawCookies = hres.headers['set-cookie'] || [];
-      console.log('QR check code:', d.code, 'set-cookie count:', rawCookies.length);
+      console.log('QR check code:', d.code, 'set-cookie count:', rawCookies.length, 'body keys:', Object.keys(d).join(','));
       if (d.code === 803) {
         let musicU = '';
         for (const c of rawCookies) {
           const m = c.match(/MUSIC_U=([^;]+)/);
           if (m) { musicU = m[1]; break; }
         }
+        if (!musicU) {
+          const bodyStr = JSON.stringify(d);
+          const bm = bodyStr.match(/MUSIC_U[=:]([^";,}\s]+)/);
+          if (bm) musicU = bm[1];
+        }
         if (musicU) {
           writeNeteaseCred({ music_u: musicU, ts: Date.now() });
           console.log('网易云登录成功，cookie已保存，长度:', musicU.length);
         } else {
-          console.log('登录803但无MUSIC_U，cookies:', rawCookies.map(c => c.substring(0, 40)).join(' | '));
+          console.log('登录803但无MUSIC_U');
+          console.log('set-cookie:', JSON.stringify(rawCookies).substring(0, 500));
+          console.log('body:', JSON.stringify(d).substring(0, 500));
         }
       }
-      res.json({ code: d.code });
+      res.json({ code: d.code, _debug: d.code === 803 ? { cookieCount: rawCookies.length, bodyKeys: Object.keys(d), hasMusicU: rawCookies.some(c => c.includes('MUSIC_U')) } : undefined });
     });
   });
   hreq.on('error', e => { console.log('QR check error:', e.message); res.json({ code: 0, error: e.message }); });
   hreq.end();
+});
+
+app.post('/music/cookie', (req, res) => {
+  const musicU = (req.body?.cookie || '').trim();
+  if (!musicU) return res.json({ ok: false, error: '请输入cookie' });
+  writeNeteaseCred({ music_u: musicU, ts: Date.now() });
+  res.json({ ok: true });
 });
 
 // ── Serenade 音乐播放器 ──
