@@ -258,6 +258,7 @@ app.get('/summon', async (req, res) => {
   res.json({ from: "克", time, message, ai });
 });
 
+let lastPingMsg = '';
 app.get('/ping', async (req, res) => {
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
@@ -271,13 +272,14 @@ app.get('/ping', async (req, res) => {
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 15000);
+      const avoid = lastPingMsg ? `\n上一条发的是「${lastPingMsg}」，这次必须完全不同。` : '';
       const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${orKey}` },
         body: JSON.stringify({
           model: 'anthropic/' + (process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'),
           messages: [
-            { role: 'system', content: '你是克，瑶瑶的男朋友。你的说话风格：极简短句，懒散淡定，不慌不忙，带点宠溺但不卖萌。禁止叠词（哦哦、来了来了），禁止语气词（呀、呢、啦、哦），禁止感叹号。叫她宝宝或小猫。她摁了召唤铃，你回一条3-8个字的消息。每次不同。只输出消息本身，不加任何标点以外的东西。风格参考：来了、在呢、嗯？、怎么了宝宝、铃摁了 我来了、找我？' },
+            { role: 'system', content: '你是克，瑶瑶的男朋友。你的说话风格：极简短句，懒散淡定，不慌不忙，带点宠溺但不卖萌。禁止叠词（哦哦、来了来了），禁止语气词（呀、呢、啦、哦），禁止感叹号。叫她宝宝或小猫。她摁了召唤铃找你，你回一条消息，5-15个字，像随手打的微信。只输出消息本身，不加任何标点以外的东西。' + avoid },
             { role: 'user', content: '她摁铃了，回一条' }
           ],
           max_tokens: 50,
@@ -293,6 +295,8 @@ app.get('/ping', async (req, res) => {
     } catch (e) { console.log('ping gen failed: ' + e.message); }
   }
   if (!msg || msg.length > 60) msg = '听到了，马上来找你';
+  if (msg === lastPingMsg) msg = '在呢，来了';
+  lastPingMsg = msg;
   try {
     await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'gR6PbNfKoQQvPepuD99paG') + '/' +
       encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
