@@ -4004,43 +4004,38 @@ app.post('/music/qr/create', async (req, res) => {
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
-app.get('/music/qr/check', async (req, res) => {
+app.get('/music/qr/check', (req, res) => {
   if (!qrKey) return res.json({ code: 800 });
-  try {
-    const r = await fetch('https://music.163.com/api/login/qrcode/client/login?type=1&key=' + qrKey, {
-      headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' },
-      redirect: 'manual',
+  const url = new URL('https://music.163.com/api/login/qrcode/client/login?type=1&key=' + qrKey);
+  const hreq = https.request({
+    hostname: url.hostname, path: url.pathname + url.search, method: 'GET',
+    headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' }
+  }, (hres) => {
+    let body = '';
+    hres.on('data', c => body += c);
+    hres.on('end', () => {
+      let d;
+      try { d = JSON.parse(body); } catch { d = { code: 0 }; }
+      const rawCookies = hres.headers['set-cookie'] || [];
+      console.log('QR check code:', d.code, 'set-cookie count:', rawCookies.length);
+      if (d.code === 803) {
+        let musicU = '';
+        for (const c of rawCookies) {
+          const m = c.match(/MUSIC_U=([^;]+)/);
+          if (m) { musicU = m[1]; break; }
+        }
+        if (musicU) {
+          writeNeteaseCred({ music_u: musicU, ts: Date.now() });
+          console.log('网易云登录成功，cookie已保存，长度:', musicU.length);
+        } else {
+          console.log('登录803但无MUSIC_U，cookies:', rawCookies.map(c => c.substring(0, 40)).join(' | '));
+        }
+      }
+      res.json({ code: d.code });
     });
-    let allCookies = [];
-    if (r.headers.getSetCookie) {
-      allCookies = r.headers.getSetCookie();
-    } else {
-      const raw = r.headers.get('set-cookie');
-      if (raw) allCookies = raw.split(/,(?=\s*\w+=)/);
-    }
-    const text = await r.text();
-    let d;
-    try { d = JSON.parse(text); } catch { d = { code: 0 }; }
-    console.log('QR check code:', d.code, 'cookies count:', allCookies.length);
-    if (d.code === 803) {
-      let musicU = '';
-      for (const c of allCookies) {
-        const m = c.match(/MUSIC_U=([^;]+)/);
-        if (m) { musicU = m[1]; break; }
-      }
-      if (!musicU && d.cookie) {
-        const m2 = d.cookie.match(/MUSIC_U=([^;]+)/);
-        if (m2) musicU = m2[1];
-      }
-      if (musicU) {
-        writeNeteaseCred({ music_u: musicU, ts: Date.now() });
-        console.log('网易云登录成功，cookie已保存，长度:', musicU.length);
-      } else {
-        console.log('登录成功但未提取到MUSIC_U, response keys:', Object.keys(d).join(','));
-      }
-    }
-    res.json({ code: d.code });
-  } catch (e) { console.log('QR check error:', e.message); res.json({ code: 0, error: e.message }); }
+  });
+  hreq.on('error', e => { console.log('QR check error:', e.message); res.json({ code: 0, error: e.message }); });
+  hreq.end();
 });
 
 // ── Serenade 音乐播放器 ──
