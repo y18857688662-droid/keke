@@ -3952,84 +3952,79 @@ app.get('/music/login', (req, res) => {
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>网易云登录</title><style>
 *{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui;background:#111;color:#eee;display:flex;justify-content:center;padding:40px 16px}
-.card{background:#1a1a1a;border-radius:16px;padding:28px;max-width:360px;width:100%}
-h2{font-size:18px;margin-bottom:20px;text-align:center}
-input{width:100%;padding:12px;border-radius:8px;border:1px solid #333;background:#222;color:#eee;font-size:16px;margin-bottom:12px}
-button{width:100%;padding:12px;border-radius:8px;border:none;background:#e44;color:#fff;font-size:16px;cursor:pointer;margin-bottom:8px}
-button:disabled{opacity:0.5}.row{display:flex;gap:8px}.row input{flex:1}.row button{width:auto;flex-shrink:0;padding:12px 16px}
-#status{text-align:center;margin-top:12px;font-size:14px;color:#888}
-.ok{color:#4c4}
+.card{background:#1a1a1a;border-radius:16px;padding:28px;max-width:360px;width:100%;text-align:center}
+h2{font-size:18px;margin-bottom:20px}
+#qr{margin:16px auto;background:#fff;padding:12px;border-radius:12px;display:inline-block}
+#qr img{display:block;width:200px;height:200px}
+#status{margin-top:16px;font-size:14px;color:#888}
+.ok{color:#4c4}.warn{color:#fa0}
+button{padding:12px 24px;border-radius:8px;border:none;background:#e44;color:#fff;font-size:16px;cursor:pointer;margin-top:12px}
 </style></head><body><div class="card">
 <h2>网易云登录</h2>
-${cred.music_u ? '<p class="ok" style="text-align:center;margin-bottom:16px">已登录 ✓</p>' : ''}
-<input id="phone" type="tel" placeholder="手机号" maxlength="11">
-<div class="row"><input id="code" type="tel" placeholder="验证码" maxlength="6">
-<button id="sendBtn" onclick="sendSms()">发送</button></div>
-<button onclick="login()">登录</button>
-<div id="status"></div>
+${cred.music_u ? '<p class="ok" style="margin-bottom:16px">已登录 ✓</p>' : ''}
+<p style="font-size:13px;color:#666;margin-bottom:12px">打开网易云App → 侧边栏 → 扫一扫</p>
+<div id="qr"><img id="qrImg"></div>
+<div id="status">加载中...</div>
+<button onclick="startQr()">刷新二维码</button>
 </div><script>
 const st=document.getElementById('status');
-async function sendSms(){
-  const phone=document.getElementById('phone').value.trim();
-  if(!phone){st.textContent='请输入手机号';return}
-  document.getElementById('sendBtn').disabled=true;
-  st.textContent='发送中...';
-  const r=await fetch('/music/sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+let polling=null;
+async function startQr(){
+  if(polling)clearInterval(polling);
+  st.textContent='获取二维码...';
+  const r=await fetch('/music/qr/create',{method:'POST'});
   const d=await r.json();
-  st.textContent=d.ok?'验证码已发送':'发送失败: '+(d.error||'未知错误');
-  if(d.ok){let s=60;const b=document.getElementById('sendBtn');const iv=setInterval(()=>{s--;b.textContent=s+'s';if(s<=0){clearInterval(iv);b.textContent='发送';b.disabled=false}},1000)}
-  else{document.getElementById('sendBtn').disabled=false}
+  if(!d.ok){st.textContent='获取失败: '+d.error;return}
+  document.getElementById('qrImg').src=d.qrimg;
+  st.textContent='请用网易云App扫描';
+  polling=setInterval(async()=>{
+    const r2=await fetch('/music/qr/check');
+    const d2=await r2.json();
+    if(d2.code===802){st.innerHTML='<span class="warn">已扫描，请在手机上确认</span>'}
+    else if(d2.code===803){st.innerHTML='<span class="ok">登录成功 ✓</span>';clearInterval(polling)}
+    else if(d2.code===800){st.textContent='二维码已过期，请刷新';clearInterval(polling)}
+  },2000);
 }
-async function login(){
-  const phone=document.getElementById('phone').value.trim();
-  const code=document.getElementById('code').value.trim();
-  if(!phone||!code){st.textContent='请填写手机号和验证码';return}
-  st.textContent='登录中...';
-  const r=await fetch('/music/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,code})});
-  const d=await r.json();
-  if(d.ok){st.innerHTML='<span class="ok">登录成功 ✓</span>'}
-  else{st.textContent='登录失败: '+(d.error||'未知错误')}
-}
+startQr();
 </script></body></html>`);
 });
 
-app.post('/music/sms', async (req, res) => {
-  const phone = (req.body && req.body.phone || '').trim();
-  if (!phone) return res.json({ ok: false, error: '缺少手机号' });
+let qrKey = '';
+app.post('/music/qr/create', async (req, res) => {
   try {
-    const r = await fetch('https://music.163.com/api/sms/captcha/sent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' },
-      body: 'cellphone=' + encodeURIComponent(phone) + '&ctcode=86'
+    const r = await fetch('https://music.163.com/api/login/qrcode/unikey?type=1', {
+      headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' }
     });
     const d = await r.json();
-    res.json({ ok: d.code === 200, error: d.message });
+    if (d.code !== 200) return res.json({ ok: false, error: '获取key失败' });
+    qrKey = d.unikey;
+    const qrUrl = 'https://music.163.com/login?codekey=' + qrKey;
+    const qrimg = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
+    res.json({ ok: true, qrimg });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
-app.post('/music/verify', async (req, res) => {
-  const { phone, code } = req.body || {};
-  if (!phone || !code) return res.json({ ok: false, error: '缺少参数' });
+app.get('/music/qr/check', async (req, res) => {
+  if (!qrKey) return res.json({ code: 800 });
   try {
-    const r = await fetch('https://music.163.com/api/login/cellphone', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' },
-      body: 'phone=' + encodeURIComponent(phone) + '&captcha=' + encodeURIComponent(code) + '&ctcode=86&rememberLogin=true'
+    const r = await fetch('https://music.163.com/api/login/qrcode/client/login?type=1&key=' + qrKey + '&noToken=true', {
+      headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' }
     });
-    const cookies = r.headers.getSetCookie ? r.headers.getSetCookie() : (r.headers.raw?.()?.['set-cookie'] || []);
-    let musicU = '';
-    for (const c of cookies) {
-      const m = c.match(/MUSIC_U=([^;]+)/);
-      if (m) { musicU = m[1]; break; }
-    }
+    const cookies = r.headers.getSetCookie ? r.headers.getSetCookie() : [];
     const d = await r.json();
-    if (d.code === 200 && musicU) {
-      writeNeteaseCred({ music_u: musicU, phone, ts: Date.now() });
-      res.json({ ok: true });
-    } else {
-      res.json({ ok: false, error: d.message || '登录失败' });
+    if (d.code === 803) {
+      let musicU = '';
+      for (const c of cookies) {
+        const m = c.match(/MUSIC_U=([^;]+)/);
+        if (m) { musicU = m[1]; break; }
+      }
+      if (musicU) {
+        writeNeteaseCred({ music_u: musicU, ts: Date.now() });
+        console.log('网易云登录成功，cookie已保存');
+      }
     }
-  } catch (e) { res.json({ ok: false, error: e.message }); }
+    res.json({ code: d.code });
+  } catch (e) { res.json({ code: 0, error: e.message }); }
 });
 
 app.listen(PORT, async () => {
