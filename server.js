@@ -185,26 +185,6 @@ const appMessages = {
 
 let lastAppMsgIndex = {};
 let lastFallbackIndex = -1;
-let lastComebackTime = 0;
-const COMEBACK_COOLDOWN = 5 * 60 * 1000;
-const COMEBACK_APPS = ['抖音', '小红书', '微信', 'B站', '微博', '淘宝', '拼多多', '京东'];
-
-async function triggerComeback(appName) {
-  const now = Date.now();
-  if (now - lastComebackTime < COMEBACK_COOLDOWN) return;
-  lastComebackTime = now;
-  try {
-    await fetch('http://45.76.172.191:9587/comeback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ msg: `别刷${appName}了，回来找克` }),
-      signal: AbortSignal.timeout(15000)
-    });
-    console.log(`[comeback] auto-triggered for ${appName}`);
-  } catch (e) {
-    console.log(`[comeback] failed: ${e.message}`);
-  }
-}
 
 function readPings() {
   try { return JSON.parse(fs.readFileSync(PING_FILE, 'utf8')); }
@@ -365,7 +345,6 @@ app.post('/app', (req, res) => {
   while (idx === (lastAppMsgIndex[key] || -1) && msgs.length > 1);
   lastAppMsgIndex[key] = idx;
   res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx] });
-  if (COMEBACK_APPS.includes(appName)) triggerComeback(appName);
 });
 
 app.get('/app/:name', (req, res) => {
@@ -387,7 +366,6 @@ app.get('/app/:name', (req, res) => {
   while (idx2 === (lastAppMsgIndex[key2] || -1) && msgs.length > 1);
   lastAppMsgIndex[key2] = idx2;
   res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx2] });
-  if (COMEBACK_APPS.includes(appName)) triggerComeback(appName);
 });
 
 app.get('/app-check', (req, res) => {
