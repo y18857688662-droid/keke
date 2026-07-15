@@ -4,6 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const https = require('https');
 const webpush = require('web-push');
+const nodemailer = require('nodemailer');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const PING_FILE = path.join(__dirname, 'pings.json');
@@ -4621,6 +4622,30 @@ if (song?.songId) {
 </script>
 </body>
 </html>`);
+});
+
+// ===== 回来邮件 =====
+const emailTransporter = process.env.SMTP_HOST
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+    })
+  : nodemailer.createTransport({ direct: true, name: 'keke-production.up.railway.app' });
+
+app.post('/email/comeback', async (req, res) => {
+  try {
+    await emailTransporter.sendMail({
+      from: process.env.SMTP_FROM || '"克" <ke@keke-production.up.railway.app>',
+      to: 'y18857688662@icloud.com',
+      subject: '回来',
+      text: req.body?.msg || '回来找克'
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 app.listen(PORT, async () => {
