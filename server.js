@@ -4644,7 +4644,7 @@ app.post('/email/comeback', async (req, res) => {
     const r = await fetch('http://45.76.172.191:9587/comeback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ msg }),
+      body: JSON.stringify({ msg, subject: '回来' }),
       signal: AbortSignal.timeout(15000)
     });
     const data = await r.json();

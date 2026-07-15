@@ -18,11 +18,13 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const msg = JSON.parse(body || '{}').msg || '回来找克';
+        const d = JSON.parse(body || '{}');
+        const msg = d.msg || 'come back';
+        const subj = d.subject || 'come back';
         await transporter.sendMail({
-          from: '"克" <y18857688662@gmail.com>',
+          from: '"ke" <y18857688662@gmail.com>',
           to: 'y18857688662@icloud.com',
-          subject: '回来',
+          subject: subj,
           text: msg
         });
         res.end(JSON.stringify({ ok: true }));
