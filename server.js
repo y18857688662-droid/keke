@@ -4655,6 +4655,11 @@ app.post('/email/comeback', async (req, res) => {
   }
 });
 
+app.get('/relay-script', (req, res) => {
+  res.set('Content-Type', 'text/plain');
+  res.send(fs.readFileSync(path.join(__dirname, 'email-relay.js'), 'utf8'));
+});
+
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   buildMissYouPlan();
