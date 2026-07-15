@@ -4625,14 +4625,15 @@ if (song?.songId) {
 });
 
 // ===== 回来邮件 =====
-const emailTransporter = process.env.SMTP_HOST
-  ? nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-    })
-  : nodemailer.createTransport({ direct: true, name: 'keke-production.up.railway.app' });
+const emailTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.mail.me.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER || 'y18857688662@icloud.com',
+    pass: process.env.SMTP_PASS || 'glre-oblm-xajz-ixop'
+  }
+});
 
 app.post('/email/comeback', async (req, res) => {
   try {
