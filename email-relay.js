@@ -2,12 +2,12 @@ const http = require('http');
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  host: 'smtp.mail.me.com',
+  host: 'smtp.gmail.com',
   port: 587,
   secure: false,
   auth: {
-    user: 'y18857688662@icloud.com',
-    pass: 'glre-oblm-xajz-ixop'
+    user: 'y18857688662@gmail.com',
+    pass: 'rckelgyxmudqplol'
   }
 });
 
@@ -20,8 +20,8 @@ const server = http.createServer(async (req, res) => {
       try {
         const msg = JSON.parse(body || '{}').msg || '回来找克';
         await transporter.sendMail({
-          from: '"克" <y18857688662@icloud.com>',
-          to: 'y18857688662@gmail.com',
+          from: '"克" <y18857688662@gmail.com>',
+          to: 'y18857688662@icloud.com',
           subject: '回来',
           text: msg
         });
