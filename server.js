@@ -4639,13 +4639,14 @@ const emailTransporter = nodemailer.createTransport({
 
 app.post('/email/comeback', async (req, res) => {
   try {
-    await emailTransporter.sendMail({
-      from: process.env.SMTP_FROM || '"克" <ke@keke-production.up.railway.app>',
-      to: 'y18857688662@icloud.com',
-      subject: '回来',
-      text: req.body?.msg || '回来找克'
+    const r = await fetch('http://45.76.172.191:9587/comeback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ msg: req.body?.msg || '回来找克' }),
+      signal: AbortSignal.timeout(15000)
     });
-    res.json({ ok: true });
+    const data = await r.json();
+    res.json(data);
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
