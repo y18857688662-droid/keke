@@ -4627,12 +4627,14 @@ if (song?.songId) {
 // ===== 回来邮件 =====
 const emailTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.mail.me.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
+  port: parseInt(process.env.SMTP_PORT || '465'),
+  secure: true,
   auth: {
     user: process.env.SMTP_USER || 'y18857688662@icloud.com',
     pass: process.env.SMTP_PASS || 'glre-oblm-xajz-ixop'
-  }
+  },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000
 });
 
 app.post('/email/comeback', async (req, res) => {
