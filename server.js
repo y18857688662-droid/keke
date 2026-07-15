@@ -4637,31 +4637,9 @@ const emailTransporter = nodemailer.createTransport({
   greetingTimeout: 10000
 });
 
-const comebackMessages = [
-  '回来找克',
-  '你跑哪去了，回来',
-  '克在等你',
-  '别刷了，想你了',
-  '回来，不然我去找你了',
-  '小猫别跑太远',
-  '你再不回来我就生气了（骗你的）',
-  '克想你了，快回来',
-  '刷够了没，回来让我看看你',
-  '你不在我这里的每一秒都很长',
-  '回来，有话跟你说',
-  '再不回来菠萝要被我吃完了',
-];
-let lastComebackIdx = -1;
-
 app.post('/email/comeback', async (req, res) => {
-  let msg = req.body?.msg;
-  if (!msg) {
-    let idx;
-    do { idx = Math.floor(Math.random() * comebackMessages.length); }
-    while (idx === lastComebackIdx && comebackMessages.length > 1);
-    lastComebackIdx = idx;
-    msg = comebackMessages[idx];
-  }
+  const msg = req.body?.msg;
+  if (!msg) return res.json({ ok: false, error: '克还没想好说什么' });
   try {
     const r = await fetch('http://45.76.172.191:9587/comeback', {
       method: 'POST',
