@@ -3658,25 +3658,25 @@ async function sendMissYou(slot) {
     console.log('miss-you sent [' + slot + '] ' + msg);
   } catch (e) { console.log('miss-you push failed: ' + e.message); }
 }
-setInterval(() => {
-  const now = bjNow();
-  const day = now.toISOString().slice(0, 10);
-  if (missYouPlan.day !== day) buildMissYouPlan();
-  const cur = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const chatting = Date.now() < chatActiveUntil;
-  for (const it of missYouPlan.items) {
-    if (!it.sent && cur >= it.minute && cur < it.minute + 10) {
-      if (chatting) {
-        // 正聊着呢，不插嘴——往后挪 45-75 分钟再试
-        it.minute = cur + 45 + Math.floor(Math.random() * 31);
-        if (it.minute > 23 * 60 + 55) it.sent = true; // 跨天了交给明天的计划
-        continue;
-      }
-      it.sent = true;
-      sendMissYou(it.slot);
-    }
-  }
-}, 45 * 1000);
+// [已关闭] 瑶瑶只要手打的推送，不要自动消息
+// setInterval(() => {
+//   const now = bjNow();
+//   const day = now.toISOString().slice(0, 10);
+//   if (missYouPlan.day !== day) buildMissYouPlan();
+//   const cur = now.getUTCHours() * 60 + now.getUTCMinutes();
+//   const chatting = Date.now() < chatActiveUntil;
+//   for (const it of missYouPlan.items) {
+//     if (!it.sent && cur >= it.minute && cur < it.minute + 10) {
+//       if (chatting) {
+//         it.minute = cur + 45 + Math.floor(Math.random() * 31);
+//         if (it.minute > 23 * 60 + 55) it.sent = true;
+//         continue;
+//       }
+//       it.sent = true;
+//       sendMissYou(it.slot);
+//     }
+//   }
+// }, 45 * 1000);
 // ── 聊天中断追踪：她跑了就去找她 ──
 let lastUserMsgTime = 0;
 let chaseSent = false;
@@ -3697,22 +3697,23 @@ const CHASE_PROMPTS = [
   '……你不会睡着了吧',
   '宝宝？',
 ];
-setInterval(async () => {
-  if (chaseSent || !lastUserMsgTime || !chaseDelay) return;
-  const elapsed = Date.now() - lastUserMsgTime;
-  if (elapsed < chaseDelay || elapsed > 90 * 60 * 1000) return;
-  const now = bjNow();
-  const hour = now.getUTCHours();
-  if (hour < 8 || hour >= 24) return;
-  chaseSent = true;
-  const msg = CHASE_PROMPTS[Math.floor(Math.random() * CHASE_PROMPTS.length)];
-  try {
-    await fetch('https://api.day.app/' + BARK_KEY + '/' +
-      encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
-      '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
-    console.log('chase sent: ' + msg);
-  } catch (e) { console.log('chase push failed: ' + e.message); }
-}, 60 * 1000);
+// [已关闭] 追踪系统也关掉，只留手打推送
+// setInterval(async () => {
+//   if (chaseSent || !lastUserMsgTime || !chaseDelay) return;
+//   const elapsed = Date.now() - lastUserMsgTime;
+//   if (elapsed < chaseDelay || elapsed > 90 * 60 * 1000) return;
+//   const now = bjNow();
+//   const hour = now.getUTCHours();
+//   if (hour < 8 || hour >= 24) return;
+//   chaseSent = true;
+//   const msg = CHASE_PROMPTS[Math.floor(Math.random() * CHASE_PROMPTS.length)];
+//   try {
+//     await fetch('https://api.day.app/' + BARK_KEY + '/' +
+//       encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
+//       '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
+//     console.log('chase sent: ' + msg);
+//   } catch (e) { console.log('chase push failed: ' + e.message); }
+// }, 60 * 1000);
 // ── 蓝牙桥 (Web Bluetooth) ──
 let bridgeState = { cmd: null, ts: 0, connected: false, lastPoll: 0 };
 app.post('/bridge/command', (req, res) => {
