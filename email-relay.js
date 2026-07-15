@@ -21,7 +21,7 @@ const server = http.createServer(async (req, res) => {
         const msg = JSON.parse(body || '{}').msg || '回来找克';
         await transporter.sendMail({
           from: '"克" <y18857688662@icloud.com>',
-          to: 'y18857688662@icloud.com',
+          to: 'y18857688662@gmail.com',
           subject: '回来',
           text: msg
         });
