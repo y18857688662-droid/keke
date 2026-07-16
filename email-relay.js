@@ -1,5 +1,23 @@
 const http = require('http');
+const https = require('https');
 const nodemailer = require('nodemailer');
+
+const RAILWAY = 'https://keke-production.up.railway.app';
+
+function relay(path, method, body) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(path, RAILWAY);
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    const r = https.request(url, opts, (resp) => {
+      let d = '';
+      resp.on('data', c => d += c);
+      resp.on('end', () => resolve(d));
+    });
+    r.on('error', reject);
+    if (body) r.write(body);
+    r.end();
+  });
+}
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
@@ -28,6 +46,17 @@ const server = http.createServer(async (req, res) => {
           text: msg
         });
         res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+  } else if (req.url.startsWith('/app')) {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const result = await relay(req.url, req.method, body || undefined);
+        res.end(result);
       } catch (e) {
         res.end(JSON.stringify({ ok: false, error: e.message }));
       }
