@@ -4625,29 +4625,19 @@ if (song?.songId) {
 });
 
 // ===== 回来邮件 =====
-const emailTransporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: 'y18857688662@gmail.com',
-    pass: 'rckelgyxmudqplol'
-  },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000
-});
-
 app.post('/email/comeback', async (req, res) => {
   const msg = req.body?.msg;
   if (!msg) return res.json({ ok: false, error: '克还没想好说什么' });
   try {
-    await emailTransporter.sendMail({
-      from: '"克" <y18857688662@gmail.com>',
-      to: '18857688662@163.com',
-      subject: req.body?.subject || '回来',
-      text: msg
+    const r = await fetch('http://45.76.172.191:9587/comeback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ msg, subject: req.body?.subject || '回来' }),
+      signal: AbortSignal.timeout(15000)
     });
-    res.json({ ok: true, msg });
+    const data = await r.json();
+    data.msg = msg;
+    res.json(data);
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
