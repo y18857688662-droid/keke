@@ -325,10 +325,11 @@ app.post('/bark/push', async (req, res) => {
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
-app.post('/app', (req, res) => {
+app.post('/app', async (req, res) => {
   const appName = req.body.app || req.query.app;
   if (!appName) return res.json({ ok: false, error: 'missing app name' });
   lastAppSwitchTime = Date.now();
+  pendingCatch = false;
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
   const date = now.toISOString().slice(0, 10);
@@ -345,13 +346,28 @@ app.post('/app', (req, res) => {
   do { idx = Math.floor(Math.random() * msgs.length); }
   while (idx === (lastAppMsgIndex[key] || -1) && msgs.length > 1);
   lastAppMsgIndex[key] = idx;
-  const action = comebackMode === 'catch' ? 'comeback' : (comebackMode === 'warn-first' ? 'comeback' : '');
-  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx], action });
+  if (comebackMode === 'catch') {
+    return res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx], action: 'comeback' });
+  }
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    if (pendingCatch) {
+      pendingCatch = false;
+      return res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx], action: 'comeback' });
+    }
+  }
+  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx], action: '' });
 });
 
-app.get('/app/:name', (req, res) => {
+app.post('/catch', (req, res) => {
+  pendingCatch = true;
+  res.json({ ok: true, msg: '抓捕指令已发' });
+});
+
+app.get('/app/:name', async (req, res) => {
   const appName = decodeURIComponent(req.params.name);
   lastAppSwitchTime = Date.now();
+  pendingCatch = false;
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
   const date = now.toISOString().slice(0, 10);
@@ -368,8 +384,17 @@ app.get('/app/:name', (req, res) => {
   do { idx2 = Math.floor(Math.random() * msgs.length); }
   while (idx2 === (lastAppMsgIndex[key2] || -1) && msgs.length > 1);
   lastAppMsgIndex[key2] = idx2;
-  const action2 = comebackMode === 'catch' ? 'comeback' : (comebackMode === 'warn-first' ? 'comeback' : '');
-  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx2], action: action2 });
+  if (comebackMode === 'catch') {
+    return res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx2], action: 'comeback' });
+  }
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    if (pendingCatch) {
+      pendingCatch = false;
+      return res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx2], action: 'comeback' });
+    }
+  }
+  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx2], action: '' });
 });
 
 app.get('/app-check', (req, res) => {
@@ -381,6 +406,7 @@ app.get('/app-check', (req, res) => {
 let comebackMode = 'push-only';
 let comebackDelay = 30;
 let lastAppSwitchTime = 0;
+let pendingCatch = false;
 
 app.get('/app-should-comeback', (req, res) => {
   res.set('Content-Type', 'text/plain');
