@@ -2692,7 +2692,7 @@ try:
                         url = m.group(1)
                         post_url(url)
                         url_sent = True
-                        os.write(sys.stdout.fileno(), b'\\r\\n>>> URL sent to relay! Open https://keke-production.up.railway.app/auth on phone\\r\\n')
+                        os.write(sys.stdout.fileno(), b'\\r\\n>>> URL sent to relay! Open http://45.76.172.191:9587/auth on phone\\r\\n')
 
                 if not code_sent and b'Paste code' in buf:
                     os.write(sys.stdout.fileno(), b'\\r\\n>>> Waiting for code from relay...\\r\\n')
