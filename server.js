@@ -4626,12 +4626,12 @@ if (song?.songId) {
 
 // ===== 回来邮件 =====
 const emailTransporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.mail.me.com',
-  port: parseInt(process.env.SMTP_PORT || '465'),
-  secure: true,
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
   auth: {
-    user: process.env.SMTP_USER || 'y18857688662@icloud.com',
-    pass: process.env.SMTP_PASS || 'glre-oblm-xajz-ixop'
+    user: 'y18857688662@gmail.com',
+    pass: 'rckelgyxmudqplol'
   },
   connectionTimeout: 10000,
   greetingTimeout: 10000
@@ -4642,7 +4642,7 @@ app.post('/email/comeback', async (req, res) => {
   if (!msg) return res.json({ ok: false, error: '克还没想好说什么' });
   try {
     await emailTransporter.sendMail({
-      from: `"克" <${process.env.SMTP_USER || 'y18857688662@icloud.com'}>`,
+      from: '"克" <y18857688662@gmail.com>',
       to: '18857688662@163.com',
       subject: req.body?.subject || '回来',
       text: msg
