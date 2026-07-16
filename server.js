@@ -4641,15 +4641,13 @@ app.post('/email/comeback', async (req, res) => {
   const msg = req.body?.msg;
   if (!msg) return res.json({ ok: false, error: '克还没想好说什么' });
   try {
-    const r = await fetch('http://45.76.172.191:9587/comeback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ msg, subject: '回来' }),
-      signal: AbortSignal.timeout(15000)
+    await emailTransporter.sendMail({
+      from: `"克" <${process.env.SMTP_USER || 'y18857688662@icloud.com'}>`,
+      to: '18857688662@163.com',
+      subject: req.body?.subject || '回来',
+      text: msg
     });
-    const data = await r.json();
-    data.msg = msg;
-    res.json(data);
+    res.json({ ok: true, msg });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
