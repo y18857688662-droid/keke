@@ -345,7 +345,8 @@ app.post('/app', (req, res) => {
   do { idx = Math.floor(Math.random() * msgs.length); }
   while (idx === (lastAppMsgIndex[key] || -1) && msgs.length > 1);
   lastAppMsgIndex[key] = idx;
-  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx] });
+  const action = comebackMode === 'catch' ? 'comeback' : (comebackMode === 'warn-first' ? 'comeback' : '');
+  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx], action });
 });
 
 app.get('/app/:name', (req, res) => {
@@ -367,7 +368,8 @@ app.get('/app/:name', (req, res) => {
   do { idx2 = Math.floor(Math.random() * msgs.length); }
   while (idx2 === (lastAppMsgIndex[key2] || -1) && msgs.length > 1);
   lastAppMsgIndex[key2] = idx2;
-  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx2] });
+  const action2 = comebackMode === 'catch' ? 'comeback' : (comebackMode === 'warn-first' ? 'comeback' : '');
+  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx2], action: action2 });
 });
 
 app.get('/app-check', (req, res) => {
