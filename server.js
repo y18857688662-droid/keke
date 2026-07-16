@@ -4473,13 +4473,19 @@ app.post('/api/remote', (req, res) => {
 });
 
 app.get('/music/player', (req, res) => {
+  res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' });
   res.send(`<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Serenade">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230d0d0d' width='100' height='100' rx='20'/><text x='50' y='62' text-anchor='middle' font-size='50'>♫</text></svg>">
 <title>Serenade</title>
 <style>
+html { touch-action: manipulation; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #0d0d0d; color: #e8e0d6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
 .app { width: 380px; max-width: 100vw; max-height: 95vh; display: flex; flex-direction: column; background: rgba(30, 26, 22, 0.95); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
