@@ -4215,6 +4215,27 @@ app.post('/music/cookie', (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/music/status', async (req, res) => {
+  try {
+    const cred = readNeteaseCred();
+    const hasCookie = !!cred.music_u;
+    const cookieAge = cred.ts ? Math.round((Date.now() - cred.ts) / 3600000) + 'h' : 'unknown';
+    const accountResp = await neteaseApi('https://music.163.com/api/nuser/account/get');
+    const profile = accountResp?.profile || {};
+    const vipType = profile.vipType || 0;
+    const testResp = await neteaseApi('https://music.163.com/api/song/enhance/player/url?ids=[29567192]&br=128000');
+    const testUrl = (testResp.data || [])[0]?.url;
+    res.json({
+      hasCookie, cookieAge,
+      userId: profile.userId || null,
+      nickname: profile.nickname || null,
+      vipType,
+      vipLabel: vipType >= 11 ? '黑胶VIP' : vipType > 0 ? 'VIP' : '无VIP',
+      testSong: { id: 29567192, name: '少年锦时', hasUrl: !!testUrl }
+    });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
 // ── Serenade 音乐播放器 ──
 const MUSIC_CACHE_DIR = path.join(__dirname, 'music_cache');
 const MUSIC_PLAYLIST_FILE = path.join(__dirname, 'music_playlist.json');
