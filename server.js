@@ -4354,6 +4354,7 @@ app.get('/api/url', async (req, res) => {
   const id = req.query.id;
   if (!id) return res.json({ ok: false, error: 'missing id' });
   const cacheFile = path.join(MUSIC_CACHE_DIR, `${id}.mp3`);
+  if (req.query.force === '1' && fs.existsSync(cacheFile)) try { fs.unlinkSync(cacheFile); } catch {}
   if (fs.existsSync(cacheFile) && fs.statSync(cacheFile).size > 0) {
     return res.json({ ok: true, url: `/api/file/${id}.mp3` });
   }
@@ -4399,8 +4400,24 @@ app.get('/api/file/:filename', (req, res) => {
   const fp = path.join(MUSIC_CACHE_DIR, filename);
   if (!fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
   const stat = fs.statSync(fp);
-  res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': stat.size, 'Access-Control-Allow-Origin': '*' });
-  fs.createReadStream(fp).pipe(res);
+  const total = stat.size;
+  const range = req.headers.range;
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${total}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': end - start + 1,
+      'Content-Type': 'audio/mpeg',
+      'Access-Control-Allow-Origin': '*'
+    });
+    fs.createReadStream(fp, { start, end }).pipe(res);
+  } else {
+    res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': total, 'Accept-Ranges': 'bytes', 'Access-Control-Allow-Origin': '*' });
+    fs.createReadStream(fp).pipe(res);
+  }
 });
 
 app.get('/api/similar', async (req, res) => {
@@ -4594,6 +4611,14 @@ let currentLrcIdx = -1;
 
 function fmt(s) { const m = Math.floor(s/60), sec = Math.floor(s%60); return m+':'+String(sec).padStart(2,'0'); }
 
+document.getElementById('lyricsContent').addEventListener('click', function(e) {
+  const line = e.target.closest('.ly-line');
+  if (!line || !line.dataset.time) return;
+  e.preventDefault();
+  audio.currentTime = parseFloat(line.dataset.time);
+  if (!playing) { audio.play().catch(()=>{}); playing = true; updateUI(); }
+});
+
 audio.addEventListener('timeupdate', () => {
   if (audio.duration) {
     document.getElementById('progressFill').style.width = (audio.currentTime / audio.duration * 100) + '%';
@@ -4605,6 +4630,15 @@ audio.addEventListener('timeupdate', () => {
 });
 audio.addEventListener('ended', () => { playing = false; updateUI(); onSongEnd(); });
 audio.addEventListener('canplay', () => { ready = true; updateUI(); });
+var audioRetried = false;
+audio.addEventListener('error', () => {
+  if (song && song.songId && !audioRetried) {
+    audioRetried = true;
+    fetch('/api/url?id=' + song.songId + '&force=1').then(r=>r.json()).then(d => {
+      if (d.ok && d.url) { audio.src = d.url; audio.load(); audio.play().catch(()=>{}); }
+    });
+  }
+});
 
 document.getElementById('progressBar').addEventListener('click', e => {
   if (!audio.duration) return;
@@ -4651,7 +4685,7 @@ function loadSong(s, autoplay) {
   if (song) { history.push(song); if (history.length > 50) history.shift(); }
   song = s;
   localStorage.setItem('serenade_song', JSON.stringify(s));
-  ready = false;
+  ready = false; audioRetried = false;
   document.getElementById('progressFill').style.width = '0%';
   lrcLines = []; currentLrcIdx = -1;
   updateUI();
@@ -4751,7 +4785,7 @@ function fetchLyrics(id) {
     if (d.ok && d.lrc) {
       lrcLines = parseLrc(d.lrc);
       if (lrcLines.length === 0) { el.innerHTML = '<div class="ly-empty">暂无歌词</div>'; return; }
-      el.innerHTML = lrcLines.map((l,i) => \`<div class="ly-line" id="ly-\${i}" onclick="audio.currentTime=\${l.time}">\${l.text}</div>\`).join('');
+      el.innerHTML = lrcLines.map((l,i) => \`<div class="ly-line" id="ly-\${i}" data-time="\${l.time}">\${l.text}</div>\`).join('');
     } else { el.innerHTML = '<div class="ly-empty">暂无歌词</div>'; }
   }).catch(() => { el.innerHTML = '<div class="ly-empty">加载失败</div>'; });
 }
