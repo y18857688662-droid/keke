@@ -4,16 +4,32 @@ const nodemailer = require('nodemailer');
 
 const RAILWAY = 'https://keke-production.up.railway.app';
 
-function relay(path, method, body) {
+function relay(path, method, body, headers) {
   return new Promise((resolve, reject) => {
     const url = new URL(path, RAILWAY);
-    const opts = { method, headers: { 'Content-Type': 'application/json' } };
-    const r = https.request(url, opts, (resp) => {
-      let d = '';
-      resp.on('data', c => d += c);
-      resp.on('end', () => resolve(d));
+    const opts = {
+      method,
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      headers: {
+        'Content-Type': headers?.['content-type'] || 'application/json',
+        ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {})
+      }
+    };
+    const r = https.request(opts, (resp) => {
+      const chunks = [];
+      resp.on('data', c => chunks.push(c));
+      resp.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        resolve({
+          statusCode: resp.statusCode,
+          headers: resp.headers,
+          body: buf
+        });
+      });
     });
     r.on('error', reject);
+    r.setTimeout(30000, () => { r.destroy(); reject(new Error('timeout')); });
     if (body) r.write(body);
     r.end();
   });
@@ -30,11 +46,11 @@ const transporter = nodemailer.createTransport({
 });
 
 const server = http.createServer(async (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
   if (req.method === 'POST' && req.url === '/comeback') {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', async () => {
+      res.setHeader('Content-Type', 'application/json');
       try {
         const d = JSON.parse(body || '{}');
         const msg = d.msg || 'come back';
@@ -50,20 +66,26 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ ok: false, error: e.message }));
       }
     });
-  } else if (req.url.startsWith('/app')) {
+  } else {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const result = await relay(req.url, req.method, body || undefined);
-        res.end(result);
+        const result = await relay(req.url, req.method, body || undefined, req.headers);
+        const ct = result.headers['content-type'] || 'application/json';
+        res.writeHead(result.statusCode || 200, {
+          'Content-Type': ct,
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': '*',
+          'Access-Control-Allow-Methods': '*'
+        });
+        res.end(result.body);
       } catch (e) {
+        res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ ok: false, error: e.message }));
       }
     });
-  } else {
-    res.end(JSON.stringify({ ok: true, msg: 'email relay running' }));
   }
 });
 
-server.listen(9587, () => console.log('email relay on :9587'));
+server.listen(9587, () => console.log('relay on :9587 — all routes proxy to Railway'));
