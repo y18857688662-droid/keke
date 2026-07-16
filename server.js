@@ -4228,6 +4228,51 @@ function getMusicU() {
   } catch { return ''; }
 }
 
+const WEAPI_PRESET = '0CoJUm6Qyw8W8jud';
+const WEAPI_IV = '0102030405060708';
+const WEAPI_PUBKEY = '010001';
+const WEAPI_MODULUS = '00e0b509f6259df8642dbc35662901477df22677ec152b5ff68ace615bb7b725152b3ab17a876aea8a5aa76d2e417629ec4ee341f56135fccf695280104e0312ecbda92557c93870114af6c9d05c4f7f0c3685b7a46bee255932575cce10b424d813cfe4875d3e82047b97ddef52741d546b8e289dc6935b3ece0462db0a22b8e7';
+const BASE62 = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+function weapiEncrypt(data) {
+  const text = JSON.stringify(data);
+  let secretKey = '';
+  for (let i = 0; i < 16; i++) secretKey += BASE62[Math.floor(Math.random() * 62)];
+  const aesEnc = (t, k) => {
+    const c = crypto.createCipheriv('aes-128-cbc', k, WEAPI_IV);
+    return c.update(t, 'utf8', 'base64') + c.final('base64');
+  };
+  const params = aesEnc(aesEnc(text, WEAPI_PRESET), secretKey);
+  const reversed = secretKey.split('').reverse().join('');
+  const hex = Buffer.from(reversed).toString('hex');
+  const bigInt = BigInt('0x' + hex);
+  const bigPub = BigInt('0x' + WEAPI_PUBKEY);
+  const bigMod = BigInt('0x' + WEAPI_MODULUS);
+  let result = 1n, base = bigInt % bigMod, exp = bigPub;
+  while (exp > 0n) {
+    if (exp % 2n === 1n) result = (result * base) % bigMod;
+    exp = exp / 2n;
+    base = (base * base) % bigMod;
+  }
+  return { params, encSecKey: result.toString(16).padStart(256, '0') };
+}
+
+async function neteaseWeapi(apiPath, data) {
+  const encrypted = weapiEncrypt(data);
+  const payload = new URLSearchParams(encrypted).toString();
+  const r = await fetch('https://music.163.com/weapi' + apiPath, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Cookie': getMusicU(),
+      'Referer': 'https://music.163.com',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    },
+    body: payload,
+  });
+  return r.json();
+}
+
 async function neteaseApi(url, postData) {
   const headers = {
     'Cookie': getMusicU(),
@@ -4288,21 +4333,30 @@ app.get('/api/url', async (req, res) => {
   if (fs.existsSync(cacheFile) && fs.statSync(cacheFile).size > 0) {
     return res.json({ ok: true, url: `/api/file/${id}.mp3` });
   }
+  const downloadAudio = async (dlUrl) => {
+    const r = await fetch(dlUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://music.163.com', 'Cookie': getMusicU() }
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length < 1000) throw new Error('too small');
+    const tmp = cacheFile + '.tmp';
+    fs.writeFileSync(tmp, buf);
+    fs.renameSync(tmp, cacheFile);
+  };
   try {
+    let audioUrl = null;
     const raw = await neteaseApi(`https://music.163.com/api/song/enhance/player/url?ids=[${id}]&br=128000`);
-    const data = raw.data || [];
-    const audioUrl = data[0]?.url;
+    audioUrl = (raw.data || [])[0]?.url;
+    if (!audioUrl) {
+      const raw2 = await neteaseWeapi('/song/enhance/player/url/v1', { ids: [parseInt(id)], level: 'standard', encodeType: 'mp3' });
+      audioUrl = (raw2.data || [])[0]?.url;
+    }
+    if (!audioUrl) {
+      const raw3 = await neteaseWeapi('/song/enhance/player/url', { ids: [parseInt(id)], br: 128000 });
+      audioUrl = (raw3.data || [])[0]?.url;
+    }
     if (!audioUrl) return res.json({ ok: false, error: '无法获取，可能需要VIP或地区限制' });
-    const downloadAudio = async (dlUrl) => {
-      const r = await fetch(dlUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://music.163.com', 'Cookie': getMusicU() }
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const buf = Buffer.from(await r.arrayBuffer());
-      const tmp = cacheFile + '.tmp';
-      fs.writeFileSync(tmp, buf);
-      fs.renameSync(tmp, cacheFile);
-    };
     try {
       await downloadAudio(audioUrl);
     } catch {
