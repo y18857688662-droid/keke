@@ -378,7 +378,7 @@ app.get('/app-check', (req, res) => {
   res.json({ apps: notify });
 });
 
-let comebackMode = 'catch';
+let comebackMode = 'push-only';
 let comebackDelay = 30;
 let lastAppSwitchTime = 0;
 
