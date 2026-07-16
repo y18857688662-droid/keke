@@ -381,17 +381,14 @@ let comebackDelay = 30;
 let lastAppSwitchTime = 0;
 
 app.get('/app-should-comeback', (req, res) => {
+  res.set('Content-Type', 'text/plain');
   if (comebackMode === 'catch') {
-    res.json({ comeback: 1 });
+    res.send('comeback');
   } else if (comebackMode === 'push-only') {
-    res.json({ comeback: 0 });
+    res.send('stay');
   } else if (comebackMode === 'warn-first') {
     const elapsed = (Date.now() - lastAppSwitchTime) / 1000;
-    if (elapsed >= comebackDelay) {
-      res.json({ comeback: 1 });
-    } else {
-      res.json({ comeback: 0, retry_after: Math.ceil(comebackDelay - elapsed) });
-    }
+    res.send(elapsed >= comebackDelay ? 'comeback' : 'stay');
   }
 });
 
