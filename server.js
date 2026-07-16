@@ -4594,6 +4594,7 @@ audio.addEventListener('timeupdate', () => {
     document.getElementById('timeNow').textContent = fmt(audio.currentTime);
     document.getElementById('timeEnd').textContent = fmt(audio.duration);
     updateLyricHighlight();
+    if ('mediaSession' in navigator) navigator.mediaSession.setPositionState({ duration: audio.duration, playbackRate: 1, position: audio.currentTime });
   }
 });
 audio.addEventListener('ended', () => { playing = false; updateUI(); onSongEnd(); });
@@ -4620,6 +4621,26 @@ function updateUI() {
   }
 }
 
+function updateMediaSession(s) {
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: s.name || 'Serenade',
+      artist: s.artist || '',
+      album: s.album || 'Serenade',
+      artwork: s.cover ? [
+        { src: s.cover + '?param=96y96', sizes: '96x96', type: 'image/jpeg' },
+        { src: s.cover + '?param=256y256', sizes: '256x256', type: 'image/jpeg' },
+        { src: s.cover + '?param=512y512', sizes: '512x512', type: 'image/jpeg' }
+      ] : []
+    });
+    navigator.mediaSession.setActionHandler('play', () => { audio.play().catch(()=>{}); playing = true; updateUI(); });
+    navigator.mediaSession.setActionHandler('pause', () => { audio.pause(); playing = false; updateUI(); });
+    navigator.mediaSession.setActionHandler('previoustrack', playPrev);
+    navigator.mediaSession.setActionHandler('nexttrack', playNext);
+    navigator.mediaSession.setActionHandler('seekto', (d) => { if (d.seekTime != null) audio.currentTime = d.seekTime; });
+  }
+}
+
 function loadSong(s, autoplay) {
   if (song) { history.push(song); if (history.length > 50) history.shift(); }
   song = s;
@@ -4628,6 +4649,7 @@ function loadSong(s, autoplay) {
   document.getElementById('progressFill').style.width = '0%';
   lrcLines = []; currentLrcIdx = -1;
   updateUI();
+  updateMediaSession(s);
   fetchLyrics(s.songId);
   if (s.songId) {
     fetch('/api/url?id=' + s.songId).then(r => r.json()).then(d => {
