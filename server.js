@@ -328,6 +328,7 @@ app.post('/bark/push', async (req, res) => {
 app.post('/app', (req, res) => {
   const appName = req.body.app || req.query.app;
   if (!appName) return res.json({ ok: false, error: 'missing app name' });
+  lastAppSwitchTime = Date.now();
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
   const date = now.toISOString().slice(0, 10);
@@ -349,6 +350,7 @@ app.post('/app', (req, res) => {
 
 app.get('/app/:name', (req, res) => {
   const appName = decodeURIComponent(req.params.name);
+  lastAppSwitchTime = Date.now();
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
   const date = now.toISOString().slice(0, 10);
@@ -372,6 +374,36 @@ app.get('/app-check', (req, res) => {
   const notify = readAppNotify();
   writeAppNotify([]);
   res.json({ apps: notify });
+});
+
+let comebackMode = 'catch';
+let comebackDelay = 30;
+let lastAppSwitchTime = 0;
+
+app.get('/app-should-comeback', (req, res) => {
+  if (comebackMode === 'catch') {
+    res.json({ comeback: true });
+  } else if (comebackMode === 'push-only') {
+    res.json({ comeback: false });
+  } else if (comebackMode === 'warn-first') {
+    const elapsed = (Date.now() - lastAppSwitchTime) / 1000;
+    if (elapsed >= comebackDelay) {
+      res.json({ comeback: true });
+    } else {
+      res.json({ comeback: false, retry_after: Math.ceil(comebackDelay - elapsed) });
+    }
+  }
+});
+
+app.post('/app-comeback-mode', (req, res) => {
+  const { mode, delay } = req.body || {};
+  if (['catch', 'push-only', 'warn-first'].includes(mode)) {
+    comebackMode = mode;
+    if (delay) comebackDelay = delay;
+    res.json({ ok: true, mode: comebackMode, delay: comebackDelay });
+  } else {
+    res.json({ ok: false, error: 'invalid mode', current: comebackMode });
+  }
 });
 
 app.get('/apps/data', (req, res) => {
