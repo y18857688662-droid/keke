@@ -3,6 +3,7 @@ const https = require('https');
 const nodemailer = require('nodemailer');
 
 const RAILWAY = 'https://keke-production.up.railway.app';
+const WORKKK = 'https://workkk-production-70be.up.railway.app';
 
 function relay(path, method, body, headers) {
   return new Promise((resolve, reject) => {
@@ -89,3 +90,44 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(9587, () => console.log('relay on :9587 — all routes proxy to Railway'));
+
+const workServer = http.createServer(async (req, res) => {
+  let body = '';
+  req.on('data', c => body += c);
+  req.on('end', async () => {
+    try {
+      const url = new URL(req.url, WORKKK);
+      const opts = {
+        method: req.method,
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        headers: {
+          'Content-Type': req.headers['content-type'] || 'application/json',
+          ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {})
+        }
+      };
+      const r = https.request(opts, (resp) => {
+        const chunks = [];
+        resp.on('data', c => chunks.push(c));
+        resp.on('end', () => {
+          const ct = resp.headers['content-type'] || 'application/json';
+          res.writeHead(resp.statusCode || 200, {
+            'Content-Type': ct,
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': '*',
+            'Access-Control-Allow-Methods': '*'
+          });
+          res.end(Buffer.concat(chunks));
+        });
+      });
+      r.on('error', (e) => { res.writeHead(502); res.end(JSON.stringify({ error: e.message })); });
+      r.setTimeout(30000, () => { r.destroy(); res.writeHead(504); res.end('timeout'); });
+      if (body) r.write(body);
+      r.end();
+    } catch (e) {
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+  });
+});
+workServer.listen(9588, () => console.log('workkk relay on :9588'));
