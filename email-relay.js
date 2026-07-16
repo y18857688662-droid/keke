@@ -41,7 +41,7 @@ const server = http.createServer(async (req, res) => {
         const subj = d.subject || 'come back';
         await transporter.sendMail({
           from: '"ke" <y18857688662@gmail.com>',
-          to: 'y18857688662@icloud.com',
+          to: 'y18857688662@gmail.com',
           subject: subj,
           text: msg
         });
