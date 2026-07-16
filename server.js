@@ -4245,8 +4245,11 @@ if (!fs.existsSync(MUSIC_CACHE_DIR)) fs.mkdirSync(MUSIC_CACHE_DIR, { recursive: 
 function getMusicU() {
   try {
     const cred = JSON.parse(fs.readFileSync(NETEASE_CRED_FILE, 'utf8'));
-    return cred.music_u ? `MUSIC_U=${cred.music_u}` : '';
-  } catch { return ''; }
+    if (cred.music_u) return `MUSIC_U=${cred.music_u}`;
+  } catch {}
+  const envU = process.env.MUSIC_U;
+  if (envU) return `MUSIC_U=${envU}`;
+  return '';
 }
 
 const WEAPI_PRESET = '0CoJUm6Qyw8W8jud';
