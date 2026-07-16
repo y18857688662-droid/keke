@@ -4362,8 +4362,10 @@ app.get('/api/url', async (req, res) => {
       headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://music.163.com', 'Cookie': getMusicU() }
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const expected = parseInt(r.headers.get('content-length') || '0');
     const buf = Buffer.from(await r.arrayBuffer());
     if (buf.length < 1000) throw new Error('too small');
+    if (expected > 0 && buf.length < expected * 0.95) throw new Error('incomplete download');
     const tmp = cacheFile + '.tmp';
     fs.writeFileSync(tmp, buf);
     fs.renameSync(tmp, cacheFile);
@@ -4529,6 +4531,7 @@ body { background: #0d0d0d; color: #e8e0d6; font-family: -apple-system, BlinkMac
 .ly-line { padding: 6px 0; font-size: 14px; color: #e8e0d6; opacity: 0.25; transition: all 0.3s; cursor: pointer; line-height: 1.5; }
 .ly-line.active { opacity: 1; font-size: 16px; font-weight: 600; color: #e0a870; }
 .ly-empty { text-align: center; padding: 40px; color: #a09080; opacity: 0.3; font-size: 13px; }
+.mini-lyric { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(30,25,20,0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 10px 20px; text-align: center; font-size: 13px; color: #e0a870; z-index: 100; border-top: 1px solid rgba(255,255,255,0.06); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.3s; }
 </style>
 </head>
 <body>
@@ -4569,8 +4572,9 @@ body { background: #0d0d0d; color: #e8e0d6; font-family: -apple-system, BlinkMac
     <div id="lyricsContent"><div class="ly-empty">播放歌曲后显示歌词</div></div>
   </div>
 </div>
+<div class="mini-lyric" id="miniLyric" style="opacity:0"></div>
 <script>
-const audio = new Audio();
+var audio = new Audio();
 audio.preload = 'auto';
 let song = JSON.parse(localStorage.getItem('serenade_song') || 'null');
 let playlist = [];
@@ -4725,7 +4729,8 @@ function fetchLyrics(id) {
 }
 
 function updateLyricHighlight() {
-  if (lrcLines.length === 0) return;
+  const ml = document.getElementById('miniLyric');
+  if (lrcLines.length === 0) { ml.style.opacity = '0'; return; }
   const t = audio.currentTime;
   let idx = -1;
   for (let i = lrcLines.length-1; i >= 0; i--) { if (t >= lrcLines[i].time) { idx = i; break; } }
@@ -4739,6 +4744,8 @@ function updateLyricHighlight() {
       const panel = document.getElementById('panelLyrics');
       panel.scrollTo({ top: el.offsetTop - panel.clientHeight/2 + el.clientHeight/2, behavior: 'smooth' });
     }
+    ml.textContent = lrcLines[idx].text;
+    ml.style.opacity = '1';
   }
 }
 
