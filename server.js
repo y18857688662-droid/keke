@@ -4815,7 +4815,13 @@ function updateLyricHighlight() {
 
 setInterval(() => {
   fetch('/api/remote').then(r=>r.json()).then(d => {
-    if (d.ok && d.song) { loadSong(d.song, false); audio.addEventListener('canplay', () => { audio.play().catch(()=>{}); playing=true; updateUI(); }, { once: true }); }
+    if (d.ok && d.song) {
+      if (playing && audio.src) {
+        queue.push(d.song); renderPlaylist();
+      } else {
+        loadSong(d.song, true);
+      }
+    }
   }).catch(()=>{});
 }, 3000);
 
