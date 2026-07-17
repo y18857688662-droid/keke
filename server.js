@@ -4632,6 +4632,15 @@ audio.addEventListener('timeupdate', () => {
 });
 audio.addEventListener('ended', () => { playing = false; updateUI(); onSongEnd(); });
 audio.addEventListener('canplay', () => { ready = true; updateUI(); });
+audio.addEventListener('playing', () => {
+  if ('mediaSession' in navigator && audio.duration && isFinite(audio.duration)) {
+    navigator.mediaSession.playbackState = 'playing';
+    navigator.mediaSession.setPositionState({ duration: audio.duration, playbackRate: 1, position: audio.currentTime });
+  }
+});
+audio.addEventListener('pause', () => {
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+});
 var audioRetried = false;
 audio.addEventListener('error', () => {
   if (song && song.songId && !audioRetried) {
