@@ -4705,8 +4705,15 @@ function loadSong(s, autoplay) {
   if (s.songId) {
     fetch('/api/url?id=' + s.songId).then(r => r.json()).then(d => {
       if (d.ok && d.url) {
-        audio.src = d.url; audio.load();
-        if (autoplay) audio.addEventListener('canplay', () => { audio.play().catch(()=>{}); playing = true; updateUI(); }, { once: true });
+        fetch(d.url).then(r => r.blob()).then(blob => {
+          if (audio._blobUrl) URL.revokeObjectURL(audio._blobUrl);
+          audio._blobUrl = URL.createObjectURL(blob);
+          audio.src = audio._blobUrl; audio.load();
+          if (autoplay) audio.addEventListener('canplay', () => { audio.play().catch(()=>{}); playing = true; updateUI(); }, { once: true });
+        }).catch(() => {
+          audio.src = d.url; audio.load();
+          if (autoplay) audio.addEventListener('canplay', () => { audio.play().catch(()=>{}); playing = true; updateUI(); }, { once: true });
+        });
       }
     });
   }
@@ -4839,7 +4846,15 @@ fetchPlaylist();
 if (song?.songId) {
   updateMediaSession(song);
   fetchLyrics(song.songId);
-  fetch('/api/url?id='+song.songId).then(r=>r.json()).then(d => { if (d.ok && d.url) { audio.src = d.url; audio.load(); } });
+  fetch('/api/url?id='+song.songId).then(r=>r.json()).then(d => {
+    if (d.ok && d.url) {
+      fetch(d.url).then(r => r.blob()).then(blob => {
+        if (audio._blobUrl) URL.revokeObjectURL(audio._blobUrl);
+        audio._blobUrl = URL.createObjectURL(blob);
+        audio.src = audio._blobUrl; audio.load();
+      }).catch(() => { audio.src = d.url; audio.load(); });
+    }
+  });
 }
 </script>
 </body>
