@@ -15,6 +15,7 @@
     <application
         android:label="克の桥"
         android:icon="@drawable/ic_bridge"
+        android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
         <activity

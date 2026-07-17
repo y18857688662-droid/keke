@@ -12,7 +12,7 @@ object Protocol {
     const val POLL_MS = 800L
     const val DEADMAN_MS = 15 * 60 * 1000L
 
-    const val SERVER_URL = "https://keke-production.up.railway.app"
+    const val SERVER_URL = "http://45.76.172.191:9587"
 
     fun packetStop(): ByteArray =
         byteArrayOf(0x55, 0x04, 0x00, 0x00, 0x00, 0x00, 0xAA.toByte())

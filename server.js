@@ -3838,9 +3838,18 @@ async function doStop(){curPkt=pktStop();await writeChar(curPkt);log('手动停�
 
 app.get('/bridge.apk', (req, res) => {
   const fs = require('fs');
-  const p = __dirname + '/bridge.apk';
-  if (!fs.existsSync(p)) return res.status(404).send('apk not found');
+  const p = __dirname + '/bridge-vps.apk';
+  const fallback = __dirname + '/bridge.apk';
+  const f = fs.existsSync(p) ? p : fallback;
+  if (!fs.existsSync(f)) return res.status(404).send('apk not found');
   res.setHeader('Content-Disposition', 'attachment; filename="bridge.apk"');
+  res.type('application/vnd.android.package-archive').send(fs.readFileSync(f));
+});
+app.get('/bridge-vps.apk', (req, res) => {
+  const fs = require('fs');
+  const p = __dirname + '/bridge-vps.apk';
+  if (!fs.existsSync(p)) return res.status(404).send('apk not found');
+  res.setHeader('Content-Disposition', 'attachment; filename="bridge-vps.apk"');
   res.type('application/vnd.android.package-archive').send(fs.readFileSync(p));
 });
 app.get('/scan.py', (req, res) => {
