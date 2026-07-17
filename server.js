@@ -4330,6 +4330,7 @@ app.get('/api/remote', (req, res) => {
     if (fs.existsSync(MUSIC_REMOTE_FILE)) {
       const data = JSON.parse(fs.readFileSync(MUSIC_REMOTE_FILE, 'utf8'));
       fs.unlinkSync(MUSIC_REMOTE_FILE);
+      if (data.id && !data.songId) data.songId = data.id;
       res.json({ ok: true, song: data });
     } else {
       res.json({ ok: false });
