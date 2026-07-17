@@ -2379,6 +2379,23 @@ async function autoCapture(){
 </html>`);
 });
 
+app.get('/bridge.apk', (req, res) => {
+  const fs = require('fs');
+  const p = __dirname + '/bridge-vps.apk';
+  const fallback = __dirname + '/bridge.apk';
+  const f = fs.existsSync(p) ? p : fallback;
+  if (!fs.existsSync(f)) return res.status(404).send('apk not found');
+  res.setHeader('Content-Disposition', 'attachment; filename="bridge.apk"');
+  res.type('application/vnd.android.package-archive').send(fs.readFileSync(f));
+});
+app.get('/bridge-vps.apk', (req, res) => {
+  const fs = require('fs');
+  const p = __dirname + '/bridge-vps.apk';
+  if (!fs.existsSync(p)) return res.status(404).send('apk not found');
+  res.setHeader('Content-Disposition', 'attachment; filename="bridge-vps.apk"');
+  res.type('application/vnd.android.package-archive').send(fs.readFileSync(p));
+});
+
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   let auth = readAuth();
