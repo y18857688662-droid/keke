@@ -25,11 +25,12 @@ class BleManager(private val context: Context, private val listener: Listener) {
     private var connected = false
     private var writing = false
     private var currentPacket: ByteArray = Protocol.packetStop()
+    private var patternMode = false
 
     private val keepalive = object : Runnable {
         override fun run() {
             if (connected) {
-                writePacket(currentPacket)
+                if (!patternMode) writePacket(currentPacket)
                 handler.postDelayed(this, Protocol.KEEPALIVE_MS)
             }
         }
@@ -136,16 +137,19 @@ class BleManager(private val context: Context, private val listener: Listener) {
     }
 
     fun setIntensity(value: Int) {
+        patternMode = false
         currentPacket = Protocol.packetIntensity(value)
         writePacket(currentPacket)
     }
 
     fun setPattern(mode: Int, level: Int) {
+        patternMode = true
         currentPacket = Protocol.packetPattern(mode, level)
         writePacket(currentPacket)
     }
 
     fun stop() {
+        patternMode = false
         currentPacket = Protocol.packetStop()
         writePacket(currentPacket)
     }
