@@ -4822,6 +4822,7 @@ setInterval(() => {
 updateUI();
 fetchPlaylist();
 if (song?.songId) {
+  updateMediaSession(song);
   fetchLyrics(song.songId);
   fetch('/api/url?id='+song.songId).then(r=>r.json()).then(d => { if (d.ok && d.url) { audio.src = d.url; audio.load(); } });
 }
