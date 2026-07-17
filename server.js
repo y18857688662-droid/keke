@@ -4616,6 +4616,8 @@ document.getElementById('lyricsContent').addEventListener('click', function(e) {
   if (!line || !line.dataset.time) return;
   e.preventDefault();
   audio.currentTime = parseFloat(line.dataset.time);
+  currentLrcIdx = -1;
+  updateLyricHighlight();
   if (!playing) { audio.play().catch(()=>{}); playing = true; updateUI(); }
 });
 

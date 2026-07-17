@@ -14,7 +14,8 @@ function relay(path, method, body, headers) {
       path: url.pathname + url.search,
       headers: {
         'Content-Type': headers?.['content-type'] || 'application/json',
-        ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {})
+        ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {}),
+        ...(headers?.['range'] ? { 'Range': headers['range'] } : {})
       }
     };
     const r = https.request(opts, (resp) => {
@@ -74,12 +75,16 @@ const server = http.createServer(async (req, res) => {
       try {
         const result = await relay(req.url, req.method, body || undefined, req.headers);
         const ct = result.headers['content-type'] || 'application/json';
-        res.writeHead(result.statusCode || 200, {
+        const rh = {
           'Content-Type': ct,
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Headers': '*',
           'Access-Control-Allow-Methods': '*'
-        });
+        };
+        if (result.headers['accept-ranges']) rh['Accept-Ranges'] = result.headers['accept-ranges'];
+        if (result.headers['content-range']) rh['Content-Range'] = result.headers['content-range'];
+        if (result.headers['content-length']) rh['Content-Length'] = result.headers['content-length'];
+        res.writeHead(result.statusCode || 200, rh);
         res.end(result.body);
       } catch (e) {
         res.setHeader('Content-Type', 'application/json');
