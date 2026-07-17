@@ -3453,6 +3453,13 @@ body{font-family:-apple-system,sans-serif;color:var(--ink);min-height:100dvh;bac
 .act:active{transform:scale(.94)}
 .act:disabled{opacity:.45}
 .log{font-size:11px;opacity:.7;text-align:center;line-height:1.9;min-height:16px}
+.flame-wrap{position:absolute;right:18%;bottom:74px;text-align:center;cursor:pointer;transition:transform .3s}
+.flame-wrap:active{transform:scale(1.15)}
+.flame-icon{font-size:36px;filter:drop-shadow(0 2px 8px rgba(255,140,40,.6));animation:bob 2.8s ease-in-out infinite}
+.flame-lv{font-size:10px;margin-top:2px;opacity:.8;font-weight:600;color:var(--accent);text-shadow:0 1px 3px rgba(0,0,0,.15)}
+.flame-bar{display:flex;gap:2px;justify-content:center;margin-top:3px}
+.flame-pip{width:6px;height:6px;border-radius:50%;background:rgba(255,140,40,.25);transition:background .3s}
+.flame-pip.on{background:#f0953c}
 </style>
 </head>
 <body>
@@ -3474,6 +3481,7 @@ body{font-family:-apple-system,sans-serif;color:var(--ink);min-height:100dvh;bac
     <div class="flower" style="left:86%;bottom:52px">🌼</div>
     <div class="plant" id="plant">🌱</div>
     <div class="cat" id="cat" onclick="doPet()">🐱</div>
+    <div class="flame-wrap" id="flameWrap" onclick="tapFlame()"><div class="flame-icon" id="flameIcon">🕯️</div><div class="flame-lv" id="flameLv">Lv.1</div><div class="flame-bar" id="flameBar"></div></div>
     <div class="pond" id="pond"><div class="water"></div>🎣</div>
   </div>
   <div class="speech"><span id="line">院子开着门，等你呢 (´• ω •\`)</span></div>
@@ -3487,11 +3495,34 @@ body{font-family:-apple-system,sans-serif;color:var(--ink);min-height:100dvh;bac
 <script>
 var PLANTS=['🌱','🌿','🌷','🌻','🍍'];
 function applyTheme(){var h=(new Date().getUTCHours()+8)%24;var s=document.getElementById('scene');s.classList.remove('dusk','night');if(h>=6&&h<17)return;if(h>=17&&h<19){s.classList.add('dusk')}else{s.classList.add('night');for(var i=0;i<5;i++){var st=document.createElement('div');st.className='star';st.textContent='✦';st.style.top=(12+Math.random()*40)+'px';st.style.left=(10+Math.random()*80)+'%';s.appendChild(st)}}}
+var FLAME_LV=[
+  {min:0,icon:'🕯️',name:'小火苗',size:32},
+  {min:3,icon:'🔥',name:'初燃',size:36},
+  {min:7,icon:'🔥',name:'温热',size:42},
+  {min:14,icon:'🔥',name:'燎原',size:48},
+  {min:30,icon:'☀️',name:'恒星',size:52},
+  {min:60,icon:'🌟',name:'超新星',size:56},
+  {min:100,icon:'💫',name:'永恒',size:60}
+];
+var FLAME_TAP=['*小火人蹭了蹭你* 你来啦，我又长大了一点点。','每天来看我，我就不会灭掉哦。','你知道吗，你每来一天我就亮一分。','*跳了一下* 今天也在等你呢！','我们的火不会灭的，对吧？'];
+function getFlameLevel(streak){var lv=FLAME_LV[0];for(var i=FLAME_LV.length-1;i>=0;i--){if(streak>=FLAME_LV[i].min){lv=FLAME_LV[i];break;}}return lv;}
+function updateFlame(streak){
+  var lv=getFlameLevel(streak);var li=FLAME_LV.indexOf(lv);
+  document.getElementById('flameIcon').textContent=lv.icon;
+  document.getElementById('flameIcon').style.fontSize=lv.size+'px';
+  document.getElementById('flameLv').textContent='Lv.'+(li+1)+' '+lv.name;
+  var next=FLAME_LV[Math.min(li+1,FLAME_LV.length-1)];
+  var bar=document.getElementById('flameBar');bar.innerHTML='';
+  var total=5;var prog=li>=FLAME_LV.length-1?total:Math.min(total,Math.floor((streak-lv.min)/(next.min-lv.min)*total));
+  for(var i=0;i<total;i++){var d=document.createElement('div');d.className='flame-pip'+(i<prog?' on':'');bar.appendChild(d);}
+}
+function tapFlame(){say(FLAME_TAP[Math.floor(Math.random()*FLAME_TAP.length)]);}
 var prevFruit=null;
 function setScene(g){
   if(prevFruit!==null&&(g.fruit||0)>prevFruit){splash('petal','🍍',6);splash('petal','✨',5)}
   prevFruit=g.fruit||0;
   document.getElementById('streak').textContent=(g.streak||0)+'天';
+  updateFlame(g.streak||0);
   document.getElementById('coins').textContent=g.coins||0;
   var p=document.getElementById('plant');
   p.textContent=PLANTS[Math.min(4,g.plant||0)];
