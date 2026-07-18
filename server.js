@@ -4356,9 +4356,13 @@ app.get('/music/player', (req, res) => {
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #0d0d0d; color: #e8e0d6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
 .app { width: 380px; max-width: 100vw; height: 100vh; height: 100dvh; display: flex; flex-direction: column; background: rgba(30, 26, 22, 0.95); overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
-.np { position: relative; flex-shrink: 0; }
-.np-cover { width: 100%; aspect-ratio: 1; max-height: 45vh; max-height: 45dvh; object-fit: cover; display: block; cursor: pointer; }
-.np-empty { width: 100%; aspect-ratio: 1; max-height: 45vh; max-height: 45dvh; display: flex; align-items: center; justify-content: center; font-size: 64px; opacity: 0.15; background: #1a1714; }
+.np { position: relative; flex-shrink: 0; transition: all 0.3s; }
+.np-cover { width: 100%; aspect-ratio: 1; max-height: 45vh; max-height: 45dvh; object-fit: cover; display: block; cursor: pointer; transition: max-height 0.3s; }
+.np-empty { width: 100%; aspect-ratio: 1; max-height: 45vh; max-height: 45dvh; display: flex; align-items: center; justify-content: center; font-size: 64px; opacity: 0.15; background: #1a1714; transition: max-height 0.3s; }
+.lyrics-mode .np-cover, .lyrics-mode .np-empty { max-height: 0; overflow: hidden; }
+.lyrics-mode .np-info { display: none; }
+.lyrics-mode .np-progress { margin-top: 0; }
+
 .np-info { padding: 14px 20px 6px; }
 .np-name { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np-artist { font-size: 12px; color: #a09080; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -4548,6 +4552,7 @@ function showTab(name) {
     document.getElementById('panel'+t.charAt(0).toUpperCase()+t.slice(1)).style.display = t===name?'':'none';
     document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===name);
   });
+  document.querySelector('.app').classList.toggle('lyrics-mode', name==='lyrics');
   if (name==='search') setTimeout(()=>document.getElementById('searchInput').focus(), 100);
 }
 
