@@ -4623,8 +4623,7 @@ function updateLyricHighlight() {
     const el = document.getElementById('ly-'+idx);
     if (el) {
       el.classList.add('active');
-      const panel = document.getElementById('panelLyrics');
-      panel.scrollTo({ top: el.offsetTop - panel.clientHeight/2 + el.clientHeight/2, behavior: 'smooth' });
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
   }
 }
