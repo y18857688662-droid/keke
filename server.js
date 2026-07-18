@@ -4355,10 +4355,10 @@ app.get('/music/player', (req, res) => {
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #0d0d0d; color: #e8e0d6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-.app { width: 380px; max-width: 100vw; max-height: 95vh; display: flex; flex-direction: column; background: rgba(30, 26, 22, 0.95); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
-.np { position: relative; }
-.np-cover { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; cursor: pointer; }
-.np-empty { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 64px; opacity: 0.15; background: #1a1714; }
+.app { width: 380px; max-width: 100vw; height: 100vh; height: 100dvh; display: flex; flex-direction: column; background: rgba(30, 26, 22, 0.95); overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.np { position: relative; flex-shrink: 0; }
+.np-cover { width: 100%; aspect-ratio: 1; max-height: 45vh; max-height: 45dvh; object-fit: cover; display: block; cursor: pointer; }
+.np-empty { width: 100%; aspect-ratio: 1; max-height: 45vh; max-height: 45dvh; display: flex; align-items: center; justify-content: center; font-size: 64px; opacity: 0.15; background: #1a1714; }
 .np-info { padding: 14px 20px 6px; }
 .np-name { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np-artist { font-size: 12px; color: #a09080; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -4372,10 +4372,10 @@ body { background: #0d0d0d; color: #e8e0d6; font-family: -apple-system, BlinkMac
 .play-btn { width: 48px; height: 48px; border-radius: 50%; background: #e0a870; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .play-btn:active { transform: scale(0.93); }
 .play-btn svg { color: #1a1714; }
-.tabs { display: flex; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.tabs { display: flex; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
 .tab { flex: 1; text-align: center; padding: 8px; font-size: 12px; color: #a09080; cursor: pointer; }
 .tab.active { color: #e0a870; border-bottom: 2px solid #e0a870; }
-.panel { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 200px; }
+.panel { flex: 1 1 0; overflow-y: scroll; -webkit-overflow-scrolling: touch; min-height: 0; }
 .pl-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; cursor: pointer; }
 .pl-item:hover { background: rgba(255,255,255,0.04); }
 .pl-item.active { background: rgba(224,168,112,0.08); }
