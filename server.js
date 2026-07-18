@@ -4515,7 +4515,7 @@ function loadSong(s, autoplay) {
 }
 
 function onSongEnd() {
-  if (queue.length > 0) { loadSong(queue.shift(), true); renderPlaylist(); }
+  if (playlist.length > 0) { playNext(); }
   else if (roaming && song?.songId) fetchSimilar(song.songId);
 }
 
