@@ -4526,8 +4526,22 @@ function fetchSimilar(id) {
 
 function togglePlay() { if (!song||!ready) return; if (playing) { audio.pause(); playing=false; } else { audio.play().catch(()=>{}); playing=true; } updateUI(); }
 function toggleRoam() { roaming=!roaming; localStorage.setItem('serenade_roam', JSON.stringify(roaming)); updateUI(); }
-function playNext() { if (queue.length>0) { loadSong(queue.shift(), true); renderPlaylist(); } else if (playlist.length>0) { const idx = song ? playlist.findIndex(s=>s.songId===song.songId) : -1; const next = idx>=0 && idx<playlist.length-1 ? idx+1 : 0; loadSong(playlist[next], true); queue = playlist.slice(next+1).map(s=>({...s})); renderPlaylist(); } else if (roaming&&song?.songId) fetchSimilar(song.songId); }
-function playPrev() { if (history.length>0) { const prev=history.pop(); song=null; loadSong(prev, true); history.pop(); renderPlaylist(); } }
+function playNext() {
+  if (playlist.length>0) {
+    const idx = song ? playlist.findIndex(s=>s.songId===song.songId) : -1;
+    const next = (idx>=0 && idx<playlist.length-1) ? idx+1 : 0;
+    loadSong(playlist[next], true);
+    renderPlaylist();
+  } else if (roaming&&song?.songId) fetchSimilar(song.songId);
+}
+function playPrev() {
+  if (playlist.length>0) {
+    const idx = song ? playlist.findIndex(s=>s.songId===song.songId) : -1;
+    const prev = (idx>0) ? idx-1 : playlist.length-1;
+    loadSong(playlist[prev], true);
+    renderPlaylist();
+  }
+}
 
 function showTab(name) {
   ['playlist','search','lyrics'].forEach(t => {
@@ -4541,9 +4555,7 @@ function fetchPlaylist() {
   fetch('/api/playlist').then(r=>r.json()).then(d => { if (d.ok) { playlist=d.songs.map(s=>({name:s.name,artist:s.artist,album:s.album,cover:s.cover,songId:s.songId,addedBy:s.addedBy})); renderPlaylist(); } }).catch(()=>{});
 }
 function playFromPlaylist(idx) {
-  const rest = playlist.slice(idx + 1);
   loadSong(playlist[idx], true);
-  queue = rest.map(s => ({...s}));
   renderPlaylist();
 }
 function renderPlaylist() {
