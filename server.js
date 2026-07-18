@@ -4375,7 +4375,7 @@ body { background: #0d0d0d; color: #e8e0d6; font-family: -apple-system, BlinkMac
 .tabs { display: flex; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); }
 .tab { flex: 1; text-align: center; padding: 8px; font-size: 12px; color: #a09080; cursor: pointer; }
 .tab.active { color: #e0a870; border-bottom: 2px solid #e0a870; }
-.panel { flex: 1; overflow-y: auto; min-height: 200px; max-height: 300px; }
+.panel { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 200px; }
 .pl-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; cursor: pointer; }
 .pl-item:hover { background: rgba(255,255,255,0.04); }
 .pl-item.active { background: rgba(224,168,112,0.08); }
@@ -4526,8 +4526,8 @@ function fetchSimilar(id) {
 
 function togglePlay() { if (!song||!ready) return; if (playing) { audio.pause(); playing=false; } else { audio.play().catch(()=>{}); playing=true; } updateUI(); }
 function toggleRoam() { roaming=!roaming; localStorage.setItem('serenade_roam', JSON.stringify(roaming)); updateUI(); }
-function playNext() { if (queue.length>0) { loadSong(queue.shift(), true); renderPlaylist(); } else if (roaming&&song?.songId) fetchSimilar(song.songId); }
-function playPrev() { if (history.length>0) { if (song) playlist.unshift(song); const prev=history.pop(); song=null; loadSong(prev, true); history.pop(); renderPlaylist(); } }
+function playNext() { if (queue.length>0) { loadSong(queue.shift(), true); renderPlaylist(); } else if (playlist.length>0) { const idx = song ? playlist.findIndex(s=>s.songId===song.songId) : -1; const next = idx>=0 && idx<playlist.length-1 ? idx+1 : 0; loadSong(playlist[next], true); queue = playlist.slice(next+1).map(s=>({...s})); renderPlaylist(); } else if (roaming&&song?.songId) fetchSimilar(song.songId); }
+function playPrev() { if (history.length>0) { const prev=history.pop(); song=null; loadSong(prev, true); history.pop(); renderPlaylist(); } }
 
 function showTab(name) {
   ['playlist','search','lyrics'].forEach(t => {
