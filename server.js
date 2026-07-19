@@ -2254,10 +2254,11 @@ fetch('/period/data').then(function(r){return r.json()}).then(function(j){
 // ==================== 小院子 ====================
 const GARDEN_FILE = path.join(__dirname, 'garden_data.json');
 function gBjToday() { return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10); }
+const GARDEN_SEED = { lastVisit: '2026-07-18', streak: 3, coins: 0, plant: 0, fruit: 0, day: '', watered: false, fished: 0, petted: false, fishlog: [] };
 function gReadGarden() {
   let g = {};
   try { g = JSON.parse(fs.readFileSync(GARDEN_FILE, 'utf8')); } catch (e) {}
-  return Object.assign({ lastVisit: '', streak: 0, coins: 0, plant: 0, fruit: 0, day: '', watered: false, fished: 0, petted: false, fishlog: [] }, g);
+  return Object.assign({...GARDEN_SEED}, g);
 }
 function gWriteGarden(g) { try { fs.writeFileSync(GARDEN_FILE, JSON.stringify(g)); } catch (e) {} }
 function gRoll(g) {
