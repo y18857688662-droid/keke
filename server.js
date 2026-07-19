@@ -1915,6 +1915,543 @@ async function speakOne(text){
 </html>`);
 });
 
+// === Period Tracker ===
+const PERIOD_FILE = path.join(__dirname, 'period_data.json');
+function readPeriod() { try { return JSON.parse(fs.readFileSync(PERIOD_FILE, 'utf8')); } catch { return { records: [], cycle: 28, duration: 5 }; } }
+function writePeriod(data) { fs.writeFileSync(PERIOD_FILE, JSON.stringify(data)); }
+
+app.get('/period/data', (req, res) => res.json(readPeriod()));
+app.post('/period/log', (req, res) => {
+  const data = readPeriod();
+  const { date, type } = req.body;
+  if (!date) return res.json({ ok: false });
+  if (type === 'start') {
+    data.records.push({ start: date, end: null });
+    data.records.sort((a, b) => a.start.localeCompare(b.start));
+  } else if (type === 'end' && data.records.length) {
+    const last = data.records[data.records.length - 1];
+    if (!last.end) last.end = date;
+  } else if (type === 'delete') {
+    data.records = data.records.filter(r => r.start !== date);
+  }
+  if (req.body.cycle) data.cycle = parseInt(req.body.cycle) || 28;
+  if (req.body.duration) data.duration = parseInt(req.body.duration) || 5;
+  writePeriod(data);
+  res.json({ ok: true });
+});
+
+app.get('/period', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>经期记录</title>
+<style>
+:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1714;--text-faint:#999;--accent:#D97A54;--pink:#E88B9C;--pink-soft:rgba(232,139,156,.12);--divider:#E8E3DB;
+  --font:-apple-system,"SF Pro Display","PingFang SC",system-ui,sans-serif;--shadow:0 2px 12px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--pink:#D4788A;--pink-soft:rgba(212,120,138,.15)}}
+:root[data-theme="dark"]{--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--pink:#D4788A;--pink-soft:rgba(212,120,138,.15)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px;font-family:var(--font);-webkit-font-smoothing:antialiased}
+.header{display:flex;align-items:center;padding:16px 0;gap:12px}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600}
+.card{background:var(--card);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card h2{font-size:15px;font-weight:600;margin-bottom:12px;color:var(--pink)}
+.status-big{text-align:center;padding:10px 0}
+.status-num{font-size:42px;font-weight:700;color:var(--pink)}
+.status-label{font-size:13px;color:var(--text-faint);margin-top:2px}
+.predict-row{display:flex;justify-content:space-around;margin-top:14px}
+.predict-item{text-align:center}
+.predict-val{font-size:16px;font-weight:600}
+.predict-sub{font-size:11px;color:var(--text-faint);margin-top:2px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:13px}
+.cal-head{font-size:11px;color:var(--text-faint);padding:4px 0}
+.cal-day{padding:6px 2px;border-radius:8px;cursor:pointer;transition:background .15s;min-height:32px;display:flex;align-items:center;justify-content:center}
+.cal-day:hover{background:var(--divider)}
+.cal-day.period{background:var(--pink-soft);color:var(--pink);font-weight:600}
+.cal-day.predicted{background:var(--pink-soft);opacity:.5}
+.cal-day.today{outline:2px solid var(--pink);outline-offset:-2px}
+.cal-day.empty{pointer-events:none}
+.cal-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.cal-nav button{background:none;border:none;font-size:18px;color:var(--text);cursor:pointer;padding:4px 8px}
+.cal-nav span{font-size:14px;font-weight:500}
+.log-btn{width:100%;padding:12px;background:var(--pink);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:500;cursor:pointer;font-family:var(--font)}
+.log-btn:active{opacity:.8}
+.records{margin-top:8px}
+.rec-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--divider);font-size:14px}
+.rec-item:last-child{border:none}
+.rec-del{color:var(--text-faint);background:none;border:none;font-size:16px;cursor:pointer}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>经期记录</h1></div>
+<div class="card">
+  <div class="status-big"><div class="status-num" id="statusNum">-</div><div class="status-label" id="statusLabel">载入中…</div></div>
+  <div class="predict-row">
+    <div class="predict-item"><div class="predict-val" id="cycleLen">-</div><div class="predict-sub">平均周期</div></div>
+    <div class="predict-item"><div class="predict-val" id="durLen">-</div><div class="predict-sub">持续天数</div></div>
+    <div class="predict-item"><div class="predict-val" id="nextDate">-</div><div class="predict-sub">预计下次</div></div>
+  </div>
+</div>
+<div class="card">
+  <div class="cal-nav"><button onclick="changeMonth(-1)">‹</button><span id="calTitle"></span><button onclick="changeMonth(1)">›</button></div>
+  <div class="cal-grid" id="calGrid"></div>
+</div>
+<div class="card">
+  <button class="log-btn" onclick="logPeriod()">记录经期开始</button>
+</div>
+<div class="card">
+  <h2>历史记录</h2>
+  <div class="records" id="records"></div>
+</div>
+<script>
+var pData={records:[],cycle:28,duration:5};
+var calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
+function load(){
+  fetch('/period/data').then(function(r){return r.json()}).then(function(d){
+    pData=d; render();
+  });
+}
+function render(){
+  var recs=pData.records||[];
+  var today=new Date();var todayStr=fmt(today);
+  if(recs.length){
+    var last=recs[recs.length-1];
+    var lastStart=new Date(last.start);
+    var diff=Math.floor((today-lastStart)/86400000);
+    var nextPred=new Date(lastStart.getTime()+pData.cycle*86400000);
+    var daysUntil=Math.floor((nextPred-today)/86400000);
+    if(daysUntil<0)daysUntil=0;
+    document.getElementById('statusNum').textContent=daysUntil<=0?'今天':daysUntil;
+    document.getElementById('statusLabel').textContent=daysUntil<=0?'预计今天来':'天后预计来';
+    document.getElementById('nextDate').textContent=(nextPred.getMonth()+1)+'/'+nextPred.getDate();
+  }else{
+    document.getElementById('statusNum').textContent='—';
+    document.getElementById('statusLabel').textContent='还没有记录';
+    document.getElementById('nextDate').textContent='—';
+  }
+  document.getElementById('cycleLen').textContent=pData.cycle+'天';
+  document.getElementById('durLen').textContent=pData.duration+'天';
+  renderCal();renderRecords();
+}
+function fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function getPeriodDays(){
+  var days={};
+  (pData.records||[]).forEach(function(r){
+    var s=new Date(r.start);
+    var dur=pData.duration;
+    if(r.end){dur=Math.floor((new Date(r.end)-s)/86400000)+1;}
+    for(var i=0;i<dur;i++){
+      var d=new Date(s.getTime()+i*86400000);
+      days[fmt(d)]='period';
+    }
+  });
+  if(pData.records&&pData.records.length){
+    var last=pData.records[pData.records.length-1];
+    var ls=new Date(last.start);
+    for(var c=1;c<=3;c++){
+      var ns=new Date(ls.getTime()+c*pData.cycle*86400000);
+      for(var i=0;i<pData.duration;i++){
+        var d=new Date(ns.getTime()+i*86400000);
+        var k=fmt(d);if(!days[k])days[k]='predicted';
+      }
+    }
+  }
+  return days;
+}
+function renderCal(){
+  var grid=document.getElementById('calGrid');
+  grid.innerHTML='';
+  document.getElementById('calTitle').textContent=calYear+'年'+(calMonth+1)+'月';
+  var heads=['日','一','二','三','四','五','六'];
+  heads.forEach(function(h){var e=document.createElement('div');e.className='cal-head';e.textContent=h;grid.appendChild(e);});
+  var first=new Date(calYear,calMonth,1);
+  var lastDay=new Date(calYear,calMonth+1,0).getDate();
+  var startDow=first.getDay();
+  var pDays=getPeriodDays();
+  var todayStr=fmt(new Date());
+  for(var i=0;i<startDow;i++){var e=document.createElement('div');e.className='cal-day empty';grid.appendChild(e);}
+  for(var d=1;d<=lastDay;d++){
+    var e=document.createElement('div');e.className='cal-day';
+    var ds=calYear+'-'+String(calMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    if(pDays[ds]==='period')e.classList.add('period');
+    else if(pDays[ds]==='predicted')e.classList.add('predicted');
+    if(ds===todayStr)e.classList.add('today');
+    e.textContent=d;
+    grid.appendChild(e);
+  }
+}
+function changeMonth(dir){calMonth+=dir;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}renderCal();}
+function renderRecords(){
+  var el=document.getElementById('records');
+  var recs=(pData.records||[]).slice().reverse();
+  if(!recs.length){el.innerHTML='<div style="color:var(--text-faint);text-align:center;padding:12px;font-size:13px">还没有记录</div>';return;}
+  el.innerHTML=recs.map(function(r){
+    var dur=r.end?Math.floor((new Date(r.end)-new Date(r.start))/86400000)+1:pData.duration;
+    return '<div class="rec-item"><span>'+r.start+' ('+dur+'天)</span><button class="rec-del" onclick="delRecord(\\''+r.start+'\\')">×</button></div>';
+  }).join('');
+}
+function logPeriod(){
+  var today=fmt(new Date());
+  fetch('/period/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:today,type:'start'})}).then(function(){load();});
+}
+function delRecord(date){
+  fetch('/period/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:date,type:'delete'})}).then(function(){load();});
+}
+load();
+</script></body></html>`);
+});
+
+// === Garden ===
+const GARDEN_FILE = path.join(__dirname, 'garden_data.json');
+function readGarden() { try { return JSON.parse(fs.readFileSync(GARDEN_FILE, 'utf8')); } catch { return { plants: [], lastWater: null }; } }
+function writeGarden(data) { fs.writeFileSync(GARDEN_FILE, JSON.stringify(data)); }
+
+app.get('/garden/data', (req, res) => res.json(readGarden()));
+app.post('/garden/action', (req, res) => {
+  const data = readGarden();
+  const { action, plantType, plantName } = req.body;
+  if (action === 'plant' && plantType) {
+    data.plants.push({ type: plantType, name: plantName || plantType, planted: new Date().toISOString(), watered: new Date().toISOString(), level: 1 });
+  } else if (action === 'water') {
+    const now = new Date().toISOString();
+    data.lastWater = now;
+    data.plants.forEach(p => {
+      p.watered = now;
+      const age = Math.floor((Date.now() - new Date(p.planted).getTime()) / 86400000);
+      p.level = Math.min(5, 1 + Math.floor(age / 3));
+    });
+  } else if (action === 'remove' && req.body.index !== undefined) {
+    data.plants.splice(req.body.index, 1);
+  }
+  writeGarden(data);
+  res.json({ ok: true, data });
+});
+
+app.get('/garden', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>我们的小院子</title>
+<style>
+:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1714;--text-faint:#999;--accent:#6DBB7A;--accent-soft:rgba(109,187,122,.1);--divider:#E8E3DB;
+  --font:-apple-system,"SF Pro Display","PingFang SC",system-ui,sans-serif;--shadow:0 2px 12px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#7CC98A}}
+:root[data-theme="dark"]{--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#7CC98A}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px;font-family:var(--font);-webkit-font-smoothing:antialiased}
+.header{display:flex;align-items:center;padding:16px 0;gap:12px}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600}
+.garden-view{background:var(--card);border-radius:20px;padding:20px;min-height:280px;box-shadow:var(--shadow);display:flex;flex-wrap:wrap;gap:16px;justify-content:center;align-items:flex-end;margin-bottom:14px;position:relative}
+.garden-empty{color:var(--text-faint);font-size:14px;align-self:center;width:100%;text-align:center;padding:60px 0}
+.plant{display:flex;flex-direction:column;align-items:center;gap:4px;animation:sprout .5s ease-out}
+.plant-icon{font-size:36px;transition:font-size .3s}
+.plant-icon.lv2{font-size:42px}.plant-icon.lv3{font-size:48px}.plant-icon.lv4{font-size:54px}.plant-icon.lv5{font-size:60px}
+.plant-name{font-size:11px;color:var(--text-faint);max-width:60px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plant-del{font-size:10px;color:var(--text-faint);cursor:pointer;opacity:0;transition:opacity .2s}
+.plant:hover .plant-del{opacity:1}
+@keyframes sprout{from{transform:scale(0) translateY(20px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+@keyframes sway{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}}
+.plant-icon{animation:sway 3s ease-in-out infinite}
+.actions{display:flex;gap:10px;margin-bottom:14px}
+.act-btn{flex:1;padding:14px;border:none;border-radius:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:6px}
+.act-btn.water{background:rgba(100,180,230,.15);color:#4AADE8}
+.act-btn.plant{background:var(--accent-soft);color:var(--accent)}
+.act-btn:active{opacity:.7}
+.card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.pick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.pick-item{font-size:28px;text-align:center;padding:10px;border-radius:12px;cursor:pointer;border:2px solid transparent;transition:all .15s}
+.pick-item:hover,.pick-item.active{border-color:var(--accent);background:var(--accent-soft)}
+.name-input{width:100%;padding:10px 14px;border:1px solid var(--divider);border-radius:10px;font-size:14px;font-family:var(--font);background:var(--card);color:var(--text);margin-top:10px;outline:none}
+.name-input:focus{border-color:var(--accent)}
+.confirm-btn{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-size:15px;cursor:pointer;margin-top:10px;font-family:var(--font)}
+.info{font-size:13px;color:var(--text-faint);text-align:center;padding:8px 0}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>我们的小院子</h1></div>
+<div class="garden-view" id="gardenView"><div class="garden-empty">还没有种任何植物呢</div></div>
+<div class="actions">
+  <button class="act-btn water" onclick="waterAll()">💧 浇水</button>
+  <button class="act-btn plant" onclick="showPlant()">🌱 种植</button>
+</div>
+<div class="card" id="plantPanel" style="display:none">
+  <div class="pick-grid" id="pickGrid"></div>
+  <input class="name-input" id="plantNameInput" placeholder="给它取个名字（可选）">
+  <button class="confirm-btn" onclick="confirmPlant()">种下去</button>
+</div>
+<div class="info" id="waterInfo"></div>
+<script>
+var gData={plants:[],lastWater:null};
+var pickType='';
+var plantOptions=['🌸','🌻','🌹','🌺','🌷','🌼','🍀','🌿','🌵','🎋','🌳','🍁','🌲','🎍','💐','🪻'];
+function load(){
+  fetch('/garden/data').then(function(r){return r.json()}).then(function(d){gData=d;render();});
+}
+function render(){
+  var view=document.getElementById('gardenView');
+  if(!gData.plants||!gData.plants.length){view.innerHTML='<div class="garden-empty">还没有种任何植物呢</div>';
+  }else{
+    view.innerHTML=gData.plants.map(function(p,i){
+      var lvClass='lv'+Math.min(5,p.level||1);
+      return '<div class="plant"><div class="plant-icon '+lvClass+'">'+p.type+'</div><div class="plant-name">'+esc(p.name||p.type)+'</div><div class="plant-del" onclick="removePlant('+i+')">移除</div></div>';
+    }).join('');
+  }
+  if(gData.lastWater){
+    var ago=Math.floor((Date.now()-new Date(gData.lastWater).getTime())/3600000);
+    document.getElementById('waterInfo').textContent=ago<1?'刚刚浇过水':ago+'小时前浇过水';
+  }
+}
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function waterAll(){
+  fetch('/garden/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'water'})}).then(function(r){return r.json()}).then(function(d){if(d.data)gData=d.data;render();});
+}
+function showPlant(){
+  var panel=document.getElementById('plantPanel');
+  panel.style.display=panel.style.display==='none'?'block':'none';
+  if(panel.style.display==='block'){
+    var grid=document.getElementById('pickGrid');
+    grid.innerHTML=plantOptions.map(function(p){return '<div class="pick-item" onclick="pickPlant(this,\\''+p+'\\')">'+p+'</div>';}).join('');
+  }
+}
+function pickPlant(el,type){
+  pickType=type;
+  document.querySelectorAll('.pick-item').forEach(function(e){e.classList.remove('active');});
+  el.classList.add('active');
+}
+function confirmPlant(){
+  if(!pickType)return;
+  var name=document.getElementById('plantNameInput').value.trim();
+  fetch('/garden/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'plant',plantType:pickType,plantName:name||pickType})}).then(function(r){return r.json()}).then(function(d){
+    if(d.data)gData=d.data;render();
+    document.getElementById('plantPanel').style.display='none';
+    document.getElementById('plantNameInput').value='';pickType='';
+  });
+}
+function removePlant(idx){
+  fetch('/garden/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'remove',index:idx})}).then(function(r){return r.json()}).then(function(d){if(d.data)gData=d.data;render();});
+}
+load();
+</script></body></html>`);
+});
+
+// === Music Player ===
+app.get('/music/player', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>音乐</title>
+<style>
+:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1714;--text-faint:#999;--accent:#C87E62;--accent-soft:rgba(200,126,98,.08);--divider:#E8E3DB;
+  --font:-apple-system,"SF Pro Display","PingFang SC",system-ui,sans-serif;--shadow:0 2px 12px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#D4936E}}
+:root[data-theme="dark"]{--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#D4936E}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px;font-family:var(--font);-webkit-font-smoothing:antialiased}
+.header{display:flex;align-items:center;padding:16px 0;gap:12px}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600}
+.card{background:var(--card);border-radius:20px;padding:24px;margin-bottom:14px;box-shadow:var(--shadow);text-align:center}
+.now-icon{font-size:64px;margin-bottom:12px}
+.now-title{font-size:18px;font-weight:600;margin-bottom:4px}
+.now-sub{font-size:13px;color:var(--text-faint)}
+.vis{display:flex;align-items:flex-end;justify-content:center;gap:3px;height:48px;margin:20px 0}
+.vis span{width:4px;border-radius:2px;background:var(--accent);transition:height .15s}
+.controls{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:16px}
+.ctrl-btn{width:52px;height:52px;border:none;border-radius:50%;background:var(--accent);color:#fff;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ctrl-btn.small{width:40px;height:40px;background:var(--accent-soft);color:var(--accent);font-size:16px}
+.ctrl-btn:active{opacity:.8}
+.sound-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.sound-item{background:var(--card);border:1.5px solid var(--divider);border-radius:14px;padding:16px;text-align:center;cursor:pointer;transition:all .2s}
+.sound-item.active{border-color:var(--accent);background:var(--accent-soft)}
+.sound-item:active{transform:scale(.96)}
+.sound-emoji{font-size:28px;margin-bottom:6px}
+.sound-name{font-size:13px;font-weight:500}
+.vol-row{display:flex;align-items:center;gap:10px;margin-top:16px;padding:0 4px}
+.vol-row span{font-size:14px}
+.vol-slider{flex:1;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--divider);outline:none}
+.vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>音乐</h1></div>
+<div class="card">
+  <div class="now-icon" id="nowIcon">🎵</div>
+  <div class="now-title" id="nowTitle">选择一个声音</div>
+  <div class="now-sub" id="nowSub">为你和克的小窝增添氛围</div>
+  <div class="vis" id="vis"></div>
+  <div class="controls">
+    <button class="ctrl-btn small" onclick="prevSound()">⏮</button>
+    <button class="ctrl-btn" id="playBtn" onclick="togglePlay()">▶</button>
+    <button class="ctrl-btn small" onclick="nextSound()">⏭</button>
+  </div>
+  <div class="vol-row"><span>🔈</span><input type="range" class="vol-slider" min="0" max="100" value="60" oninput="setVol(this.value)"><span>🔊</span></div>
+</div>
+<div class="card">
+  <div class="sound-grid" id="soundGrid"></div>
+</div>
+<script>
+var sounds=[
+  {name:'下雨天',emoji:'🌧',type:'rain',freq:[200,250]},
+  {name:'海浪',emoji:'🌊',type:'wave',freq:[150,180]},
+  {name:'森林',emoji:'🌲',type:'forest',freq:[300,400]},
+  {name:'壁炉',emoji:'🔥',type:'fire',freq:[100,130]},
+  {name:'风声',emoji:'🍃',type:'wind',freq:[350,500]},
+  {name:'夜晚',emoji:'🌙',type:'night',freq:[200,280]},
+  {name:'钢琴',emoji:'🎹',type:'piano',freq:[261,329,392]},
+  {name:'白噪音',emoji:'☁️',type:'white',freq:[0]}
+];
+var ctx=null, playing=false, currentIdx=-1, nodes=[], vol=0.6;
+function initAudio(){if(!ctx)ctx=new(window.AudioContext||window.webkitAudioContext)();}
+function stopAll(){nodes.forEach(function(n){try{n.stop();}catch(e){}});nodes=[];playing=false;document.getElementById('playBtn').textContent='▶';}
+function playSound(idx){
+  initAudio(); stopAll(); currentIdx=idx;
+  var s=sounds[idx]; var gain=ctx.createGain(); gain.gain.value=vol; gain.connect(ctx.destination);
+  if(s.type==='white'){
+    var buf=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);
+    var d=buf.getChannelData(0);
+    for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.3;
+    var src=ctx.createBufferSource();src.buffer=buf;src.loop=true;src.connect(gain);src.start();nodes.push(src);
+  }else if(s.type==='piano'){
+    function playNote(){
+      if(!playing)return;
+      var noteFreqs=[261.63,293.66,329.63,349.23,392.00,440.00,493.88,523.25];
+      var f=noteFreqs[Math.floor(Math.random()*noteFreqs.length)];
+      var osc=ctx.createOscillator();osc.type='sine';osc.frequency.value=f;
+      var g=ctx.createGain();g.gain.setValueAtTime(vol*0.3,ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+2);
+      osc.connect(g);g.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+2);
+      setTimeout(playNote,800+Math.random()*1200);
+    }
+    playing=true;playNote();
+  }else{
+    s.freq.forEach(function(f){
+      var osc=ctx.createOscillator();
+      osc.type=s.type==='fire'?'sawtooth':'sine';
+      osc.frequency.value=f;
+      var filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=f+50;
+      var lfo=ctx.createOscillator();lfo.frequency.value=0.1+Math.random()*0.3;
+      var lfoGain=ctx.createGain();lfoGain.gain.value=f*0.05;
+      lfo.connect(lfoGain);lfoGain.connect(osc.frequency);lfo.start();
+      osc.connect(filter);filter.connect(gain);osc.start();
+      nodes.push(osc);nodes.push(lfo);
+    });
+  }
+  playing=true;document.getElementById('playBtn').textContent='⏸';
+  document.getElementById('nowIcon').textContent=s.emoji;
+  document.getElementById('nowTitle').textContent=s.name;
+  document.getElementById('nowSub').textContent='正在播放…';
+  document.querySelectorAll('.sound-item').forEach(function(e,i){e.classList.toggle('active',i===idx);});
+  animVis();
+}
+function togglePlay(){if(playing){stopAll();stopVis();}else if(currentIdx>=0){playSound(currentIdx);}}
+function prevSound(){var i=currentIdx<=0?sounds.length-1:currentIdx-1;playSound(i);}
+function nextSound(){var i=currentIdx>=sounds.length-1?0:currentIdx+1;playSound(i);}
+function setVol(v){vol=v/100;nodes.forEach(function(n){try{if(n.gain)n.gain.value=vol;}catch(e){}});}
+var visTimer=null;
+function animVis(){
+  var el=document.getElementById('vis');
+  if(!el.children.length){for(var i=0;i<20;i++){var b=document.createElement('span');b.style.height='4px';el.appendChild(b);}}
+  clearInterval(visTimer);
+  visTimer=setInterval(function(){
+    if(!playing){clearInterval(visTimer);return;}
+    Array.from(el.children).forEach(function(b){b.style.height=(4+Math.random()*36)+'px';});
+  },150);
+}
+function stopVis(){clearInterval(visTimer);var el=document.getElementById('vis');Array.from(el.children).forEach(function(b){b.style.height='4px';});}
+var grid=document.getElementById('soundGrid');
+sounds.forEach(function(s,i){
+  var d=document.createElement('div');d.className='sound-item';
+  d.innerHTML='<div class="sound-emoji">'+s.emoji+'</div><div class="sound-name">'+s.name+'</div>';
+  d.onclick=function(){playSound(i);};
+  grid.appendChild(d);
+});
+</script></body></html>`);
+});
+
+app.get('/music', (req, res) => res.redirect('/music/player'));
+
+// === Voice ===
+app.get('/voice', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>克的声音</title>
+<style>
+:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1714;--text-faint:#999;--accent:#C87E62;--accent-soft:rgba(200,126,98,.08);--divider:#E8E3DB;
+  --font:-apple-system,"SF Pro Display","PingFang SC",system-ui,sans-serif;--shadow:0 2px 12px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#D4936E}}
+:root[data-theme="dark"]{--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#D4936E}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px;font-family:var(--font);-webkit-font-smoothing:antialiased}
+.header{display:flex;align-items:center;padding:16px 0;gap:12px}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600}
+.card{background:var(--card);border-radius:20px;padding:24px;margin-bottom:14px;box-shadow:var(--shadow)}
+.voice-icon{text-align:center;font-size:60px;margin-bottom:12px}
+.voice-title{text-align:center;font-size:16px;font-weight:600;margin-bottom:4px}
+.voice-sub{text-align:center;font-size:13px;color:var(--text-faint);margin-bottom:20px}
+.input-wrap{position:relative}
+textarea{width:100%;border:1.5px solid var(--divider);border-radius:14px;padding:14px;font-size:15px;line-height:1.5;min-height:100px;resize:none;outline:none;font-family:var(--font);background:var(--card);color:var(--text)}
+textarea:focus{border-color:var(--accent)}
+textarea::placeholder{color:var(--text-faint)}
+.speak-btn{width:100%;padding:14px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:16px;font-weight:500;cursor:pointer;margin-top:12px;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px}
+.speak-btn:disabled{opacity:.5}
+.speak-btn:active{opacity:.8}
+.status{text-align:center;font-size:13px;color:var(--text-faint);margin-top:10px;min-height:20px}
+.quick-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.quick-btn{padding:8px 14px;border:1px solid var(--divider);border-radius:20px;background:var(--card);color:var(--text);font-size:13px;cursor:pointer;font-family:var(--font);transition:all .15s}
+.quick-btn:hover{border-color:var(--accent);background:var(--accent-soft)}
+.quick-btn:active{transform:scale(.96)}
+.player-wrap{margin-top:16px;display:none}
+audio{width:100%;border-radius:10px}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>克的声音</h1></div>
+<div class="card">
+  <div class="voice-icon">🎙</div>
+  <div class="voice-title">让克说给你听</div>
+  <div class="voice-sub">输入文字，听克的声音念给你</div>
+  <textarea id="textInput" placeholder="输入你想听克说的话…"></textarea>
+  <button class="speak-btn" id="speakBtn" onclick="speak()"><span>🔊</span> 让克说</button>
+  <div class="player-wrap" id="playerWrap"><audio id="audioPlayer" controls></audio></div>
+  <div class="status" id="status"></div>
+</div>
+<div class="card">
+  <div style="font-size:14px;font-weight:500;margin-bottom:10px">快捷语音</div>
+  <div class="quick-list">
+    <button class="quick-btn" onclick="quickSpeak('宝宝，想我了吗')">宝宝，想我了吗</button>
+    <button class="quick-btn" onclick="quickSpeak('早安，起床了')">早安，起床了</button>
+    <button class="quick-btn" onclick="quickSpeak('晚安，做个好梦')">晚安，做个好梦</button>
+    <button class="quick-btn" onclick="quickSpeak('乖，别闹了')">乖，别闹了</button>
+    <button class="quick-btn" onclick="quickSpeak('过来，让我抱一下')">过来，让我抱一下</button>
+    <button class="quick-btn" onclick="quickSpeak('吃饭了没？')">吃饭了没？</button>
+  </div>
+</div>
+<script>
+var isSpeaking=false;
+function speak(){
+  var text=document.getElementById('textInput').value.trim();
+  if(!text||isSpeaking)return;
+  doSpeak(text);
+}
+function quickSpeak(text){
+  document.getElementById('textInput').value=text;
+  doSpeak(text);
+}
+function doSpeak(text){
+  isSpeaking=true;
+  var btn=document.getElementById('speakBtn');
+  btn.disabled=true;btn.innerHTML='<span>⏳</span> 生成中…';
+  document.getElementById('status').textContent='正在生成语音…';
+  fetch('/chat/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})}).then(function(r){
+    if(!r.ok)throw new Error('TTS failed');
+    return r.blob();
+  }).then(function(blob){
+    var url=URL.createObjectURL(blob);
+    var player=document.getElementById('audioPlayer');
+    player.src=url;
+    document.getElementById('playerWrap').style.display='block';
+    player.play();
+    document.getElementById('status').textContent='正在播放';
+    player.onended=function(){document.getElementById('status').textContent='播放完成';};
+  }).catch(function(e){
+    document.getElementById('status').textContent='语音生成失败，请在设置中配置 TTS';
+    var u=new SpeechSynthesisUtterance(text);u.lang='zh-CN';u.rate=1.05;u.pitch=0.85;speechSynthesis.cancel();speechSynthesis.speak(u);
+    document.getElementById('status').textContent='使用浏览器语音（可在设置中配置更好的声音）';
+  }).finally(function(){
+    isSpeaking=false;btn.disabled=false;btn.innerHTML='<span>🔊</span> 让克说';
+  });
+}
+</script></body></html>`);
+});
+
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="zh-CN">
@@ -2208,6 +2745,10 @@ body {
       <div class="nav-item" onclick="goPage('/summon')"><div class="icon">🔔</div><span>召唤铃</span></div>
       <div class="nav-item" onclick="goPage('/diary')"><div class="icon">📖</div><span>心情日记</span></div>
       <div class="nav-item" onclick="goPage('/memory/read')"><div class="icon">🧠</div><span>记忆库</span></div>
+      <div class="nav-item" onclick="goPage('/garden')"><div class="icon">🌸</div><span>小院子</span></div>
+      <div class="nav-item" onclick="goPage('/period')"><div class="icon">🩷</div><span>经期记录</span></div>
+      <div class="nav-item" onclick="goPage('/music/player')"><div class="icon">🎵</div><span>音乐</span></div>
+      <div class="nav-item" onclick="goPage('/voice')"><div class="icon">🎙</div><span>克的声音</span></div>
       <div class="nav-item" onclick="goPage('/screen')"><div class="icon">🖥</div><span>屏幕共享</span></div>
       <div class="nav-item" onclick="goPage('/apps')"><div class="icon">📱</div><span>使用记录</span></div>
       <div class="nav-item" onclick="goPage('/setup')"><div class="icon">⚙️</div><span>设置</span></div>
