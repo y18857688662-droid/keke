@@ -2126,7 +2126,7 @@ body {
 .sheet-title { text-align: center; font-size: 16px; font-weight: 600; color: var(--text); }
 .sheet-body { overflow-y: auto; padding: 4px 22px 28px; }
 .sheet-text { font-size: 15.5px; line-height: 1.75; color: var(--text); }
-.input-area { padding: 6px 14px 10px; background: var(--bg); flex-shrink: 0; }
+.input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; }
 .input-box {
   background: var(--input-bg); border-radius: 24px;
   border: 1px solid var(--border); overflow: hidden; transition: border-color .2s;
@@ -2165,6 +2165,27 @@ body {
 .messages::-webkit-scrollbar-track { background: transparent; }
 .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 .sidebar::-webkit-scrollbar { width: 0; }
+.header-avatar { cursor: pointer; position: relative; }
+.header-avatar input[type=file] { display: none; }
+.sidebar-ava { cursor: pointer; position: relative; }
+.sidebar-ava input[type=file] { display: none; }
+.attach-menu {
+  position: absolute; bottom: 100%; left: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 6px 0; min-width: 160px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.1);
+  z-index: 50; display: none; flex-direction: column;
+}
+.attach-menu.show { display: flex; }
+.attach-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; font-size: 14px; color: var(--text);
+  cursor: pointer; transition: background .12s; border: none; background: none;
+  font-family: var(--font); text-align: left;
+}
+.attach-item:hover { background: var(--accent-soft); }
+.attach-item .ai { font-size: 16px; width: 22px; text-align: center; }
+.sheet { min-height: 40%; }
 @media (prefers-reduced-motion: reduce) { * { transition-duration: 0s !important; } }
 </style>
 </head>
@@ -2174,8 +2195,8 @@ body {
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-avatars">
-        <div class="sidebar-ava"><svg viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="26" fill="#E8D5F0"/><path d="M26 14c-4 0-7 3-8 6s0 8 3 11c-4 1-7 4-8 7h26c-1-3-4-6-8-7 3-3 4-7 3-11s-4-6-8-6z" fill="#B08CC2" opacity=".5"/></svg></div>
-        <div class="sidebar-ava"><svg viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="26" fill="#F0EBE4"/><path d="M26 14c-4 0-7 3-8 6s0 8 3 11c-4 1-7 4-8 7h26c-1-3-4-6-8-7 3-3 4-7 3-11s-4-6-8-6z" fill="#C87E62" opacity=".55"/></svg></div>
+        <div class="sidebar-ava" onclick="document.getElementById('avaYao').click()"><img id="avaYaoImg" style="width:100%;height:100%;object-fit:cover;display:none"><svg id="avaYaoSvg" viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="26" fill="#E8D5F0"/><path d="M26 14c-4 0-7 3-8 6s0 8 3 11c-4 1-7 4-8 7h26c-1-3-4-6-8-7 3-3 4-7 3-11s-4-6-8-6z" fill="#B08CC2" opacity=".5"/></svg><input type="file" id="avaYao" accept="image/*" onchange="setAvatar(this,'avaYaoImg','avaYaoSvg','yao')"></div>
+        <div class="sidebar-ava" onclick="document.getElementById('avaKe').click()"><img id="avaKeImg" style="width:100%;height:100%;object-fit:cover;display:none"><svg id="avaKeSvg" viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="26" fill="#F0EBE4"/><path d="M26 14c-4 0-7 3-8 6s0 8 3 11c-4 1-7 4-8 7h26c-1-3-4-6-8-7 3-3 4-7 3-11s-4-6-8-6z" fill="#C87E62" opacity=".55"/></svg><input type="file" id="avaKe" accept="image/*" onchange="setAvatar(this,'avaKeImg','avaKeSvg','ke')"></div>
       </div>
       <div class="sidebar-couple">克 & 瑶瑶</div>
       <div class="sidebar-together">在 一 起</div>
@@ -2183,16 +2204,16 @@ body {
       <div class="sidebar-since" id="sinceDate"></div>
     </div>
     <div class="sidebar-nav">
-      <div class="nav-item active" onclick="switchPage(this)"><div class="icon">💬</div><span>聊天</span></div>
-      <div class="nav-item" onclick="switchPage(this)"><div class="icon">🔔</div><span>召唤铃</span></div>
-      <div class="nav-item" onclick="switchPage(this)"><div class="icon">🎵</div><span>音乐</span></div>
-      <div class="nav-item" onclick="switchPage(this)"><div class="icon">🖼</div><span>相册</span></div>
-      <div class="nav-item" onclick="switchPage(this)"><div class="icon">📖</div><span>心情日记</span></div>
-      <div class="nav-item" onclick="switchPage(this)"><div class="icon">🌿</div><span>小院子</span></div>
-      <div class="nav-item" onclick="switchPage(this)"><div class="icon">🌙</div><span>经期</span></div>
-      <div class="nav-item" onclick="switchPage(this)"><div class="icon">🧠</div><span>记忆库</span></div>
-      <div class="nav-item" onclick="switchPage(this)"><div class="icon">📱</div><span>使用记录</span></div>
-      <div class="nav-item" onclick="switchPage(this)"><div class="icon">⚙️</div><span>设置</span></div>
+      <div class="nav-item active" onclick="goPage('/')"><div class="icon">💬</div><span>聊天</span></div>
+      <div class="nav-item" onclick="goPage('/summon')"><div class="icon">🔔</div><span>召唤铃</span></div>
+      <div class="nav-item" onclick="goPage('/music')"><div class="icon">🎵</div><span>音乐</span></div>
+      <div class="nav-item" onclick="goPage('/album')"><div class="icon">🖼</div><span>相册</span></div>
+      <div class="nav-item" onclick="goPage('/diary')"><div class="icon">📖</div><span>心情日记</span></div>
+      <div class="nav-item" onclick="goPage('/garden')"><div class="icon">🌿</div><span>小院子</span></div>
+      <div class="nav-item" onclick="goPage('/period')"><div class="icon">🌙</div><span>经期</span></div>
+      <div class="nav-item" onclick="goPage('/memory')"><div class="icon">🧠</div><span>记忆库</span></div>
+      <div class="nav-item" onclick="goPage('/apps')"><div class="icon">📱</div><span>使用记录</span></div>
+      <div class="nav-item" onclick="goPage('/setup')"><div class="icon">⚙️</div><span>设置</span></div>
     </div>
     <div class="sidebar-footer">克和瑶瑶的小窝</div>
   </div>
@@ -2207,7 +2228,7 @@ body {
         <div class="header-name">克</div>
         <div class="header-status"><span class="status-dot"></span>在线</div>
       </div>
-      <div class="header-avatar"><svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#F0EBE4"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#C87E62" opacity=".6"/></svg></div>
+      <div class="header-avatar" onclick="document.getElementById('avaKeH').click()"><img id="avaKeHImg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:none"><svg id="avaKeHSvg" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#F0EBE4"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#C87E62" opacity=".6"/></svg><input type="file" id="avaKeH" accept="image/*" onchange="setAvatar(this,'avaKeHImg','avaKeHSvg','ke')"></div>
     </div>
     <div class="messages" id="messages">
       <div class="msg-time">7/19 22:34</div>
@@ -2280,11 +2301,18 @@ body {
         </div>
       </div>
     </div>
-    <div class="input-area">
+    <div class="input-area" style="position:relative">
+      <div class="attach-menu" id="attachMenu">
+        <button class="attach-item" onclick="document.getElementById('photoInput').click();toggleAttach()"><span class="ai">📷</span>发照片</button>
+        <button class="attach-item" onclick="toggleAttach();fetch('/memory/read')"><span class="ai">🧠</span>同步记忆库</button>
+        <button class="attach-item" onclick="toggleAttach();window.open('/call','_blank')"><span class="ai">📞</span>语音通话</button>
+        <button class="attach-item" onclick="toggleAttach();window.open('/screen','_blank')"><span class="ai">🖥</span>屏幕共享</button>
+        <input type="file" id="photoInput" accept="image/*" style="display:none">
+      </div>
       <div class="input-box">
         <div class="input-field-wrap"><textarea class="input-field" rows="1" placeholder="Message..." oninput="autoResize(this)"></textarea></div>
         <div class="input-toolbar">
-          <button class="tb-btn" aria-label="附件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="tb-btn" onclick="toggleAttach()" aria-label="附件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
           <div class="model-tag">Opus 4.6</div>
           <div class="tb-spacer"></div>
           <button class="tb-btn" aria-label="麦克风"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v1a7 7 0 01-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg></button>
@@ -2315,10 +2343,45 @@ function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('overlay').classList.toggle('show');
 }
-function switchPage(el) {
-  document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});
-  el.classList.add('active'); toggleSidebar();
+function goPage(url) {
+  toggleSidebar();
+  if (url !== '/') window.location.href = url;
 }
+function toggleAttach() {
+  document.getElementById('attachMenu').classList.toggle('show');
+}
+function setAvatar(input, imgId, svgId, who) {
+  var file = input.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = document.getElementById(imgId);
+    var svg = document.getElementById(svgId);
+    img.src = e.target.result; img.style.display = 'block'; svg.style.display = 'none';
+    localStorage.setItem('avatar_' + who, e.target.result);
+    syncAvatars(who);
+  };
+  reader.readAsDataURL(file);
+}
+function syncAvatars(who) {
+  var data = localStorage.getItem('avatar_' + who); if (!data) return;
+  if (who === 'ke') {
+    ['avaKeImg','avaKeHImg'].forEach(function(id) {
+      var el = document.getElementById(id); if (el) { el.src = data; el.style.display = 'block'; }
+    });
+    ['avaKeSvg','avaKeHSvg'].forEach(function(id) {
+      var el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+  }
+  if (who === 'yao') {
+    var el = document.getElementById('avaYaoImg'); if (el) { el.src = data; el.style.display = 'block'; }
+    var sv = document.getElementById('avaYaoSvg'); if (sv) sv.style.display = 'none';
+  }
+}
+syncAvatars('ke'); syncAvatars('yao');
+document.addEventListener('click', function(e) {
+  var menu = document.getElementById('attachMenu');
+  if (menu.classList.contains('show') && !menu.contains(e.target) && !e.target.closest('.tb-btn')) menu.classList.remove('show');
+});
 function openThinking(idx) {
   document.getElementById('sheetText').innerHTML = thinkingData[idx].replace(/\\n/g, '<br>');
   sheet.style.height = '';
