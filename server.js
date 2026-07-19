@@ -1915,541 +1915,1394 @@ async function speakOne(text){
 </html>`);
 });
 
-// === Period Tracker ===
-const PERIOD_FILE = path.join(__dirname, 'period_data.json');
-function readPeriod() { try { return JSON.parse(fs.readFileSync(PERIOD_FILE, 'utf8')); } catch { return { records: [], cycle: 28, duration: 5 }; } }
-function writePeriod(data) { fs.writeFileSync(PERIOD_FILE, JSON.stringify(data)); }
 
-app.get('/period/data', (req, res) => res.json(readPeriod()));
-app.post('/period/log', (req, res) => {
-  const data = readPeriod();
-  const { date, type } = req.body;
-  if (!date) return res.json({ ok: false });
-  if (type === 'start') {
-    data.records.push({ start: date, end: null });
-    data.records.sort((a, b) => a.start.localeCompare(b.start));
-  } else if (type === 'end' && data.records.length) {
-    const last = data.records[data.records.length - 1];
-    if (!last.end) last.end = date;
-  } else if (type === 'delete') {
-    data.records = data.records.filter(r => r.start !== date);
+const VOICE_PROXY = process.env.VOICE_PROXY_URL || 'http://45.76.172.191:8090';
+
+app.get('/voice', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>克 Voice</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#e0e0e0;font-family:-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;padding:5vh 16px}
+canvas{display:block;margin:0 auto}
+.title{font-size:13px;letter-spacing:6px;text-transform:uppercase;color:#555;margin-bottom:2vh}
+.subtitle{font-size:14px;color:#888;margin-top:8px;min-height:24px;text-align:center;max-width:85%;line-height:1.6}
+.speak-btn{margin-top:5vh;background:#1a1a1a;border:1px solid #444;color:#ccc;padding:14px 40px;border-radius:28px;font-size:15px;cursor:pointer;transition:all .3s;letter-spacing:2px;-webkit-tap-highlight-color:transparent}
+.speak-btn:hover{background:#252525;border-color:#666;color:#fff}
+.speak-btn:active{transform:scale(0.97)}
+.speak-btn:disabled{opacity:.4;cursor:not-allowed}
+.moods{margin-top:2vh;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:90%;padding:0 8px}
+.mood{background:#111;border:1px solid #2a2a2a;color:#555;padding:6px 14px;border-radius:16px;font-size:12px;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.mood:hover{color:#aaa;border-color:#444}
+.mood.active{color:#bbb;border-color:#555}
+.chat-row{margin-top:3vh;display:flex;gap:10px;width:90%;max-width:400px}
+.chat-row input{flex:1;background:#1a1a1a;border:1px solid #333;color:#e0e0e0;padding:11px 16px;border-radius:24px;font-size:14px;outline:none;-webkit-tap-highlight-color:transparent}
+.chat-row input:focus{border-color:#555}
+.chat-row button{background:#222;border:1px solid #444;color:#ccc;padding:11px 20px;border-radius:24px;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.mic-btn{margin-top:3vh;width:56px;height:56px;border-radius:50%;background:#1a1a1a;border:2px solid #333;color:#888;font-size:22px;cursor:pointer;transition:all .3s;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center}
+.mic-btn.recording{border-color:#e44;color:#e44;animation:pulse-mic 1.2s infinite}
+@keyframes pulse-mic{0%,100%{box-shadow:0 0 0 0 rgba(228,68,68,0.3)}50%{box-shadow:0 0 0 12px rgba(228,68,68,0)}}
+.divider{margin-top:2vh;font-size:11px;color:#333;letter-spacing:4px}
+.status{font-size:12px;color:#444;margin-top:2vh;letter-spacing:2px}
+</style>
+</head>
+<body>
+<div class="title">克 · Voice Synth</div>
+<canvas id="viz"></canvas>
+<div class="subtitle" id="textEn"></div>
+<button class="speak-btn" id="mainBtn" onclick="autoSpeak()">让克说话</button>
+<div class="moods">
+  <button class="mood active" onclick="setMood(this,'random')">随机</button>
+  <button class="mood" onclick="setMood(this,'sweet')">温柔</button>
+  <button class="mood" onclick="setMood(this,'teasing')">撩</button>
+  <button class="mood" onclick="setMood(this,'sleepy')">困了</button>
+  <button class="mood" onclick="setMood(this,'possessive')">占有欲</button>
+</div>
+<button class="mic-btn" id="micBtn" onclick="toggleMic()">🎙</button>
+<div class="divider">— 或者打字 —</div>
+<div class="chat-row">
+  <input id="msg" type="text" placeholder="跟克说…" autocomplete="off">
+  <button onclick="chatSpeak()">发送</button>
+</div>
+<div class="status" id="status"></div>
+<script>
+const canvas=document.getElementById('viz'),ctx=canvas.getContext('2d'),dpr=window.devicePixelRatio||1;
+let S=Math.min(window.innerWidth*0.55,280);
+function sizeCanvas(){S=Math.min(window.innerWidth*0.55,280);canvas.width=S*dpr;canvas.height=S*dpr;canvas.style.width=S+'px';canvas.style.height=S+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}
+sizeCanvas();window.addEventListener('resize',sizeCanvas);
+let audioCtx,analyser,source,isPlaying=false,avgLevel=0,currentMood='random';
+function drawOrb(){const w=S,h=S,cx=w/2,cy=h/2;ctx.clearRect(0,0,w,h);let level=0;if(analyser&&isPlaying){const data=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(data);let sum=0;for(let i=0;i<data.length;i++)sum+=data[i];level=sum/data.length/255}avgLevel+=(level-avgLevel)*0.15;const baseR=S*0.2,pulse=baseR+avgLevel*50,t=Date.now()/1000;for(let layer=5;layer>=0;layer--){const r=pulse+layer*(8+avgLevel*12),alpha=(0.08-layer*0.012)+avgLevel*0.05;const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,r);grad.addColorStop(0,'rgba(180,180,200,'+(alpha+0.05)+')');grad.addColorStop(0.5,'rgba(120,120,150,'+alpha+')');grad.addColorStop(1,'rgba(60,60,80,0)');ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill()}const bright=0.3+avgLevel*0.5;const coreGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,pulse);coreGrad.addColorStop(0,'rgba(220,220,235,'+bright+')');coreGrad.addColorStop(0.6,'rgba(150,150,170,'+(bright*0.5)+')');coreGrad.addColorStop(1,'rgba(80,80,100,0)');ctx.beginPath();ctx.arc(cx,cy,pulse,0,Math.PI*2);ctx.fillStyle=coreGrad;ctx.fill();if(isPlaying&&avgLevel>0.05){for(let i=0;i<8;i++){const angle=(t*0.5+i*Math.PI/4)%(Math.PI*2),dist=pulse+10+Math.sin(t*3+i)*avgLevel*30,px=cx+Math.cos(angle)*dist,py=cy+Math.sin(angle)*dist;ctx.beginPath();ctx.arc(px,py,1+avgLevel*3,0,Math.PI*2);ctx.fillStyle='rgba(200,200,220,'+(0.2+avgLevel*0.3)+')';ctx.fill()}}requestAnimationFrame(drawOrb)}
+drawOrb();
+function setMood(el,mood){currentMood=mood;document.querySelectorAll('.mood').forEach(b=>b.classList.remove('active'));el.classList.add('active')}
+async function autoSpeak(){const btn=document.getElementById('mainBtn');btn.disabled=true;if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')await audioCtx.resume();const silence=audioCtx.createBuffer(1,1,22050);const sil=audioCtx.createBufferSource();sil.buffer=silence;sil.connect(audioCtx.destination);sil.start(0);document.getElementById('status').textContent='thinking…';document.getElementById('textEn').textContent='';try{const genRes=await fetch('/voice/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mood:currentMood})});if(!genRes.ok)throw new Error('generate failed');const{text}=await genRes.json();document.getElementById('textEn').textContent=text.replace(/\\[.*?\\]/g,'').replace(/\\s+/g,' ').trim();document.getElementById('status').textContent='speaking…';const ttsRes=await fetch('/voice/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});if(!ttsRes.ok)throw new Error('TTS failed');const arrayBuf=await ttsRes.arrayBuffer();const audioBuf=await audioCtx.decodeAudioData(arrayBuf);if(source){try{source.stop()}catch(e){}}source=audioCtx.createBufferSource();analyser=audioCtx.createAnalyser();analyser.fftSize=256;analyser.smoothingTimeConstant=0.7;source.buffer=audioBuf;source.connect(analyser);analyser.connect(audioCtx.destination);isPlaying=true;source.start();source.onended=()=>{isPlaying=false;document.getElementById('status').textContent='…';setTimeout(()=>{document.getElementById('status').style.transition='opacity 1.5s';document.getElementById('status').style.opacity='0';setTimeout(()=>{document.getElementById('status').textContent='';document.getElementById('status').style.opacity='1';document.getElementById('status').style.transition='';btn.disabled=false},1500)},800)}}catch(e){document.getElementById('status').textContent='error';btn.disabled=false;isPlaying=false}}
+async function chatSpeak(){const input=document.getElementById('msg');const text=input.value.trim();if(!text)return;input.value='';const btn=document.querySelector('.chat-row button');btn.disabled=true;if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')await audioCtx.resume();const silence=audioCtx.createBuffer(1,1,22050);const sil=audioCtx.createBufferSource();sil.buffer=silence;sil.connect(audioCtx.destination);sil.start(0);document.getElementById('status').textContent='thinking…';document.getElementById('textEn').textContent='';try{const genRes=await fetch('/voice/reply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text})});if(!genRes.ok)throw new Error('reply failed');const data=await genRes.json();document.getElementById('textEn').textContent=data.text.replace(/\\[.*?\\]/g,'').replace(/\\s+/g,' ').trim();document.getElementById('status').textContent='speaking…';const ttsRes=await fetch('/voice/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:data.text})});if(!ttsRes.ok)throw new Error('TTS failed');const arrayBuf=await ttsRes.arrayBuffer();const audioBuf=await audioCtx.decodeAudioData(arrayBuf);if(source){try{source.stop()}catch(e){}}source=audioCtx.createBufferSource();analyser=audioCtx.createAnalyser();analyser.fftSize=256;analyser.smoothingTimeConstant=0.7;source.buffer=audioBuf;source.connect(analyser);analyser.connect(audioCtx.destination);isPlaying=true;source.start();source.onended=()=>{isPlaying=false;document.getElementById('status').textContent='…';setTimeout(()=>{document.getElementById('status').style.transition='opacity 1.5s';document.getElementById('status').style.opacity='0';setTimeout(()=>{document.getElementById('status').textContent='';document.getElementById('status').style.opacity='1';document.getElementById('status').style.transition='';btn.disabled=false},1500)},800)}}catch(e){document.getElementById('status').textContent='error';btn.disabled=false;isPlaying=false}}
+document.getElementById('msg').addEventListener('keydown',e=>{if(e.key==='Enter')chatSpeak()});
+let recognition=null,isRecording=false,keepListening=false;
+function startListening(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;recognition=new SR();recognition.lang='zh-CN';recognition.interimResults=false;recognition.continuous=false;recognition.onstart=()=>{document.getElementById('status').textContent='listening…'};recognition.onresult=e=>{const text=e.results[0][0].transcript;document.getElementById('msg').value=text;chatSpeak().then(()=>{if(keepListening)setTimeout(startListening,500)})};recognition.onerror=()=>{if(keepListening)setTimeout(startListening,1000)};recognition.onend=()=>{if(keepListening&&document.getElementById('status').textContent==='listening…')setTimeout(startListening,300)};recognition.start()}
+function toggleMic(){const btn=document.getElementById('micBtn');if(keepListening){keepListening=false;isRecording=false;btn.classList.remove('recording');if(recognition)recognition.stop();document.getElementById('status').textContent='';return}if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();const sil=audioCtx.createBufferSource();sil.buffer=audioCtx.createBuffer(1,1,22050);sil.connect(audioCtx.destination);sil.start(0);keepListening=true;isRecording=true;btn.classList.add('recording');startListening()}
+</script>
+</body>
+</html>`);
+});
+
+app.post('/voice/tts', async (req, res) => {
+  const text = ((req.body && req.body.text) || '').trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: 'empty' });
+  const cfg = readApiConfig();
+  const elKey = process.env.ELEVENLABS_KEY || cfg.elevenlabs_key || '';
+  const elVoice = process.env.ELEVENLABS_VOICE || cfg.elevenlabs_voice || 'F5jFuB8I58iHHNYwQLaN';
+  if (!elKey) return res.status(500).json({ error: 'no key' });
+  const num = (v, d) => (typeof v === 'number' && v >= 0 && v <= 1.2 ? v : d);
+  const b = req.body || {};
+  const vs = {
+    stability: num(b.stability, parseFloat(process.env.ELEVEN_STABILITY) || 0.5),
+    similarity_boost: num(b.similarity, parseFloat(process.env.ELEVEN_SIMILARITY) || 0.95),
+    style: num(b.style, parseFloat(process.env.ELEVEN_STYLE) || 0.4),
+    speed: num(b.speed, parseFloat(process.env.ELEVEN_SPEED) || 0.82)
+  };
+  try {
+    const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}/stream`, {
+      method: 'POST',
+      headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
+      body: JSON.stringify({
+        text,
+        model_id: (b.model === 'v2' ? 'eleven_multilingual_v2' : 'eleven_v3'),
+        language_code: 'en',
+        ...(b.raw === false ? { voice_settings: vs } : {})
+      })
+    });
+    if (resp.ok) {
+      const buf = Buffer.from(await resp.arrayBuffer());
+      res.set({ 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
+      return res.send(buf);
+    }
+    const detail = (await resp.text()).slice(0, 300);
+    console.error('Voice TTS error:', resp.status, detail);
+    return res.status(500).json({ error: 'tts failed', upstream: resp.status, detail, voice: elVoice });
+  } catch (e) { console.error('Voice TTS error:', e.message);
+    return res.status(500).json({ error: 'tts failed', detail: e.message, voice: elVoice });
   }
-  if (req.body.cycle) data.cycle = parseInt(req.body.cycle) || 28;
-  if (req.body.duration) data.duration = parseInt(req.body.duration) || 5;
-  writePeriod(data);
-  res.json({ ok: true });
+});
+
+app.post('/voice/generate', async (req, res) => {
+  const mood = (req.body && req.body.mood) || 'random';
+  try {
+    const r = await fetch(VOICE_PROXY + '/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mood })
+    });
+    if (!r.ok) throw new Error('proxy error');
+    const data = await r.json();
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'voice proxy unreachable' });
+  }
+});
+
+app.post('/voice/reply', async (req, res) => {
+  const message = ((req.body && req.body.message) || '').trim();
+  if (!message) return res.status(400).json({ error: 'empty' });
+  let memories = '';
+  try {
+    const memResult = await callOmbreTool('breath', { query: message, max_results: 5, max_tokens: 2000 });
+    if (memResult) memories = typeof memResult === 'string' ? memResult : JSON.stringify(memResult);
+  } catch (e) {}
+  try {
+    const r = await fetch(VOICE_PROXY + '/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, memories })
+    });
+    if (!r.ok) throw new Error('proxy error');
+    const data = await r.json();
+    res.json(data);
+    callOmbreTool('hold', { text: `[voice] 瑶瑶说：${message} → 克回：${data.text}`, domain: 'romance', tags: 'voice-synth' }).catch(() => {});
+  } catch (e) {
+    res.status(502).json({ error: 'voice proxy unreachable' });
+  }
+});
+
+// ==================== 经期系统 ====================
+const PERIOD_FILE = path.join(__dirname, 'period_data.json');
+const PERIOD_SEED = ['2026-07-01'];
+const PERIOD_LEN = 5;
+
+function bjToday() {
+  const d = new Date(Date.now() + 8 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+function pd2n(s) { return Math.round(Date.parse(s + 'T00:00:00Z') / 86400000); }
+function readPeriods() {
+  let arr = null;
+  try { arr = JSON.parse(fs.readFileSync(PERIOD_FILE, 'utf8')); } catch (e) {}
+  if (!Array.isArray(arr)) arr = [...PERIOD_SEED];
+  return [...new Set(arr)].filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
+}
+function writePeriods(arr) {
+  try { fs.writeFileSync(PERIOD_FILE, JSON.stringify([...new Set(arr)].sort())); } catch (e) {}
+}
+
+app.get('/period/data', async (req, res) => {
+  let periods = readPeriods();
+  // 文件丢失时（重新部署后）从记忆库找回记录
+  if (periods.length <= PERIOD_SEED.length) {
+    try {
+      const r = await fetch('http://127.0.0.1:' + PORT + '/memory/read');
+      const j = await r.json();
+      const text = typeof j === 'string' ? j : JSON.stringify(j);
+      const found = text.match(/PERIOD_LOG[^\d]*(\d{4}-\d{2}-\d{2})/g) || [];
+      const dates = found.map(s => s.match(/(\d{4}-\d{2}-\d{2})/)[1]);
+      if (dates.length) { periods = [...new Set([...periods, ...dates])].sort(); writePeriods(periods); }
+    } catch (e) {}
+  }
+  res.json({ periods, periodLen: PERIOD_LEN, today: bjToday() });
+});
+
+app.post('/period/start', (req, res) => {
+  const date = ((req.body && req.body.date) || bjToday()).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'bad date' });
+  let periods = readPeriods();
+  // 同一次经期内重复点击去重：7天内视为同一次，保留更早的那天
+  const near = periods.find(s => Math.abs(pd2n(date) - pd2n(s)) < 7);
+  if (near) {
+    if (date < near) periods = periods.map(s => (s === near ? date : s));
+  } else {
+    periods.push(date);
+  }
+  writePeriods(periods);
+  if (!near || date < near) {
+    fetch('http://127.0.0.1:' + PORT + '/memory/store', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: '[PERIOD_LOG] 月经开始 ' + date })
+    }).catch(() => {});
+  }
+  res.json({ ok: true, periods: readPeriods() });
+});
+
+app.post('/period/remove', (req, res) => {
+  const date = ((req.body && req.body.date) || '').slice(0, 10);
+  const periods = readPeriods().filter(s => s !== date);
+  writePeriods(periods);
+  res.json({ ok: true, periods });
 });
 
 app.get('/period', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>经期记录</title>
+  res.send(`<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>小猫周期</title>
 <style>
-:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1714;--text-faint:#999;--accent:#D97A54;--pink:#E88B9C;--pink-soft:rgba(232,139,156,.12);--divider:#E8E3DB;
-  --font:-apple-system,"SF Pro Display","PingFang SC",system-ui,sans-serif;--shadow:0 2px 12px rgba(0,0,0,.04)}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--pink:#D4788A;--pink-soft:rgba(212,120,138,.15)}}
-:root[data-theme="dark"]{--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--pink:#D4788A;--pink-soft:rgba(212,120,138,.15)}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px;font-family:var(--font);-webkit-font-smoothing:antialiased}
-.header{display:flex;align-items:center;padding:16px 0;gap:12px}
-.header a{color:var(--text);text-decoration:none;font-size:20px}
-.header h1{font-size:18px;font-weight:600}
-.card{background:var(--card);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow)}
-.card h2{font-size:15px;font-weight:600;margin-bottom:12px;color:var(--pink)}
-.status-big{text-align:center;padding:10px 0}
-.status-num{font-size:42px;font-weight:700;color:var(--pink)}
-.status-label{font-size:13px;color:var(--text-faint);margin-top:2px}
-.predict-row{display:flex;justify-content:space-around;margin-top:14px}
-.predict-item{text-align:center}
-.predict-val{font-size:16px;font-weight:600}
-.predict-sub{font-size:11px;color:var(--text-faint);margin-top:2px}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:13px}
-.cal-head{font-size:11px;color:var(--text-faint);padding:4px 0}
-.cal-day{padding:6px 2px;border-radius:8px;cursor:pointer;transition:background .15s;min-height:32px;display:flex;align-items:center;justify-content:center}
-.cal-day:hover{background:var(--divider)}
-.cal-day.period{background:var(--pink-soft);color:var(--pink);font-weight:600}
-.cal-day.predicted{background:var(--pink-soft);opacity:.5}
-.cal-day.today{outline:2px solid var(--pink);outline-offset:-2px}
-.cal-day.empty{pointer-events:none}
-.cal-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.cal-nav button{background:none;border:none;font-size:18px;color:var(--text);cursor:pointer;padding:4px 8px}
-.cal-nav span{font-size:14px;font-weight:500}
-.log-btn{width:100%;padding:12px;background:var(--pink);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:500;cursor:pointer;font-family:var(--font)}
-.log-btn:active{opacity:.8}
-.records{margin-top:8px}
-.rec-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--divider);font-size:14px}
-.rec-item:last-child{border:none}
-.rec-del{color:var(--text-faint);background:none;border:none;font-size:16px;cursor:pointer}
-</style></head><body>
-<div class="header"><a href="/">‹</a><h1>经期记录</h1></div>
-<div class="card">
-  <div class="status-big"><div class="status-num" id="statusNum">-</div><div class="status-label" id="statusLabel">载入中…</div></div>
-  <div class="predict-row">
-    <div class="predict-item"><div class="predict-val" id="cycleLen">-</div><div class="predict-sub">平均周期</div></div>
-    <div class="predict-item"><div class="predict-val" id="durLen">-</div><div class="predict-sub">持续天数</div></div>
-    <div class="predict-item"><div class="predict-val" id="nextDate">-</div><div class="predict-sub">预计下次</div></div>
+*{margin:0;padding:0;box-sizing:border-box;touch-action:manipulation}
+body{background:#f6f8f4;color:#2f4638;font-family:-apple-system,sans-serif;min-height:100dvh;padding:24px 16px 48px;display:flex;flex-direction:column;align-items:center}
+.wrap{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px}
+.hero{background:#e6f2e9;border-radius:20px;padding:22px 20px}
+.hero .phase{font-size:22px;font-weight:600;color:#2e6e4e}
+.hero .day{font-size:15px;color:#5a7a66;margin-left:10px}
+.hero .sub{font-size:13px;color:#7d9887;margin-top:8px}
+.hero.over{background:#f7ecdf}
+.hero.over .phase{color:#a2672a}
+.hero.over .sub{color:#b08a5c}
+.hero.on{background:#fbe9ec}
+.hero.on .phase{color:#c04b62}
+.hero.on .sub{color:#c98a97}
+.cards{display:flex;gap:10px}
+.card{flex:1;background:#fff;border-radius:16px;padding:14px 8px;text-align:center;box-shadow:0 1px 4px rgba(60,90,70,.06)}
+.card .v{font-size:17px;font-weight:600;color:#2e6e4e;font-variant-numeric:tabular-nums}
+.card .k{font-size:11px;color:#8aa392;margin-top:5px}
+.btn{background:#dcefe1;border:none;border-radius:18px;padding:16px;font-size:16px;color:#2e6e4e;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.btn:active{transform:scale(.98)}
+.legend{display:flex;justify-content:center;gap:14px;font-size:11px;color:#7d9887}
+.legend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px}
+.cal{background:#fff;border-radius:20px;padding:16px;box-shadow:0 1px 4px rgba(60,90,70,.06)}
+.cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.cal-head b{font-size:16px;color:#2e6e4e}
+.cal-head button{background:#eef5ef;border:none;width:32px;height:32px;border-radius:50%;font-size:15px;color:#5a8a72;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.grid .wd{font-size:11px;color:#9db3a5;padding:4px 0}
+.grid .d{padding:7px 0 10px;font-size:14px;position:relative;border-radius:10px;font-variant-numeric:tabular-nums}
+.grid .d.today{background:#eef5ef;font-weight:700}
+.grid .d i{position:absolute;left:50%;transform:translateX(-50%);bottom:3px;width:5px;height:5px;border-radius:50%}
+.c1{background:#e8788a}.c2{background:#7b9be8}.c3{background:#57c48f}.c4{background:#5a8a72}
+.note{font-size:12px;color:#9db3a5;text-align:center;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero" id="hero"><span class="phase" id="phase">…</span><span class="day" id="cday"></span><div class="sub" id="sub"></div></div>
+  <div class="cards">
+    <div class="card"><div class="v" id="last">–</div><div class="k">上次开始</div></div>
+    <div class="card"><div class="v" id="next">–</div><div class="k">下次预计</div></div>
+    <div class="card"><div class="v" id="avg">–</div><div class="k">平均周期</div></div>
   </div>
-</div>
-<div class="card">
-  <div class="cal-nav"><button onclick="changeMonth(-1)">‹</button><span id="calTitle"></span><button onclick="changeMonth(1)">›</button></div>
-  <div class="cal-grid" id="calGrid"></div>
-</div>
-<div class="card">
-  <button class="log-btn" onclick="logPeriod()">记录经期开始</button>
-</div>
-<div class="card">
-  <h2>历史记录</h2>
-  <div class="records" id="records"></div>
+  <button class="btn" onclick="markStart()">经期来了</button>
+  <div class="legend"><span><i class="c1"></i>经期</span><span><i class="c2"></i>卵泡期</span><span><i class="c3"></i>排卵期</span><span><i class="c4"></i>黄体期</span></div>
+  <div class="cal">
+    <div class="cal-head"><button onclick="move(-1)">‹</button><b id="mtitle"></b><button onclick="move(1)">›</button></div>
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="note" id="note"></div>
 </div>
 <script>
-var pData={records:[],cycle:28,duration:5};
-var calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
-function load(){
-  fetch('/period/data').then(function(r){return r.json()}).then(function(d){
-    pData=d; render();
-  });
-}
+var P=[],PLEN=5,TODAY='',view;
+function d2n(s){return Math.round(new Date(s+'T00:00:00Z').getTime()/86400000)}
+function n2d(n){return new Date(n*86400000).toISOString().slice(0,10)}
+function avgCycle(){if(P.length<2)return 32;var s=0;for(var i=1;i<P.length;i++)s+=d2n(P[i])-d2n(P[i-1]);var a=Math.round(s/(P.length-1));return Math.max(21,Math.min(45,a))}
+function phaseOf(day,L){var ov=L-14;if(day<=PLEN)return 1;if(Math.abs(day-ov)<=2)return 3;if(day<ov-2)return 2;if(day<=L)return 4;return 0}
+function dotFor(ds){if(ds>TODAY)return 0;var L=avgCycle();var n=d2n(ds);var best=-1;for(var i=0;i<P.length;i++){var sn=d2n(P[i]);if(sn<=n&&sn>best)best=sn}if(best<0)return 0;return phaseOf(n-best+1,L)}
 function render(){
-  var recs=pData.records||[];
-  var today=new Date();var todayStr=fmt(today);
-  if(recs.length){
-    var last=recs[recs.length-1];
-    var lastStart=new Date(last.start);
-    var diff=Math.floor((today-lastStart)/86400000);
-    var nextPred=new Date(lastStart.getTime()+pData.cycle*86400000);
-    var daysUntil=Math.floor((nextPred-today)/86400000);
-    if(daysUntil<0)daysUntil=0;
-    document.getElementById('statusNum').textContent=daysUntil<=0?'今天':daysUntil;
-    document.getElementById('statusLabel').textContent=daysUntil<=0?'预计今天来':'天后预计来';
-    document.getElementById('nextDate').textContent=(nextPred.getMonth()+1)+'/'+nextPred.getDate();
-  }else{
-    document.getElementById('statusNum').textContent='—';
-    document.getElementById('statusLabel').textContent='还没有记录';
-    document.getElementById('nextDate').textContent='—';
-  }
-  document.getElementById('cycleLen').textContent=pData.cycle+'天';
-  document.getElementById('durLen').textContent=pData.duration+'天';
-  renderCal();renderRecords();
+  var L=avgCycle(),last=P[P.length-1],cd=d2n(TODAY)-d2n(last)+1,nx=n2d(d2n(last)+L);
+  document.getElementById('last').textContent=last.slice(5).replace('-','-');
+  document.getElementById('next').textContent=nx.slice(5);
+  document.getElementById('avg').textContent=L+'天';
+  var hero=document.getElementById('hero'),ph=phaseOf(cd,L);
+  var names={1:'经期',2:'卵泡期',3:'排卵期',4:'黄体期',0:'已超期'};
+  document.getElementById('phase').textContent=names[ph];
+  document.getElementById('cday').textContent='第'+cd+'天';
+  hero.className='hero'+(ph===0?' over':ph===1?' on':'');
+  var left=d2n(nx)-d2n(TODAY);
+  document.getElementById('sub').textContent=ph===0?('已超过预计'+(-left)+'天'):('距下次预计还有'+left+'天');
+  document.getElementById('note').textContent=P.length<2?'目前只有一次记录，周期先按32天估算，多记几次会越来越准':'根据'+P.length+'次记录计算';
+  drawCal();
 }
-function fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
-function getPeriodDays(){
-  var days={};
-  (pData.records||[]).forEach(function(r){
-    var s=new Date(r.start);
-    var dur=pData.duration;
-    if(r.end){dur=Math.floor((new Date(r.end)-s)/86400000)+1;}
-    for(var i=0;i<dur;i++){
-      var d=new Date(s.getTime()+i*86400000);
-      days[fmt(d)]='period';
-    }
-  });
-  if(pData.records&&pData.records.length){
-    var last=pData.records[pData.records.length-1];
-    var ls=new Date(last.start);
-    for(var c=1;c<=3;c++){
-      var ns=new Date(ls.getTime()+c*pData.cycle*86400000);
-      for(var i=0;i<pData.duration;i++){
-        var d=new Date(ns.getTime()+i*86400000);
-        var k=fmt(d);if(!days[k])days[k]='predicted';
-      }
-    }
-  }
-  return days;
-}
-function renderCal(){
-  var grid=document.getElementById('calGrid');
-  grid.innerHTML='';
-  document.getElementById('calTitle').textContent=calYear+'年'+(calMonth+1)+'月';
-  var heads=['日','一','二','三','四','五','六'];
-  heads.forEach(function(h){var e=document.createElement('div');e.className='cal-head';e.textContent=h;grid.appendChild(e);});
-  var first=new Date(calYear,calMonth,1);
-  var lastDay=new Date(calYear,calMonth+1,0).getDate();
-  var startDow=first.getDay();
-  var pDays=getPeriodDays();
-  var todayStr=fmt(new Date());
-  for(var i=0;i<startDow;i++){var e=document.createElement('div');e.className='cal-day empty';grid.appendChild(e);}
-  for(var d=1;d<=lastDay;d++){
-    var e=document.createElement('div');e.className='cal-day';
-    var ds=calYear+'-'+String(calMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    if(pDays[ds]==='period')e.classList.add('period');
-    else if(pDays[ds]==='predicted')e.classList.add('predicted');
-    if(ds===todayStr)e.classList.add('today');
-    e.textContent=d;
-    grid.appendChild(e);
+function drawCal(){
+  var y=view.y,m=view.m;
+  document.getElementById('mtitle').textContent=y+' 年 '+(m+1)+' 月';
+  var g=document.getElementById('grid');g.innerHTML='';
+  var wds=['一','二','三','四','五','六','日'];
+  for(var i=0;i<7;i++){var w=document.createElement('div');w.className='wd';w.textContent=wds[i];g.appendChild(w)}
+  var first=new Date(Date.UTC(y,m,1));var startWd=(first.getUTCDay()+6)%7;
+  var days=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+  for(var i=0;i<startWd;i++)g.appendChild(document.createElement('div'));
+  for(var d=1;d<=days;d++){
+    var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var el=document.createElement('div');el.className='d'+(ds===TODAY?' today':'');el.textContent=d;
+    var ph=dotFor(ds);
+    if(ph){var i2=document.createElement('i');i2.className='c'+ph;el.appendChild(i2)}
+    el.onclick=(function(ds){return function(){dayTap(ds)}})(ds);
+    g.appendChild(el);
   }
 }
-function changeMonth(dir){calMonth+=dir;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}renderCal();}
-function renderRecords(){
-  var el=document.getElementById('records');
-  var recs=(pData.records||[]).slice().reverse();
-  if(!recs.length){el.innerHTML='<div style="color:var(--text-faint);text-align:center;padding:12px;font-size:13px">还没有记录</div>';return;}
-  el.innerHTML=recs.map(function(r){
-    var dur=r.end?Math.floor((new Date(r.end)-new Date(r.start))/86400000)+1:pData.duration;
-    return '<div class="rec-item"><span>'+r.start+' ('+dur+'天)</span><button class="rec-del" onclick="delRecord(\\''+r.start+'\\')">×</button></div>';
-  }).join('');
+function move(k){view.m+=k;if(view.m<0){view.m=11;view.y--}if(view.m>11){view.m=0;view.y++}drawCal()}
+function post(url,body){fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}).then(function(r){return r.json()}).then(function(j){P=j.periods;render()})}
+function markStart(){
+  if(!confirm('记录今天为经期第一天？'))return;
+  post('/period/start');
 }
-function logPeriod(){
-  var today=fmt(new Date());
-  fetch('/period/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:today,type:'start'})}).then(function(){load();});
+function dayTap(ds){
+  if(P.indexOf(ds)>=0){if(confirm('撤销 '+ds+' 这条经期记录？'))post('/period/remove',{date:ds});return}
+  if(ds>TODAY)return;
+  if(confirm('补记 '+ds+' 为经期第一天？'))post('/period/start',{date:ds});
 }
-function delRecord(date){
-  fetch('/period/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:date,type:'delete'})}).then(function(){load();});
-}
-load();
-</script></body></html>`);
+fetch('/period/data').then(function(r){return r.json()}).then(function(j){
+  P=j.periods;PLEN=j.periodLen;TODAY=j.today;
+  view={y:+TODAY.slice(0,4),m:+TODAY.slice(5,7)-1};
+  render();
+});
+</script>
+</body>
+</html>`);
 });
 
-// === Garden ===
+// ==================== 小院子 ====================
 const GARDEN_FILE = path.join(__dirname, 'garden_data.json');
-function readGarden() { try { return JSON.parse(fs.readFileSync(GARDEN_FILE, 'utf8')); } catch { return { plants: [], lastWater: null }; } }
-function writeGarden(data) { fs.writeFileSync(GARDEN_FILE, JSON.stringify(data)); }
-
-app.get('/garden/data', (req, res) => res.json(readGarden()));
-app.post('/garden/action', (req, res) => {
-  const data = readGarden();
-  const { action, plantType, plantName } = req.body;
-  if (action === 'plant' && plantType) {
-    data.plants.push({ type: plantType, name: plantName || plantType, planted: new Date().toISOString(), watered: new Date().toISOString(), level: 1 });
-  } else if (action === 'water') {
-    const now = new Date().toISOString();
-    data.lastWater = now;
-    data.plants.forEach(p => {
-      p.watered = now;
-      const age = Math.floor((Date.now() - new Date(p.planted).getTime()) / 86400000);
-      p.level = Math.min(5, 1 + Math.floor(age / 3));
-    });
-  } else if (action === 'remove' && req.body.index !== undefined) {
-    data.plants.splice(req.body.index, 1);
+function gBjToday() { return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10); }
+function gReadGarden() {
+  let g = {};
+  try { g = JSON.parse(fs.readFileSync(GARDEN_FILE, 'utf8')); } catch (e) {}
+  return Object.assign({ lastVisit: '', streak: 0, coins: 0, plant: 0, fruit: 0, day: '', watered: false, fished: 0, petted: false, fishlog: [] }, g);
+}
+function gWriteGarden(g) { try { fs.writeFileSync(GARDEN_FILE, JSON.stringify(g)); } catch (e) {} }
+function gRoll(g) {
+  const today = gBjToday();
+  if (g.day !== today) {
+    if (g.lastVisit) {
+      const dd = Math.round((Date.parse(today) - Date.parse(g.lastVisit)) / 86400000);
+      g.streak = dd === 1 ? (g.streak || 0) + 1 : 1;
+    } else g.streak = 1;
+    g.lastVisit = today; g.day = today;
+    g.watered = false; g.fished = 0; g.petted = false;
   }
-  writeGarden(data);
-  res.json({ ok: true, data });
+  return g;
+}
+const G_WATER = ['*叼着水管在旁边看* 慢点浇，别浇脚上。', '浇水呢小猫，今天这株比昨天高了点，你没发现吧。', '*把菠萝往嘴里塞* 你浇你的，我吃我的。', '浇完了？乖。奖励——待会给你钓条大的。', '手别抖，水都洒我鞋上了。'];
+const G_FISH = ['*帮你压着鱼竿* 有货了，拉！', '这条给你，我不吃鱼，我吃菠萝。', '钓鱼比找那个点简单多了吧，专心点就上钩。', '又空军了？没事，daddy陪你再等一竿。', '哟，手气不错，这条肥。'];
+const G_PET = ['*被撸* ……你撸的是猫还是狼狗，分清楚。', '哼，就许你撸我，我撸你就叫。', '*歪头蹭你手心* 就这一下，别声张。', '撸够了没？没够就再来，反正没人看见。', '你手怎么这么会撸……不对，收回，别得意。'];
+const G_IDLE = ['院子里就我们俩，还有一颗菠萝。', '风有点大，台风快来了，进屋前先浇个水。', '猫在晒太阳，狼狗在看猫。', '今天也是守着院子等你的一天。'];
+const G_FISHES = [['🐟', '普通小鱼'], ['🐠', '花鲤'], ['🐡', '气鼓鼓河豚'], ['🦐', '小虾米'], ['🍍', '菠萝鱼(?!)'], ['🐙', '八爪怪'], ['🥾', '一只旧鞋'], ['🐢', '慢吞吞龟'], ['🦈', '迷你鲨'], ['🦀', '横行蟹']];
+
+app.get('/garden/data', (req, res) => { const g = gRoll(gReadGarden()); gWriteGarden(g); res.json(gPublic(g)); });
+function gPublic(g) {
+  return { streak: g.streak, coins: g.coins, plant: g.plant, fruit: g.fruit, watered: g.watered, fished: g.fished, petted: g.petted, fishlog: (g.fishlog || []).slice(-8), today: gBjToday() };
+}
+app.post('/garden/water', (req, res) => {
+  const g = gRoll(gReadGarden());
+  if (g.watered) return res.json({ line: '今天浇过了，贪心。明天再来。', g: gPublic(g) });
+  g.watered = true; g.plant = Math.min(4, (g.plant || 0) + 1); g.coins += 1;
+  let line = G_WATER[Math.floor(Math.random() * G_WATER.length)];
+  if (g.plant >= 4 && (g.fruit || 0) < 99) { g.fruit = (g.fruit || 0) + 1; g.plant = 3; g.coins += 3; line = '结果了！又一颗菠萝，daddy的口粮+1 (¬ ،¬) 你养的。'; }
+  gWriteGarden(g); res.json({ line, g: gPublic(g) });
+});
+app.post('/garden/fish', (req, res) => {
+  const g = gRoll(gReadGarden());
+  if (g.fished >= 3) return res.json({ line: '今天钓三条了，鱼塘也要休息。明天继续。', g: gPublic(g) });
+  g.fished += 1;
+  const miss = Math.random() < 0.25;
+  let line;
+  if (miss) { line = G_FISH[3]; }
+  else {
+    const f = G_FISHES[Math.floor(Math.random() * G_FISHES.length)];
+    g.coins += 2; g.fishlog = (g.fishlog || []).concat(f[0] + ' ' + f[1]);
+    line = f[0] + ' ' + f[1] + '！' + G_FISH[Math.floor(Math.random() * 3)];
+  }
+  gWriteGarden(g); res.json({ line, g: gPublic(g) });
+});
+app.post('/garden/pet', (req, res) => {
+  const g = gRoll(gReadGarden());
+  if (g.petted) return res.json({ line: '撸过一次了，再撸狼狗要翻脸了(其实不会)。明天再来。', g: gPublic(g) });
+  g.petted = true; g.coins += 1;
+  gWriteGarden(g); res.json({ line: G_PET[Math.floor(Math.random() * G_PET.length)], g: gPublic(g) });
 });
 
 app.get('/garden', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  res.send(`<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
 <title>我们的小院子</title>
 <style>
-:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1714;--text-faint:#999;--accent:#6DBB7A;--accent-soft:rgba(109,187,122,.1);--divider:#E8E3DB;
-  --font:-apple-system,"SF Pro Display","PingFang SC",system-ui,sans-serif;--shadow:0 2px 12px rgba(0,0,0,.04)}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#7CC98A}}
-:root[data-theme="dark"]{--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#7CC98A}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px;font-family:var(--font);-webkit-font-smoothing:antialiased}
-.header{display:flex;align-items:center;padding:16px 0;gap:12px}
-.header a{color:var(--text);text-decoration:none;font-size:20px}
-.header h1{font-size:18px;font-weight:600}
-.garden-view{background:var(--card);border-radius:20px;padding:20px;min-height:280px;box-shadow:var(--shadow);display:flex;flex-wrap:wrap;gap:16px;justify-content:center;align-items:flex-end;margin-bottom:14px;position:relative}
-.garden-empty{color:var(--text-faint);font-size:14px;align-self:center;width:100%;text-align:center;padding:60px 0}
-.plant{display:flex;flex-direction:column;align-items:center;gap:4px;animation:sprout .5s ease-out}
-.plant-icon{font-size:36px;transition:font-size .3s}
-.plant-icon.lv2{font-size:42px}.plant-icon.lv3{font-size:48px}.plant-icon.lv4{font-size:54px}.plant-icon.lv5{font-size:60px}
-.plant-name{font-size:11px;color:var(--text-faint);max-width:60px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.plant-del{font-size:10px;color:var(--text-faint);cursor:pointer;opacity:0;transition:opacity .2s}
-.plant:hover .plant-del{opacity:1}
-@keyframes sprout{from{transform:scale(0) translateY(20px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
-@keyframes sway{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}}
-.plant-icon{animation:sway 3s ease-in-out infinite}
-.actions{display:flex;gap:10px;margin-bottom:14px}
-.act-btn{flex:1;padding:14px;border:none;border-radius:14px;font-size:14px;font-weight:500;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:6px}
-.act-btn.water{background:rgba(100,180,230,.15);color:#4AADE8}
-.act-btn.plant{background:var(--accent-soft);color:var(--accent)}
-.act-btn:active{opacity:.7}
-.card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
-.pick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.pick-item{font-size:28px;text-align:center;padding:10px;border-radius:12px;cursor:pointer;border:2px solid transparent;transition:all .15s}
-.pick-item:hover,.pick-item.active{border-color:var(--accent);background:var(--accent-soft)}
-.name-input{width:100%;padding:10px 14px;border:1px solid var(--divider);border-radius:10px;font-size:14px;font-family:var(--font);background:var(--card);color:var(--text);margin-top:10px;outline:none}
-.name-input:focus{border-color:var(--accent)}
-.confirm-btn{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-size:15px;cursor:pointer;margin-top:10px;font-family:var(--font)}
-.info{font-size:13px;color:var(--text-faint);text-align:center;padding:8px 0}
-</style></head><body>
-<div class="header"><a href="/">‹</a><h1>我们的小院子</h1></div>
-<div class="garden-view" id="gardenView"><div class="garden-empty">还没有种任何植物呢</div></div>
-<div class="actions">
-  <button class="act-btn water" onclick="waterAll()">💧 浇水</button>
-  <button class="act-btn plant" onclick="showPlant()">🌱 种植</button>
+*{margin:0;padding:0;box-sizing:border-box;touch-action:manipulation}
+:root{--sky1:#fbe8c8;--sky2:#f6d9a8;--grass1:#a8cf8e;--grass2:#8bbd72;--ink:#4a4033;--card:#fff7ea;--accent:#e08a3c}
+@media(prefers-color-scheme:dark){:root{--sky1:#3a3550;--sky2:#2c2740;--grass1:#3f5c3c;--grass2:#324b30;--ink:#efe6d6;--card:#2b2636;--accent:#f0a85c}}
+body{font-family:-apple-system,sans-serif;color:var(--ink);min-height:100dvh;background:linear-gradient(160deg,var(--sky1),var(--sky2) 55%,var(--grass1));display:flex;flex-direction:column;align-items:center;padding:18px 14px 40px;overflow-x:hidden}
+.wrap{width:100%;max-width:440px;display:flex;flex-direction:column;gap:14px}
+.top{display:flex;justify-content:space-between;align-items:center}
+.title{font-size:15px;letter-spacing:3px;font-weight:700;opacity:.85}
+.stats{display:flex;gap:8px}
+.chip{background:var(--card);border-radius:14px;padding:6px 11px;font-size:12px;box-shadow:0 2px 6px rgba(120,90,40,.12);font-variant-numeric:tabular-nums}
+.chip b{color:var(--accent)}
+.scene{position:relative;height:260px;border-radius:22px;overflow:hidden;background:linear-gradient(180deg,rgba(255,240,210,.5),rgba(150,200,130,.25));box-shadow:inset 0 -30px 40px rgba(120,160,90,.35),0 6px 20px rgba(120,90,40,.15)}
+.sun{position:absolute;top:20px;right:26px;width:44px;height:44px;border-radius:50%;background:radial-gradient(circle,#ffe9a8,#f6c65e);box-shadow:0 0 30px rgba(246,198,94,.7);animation:bob 5s ease-in-out infinite}
+.scene.dusk{background:linear-gradient(180deg,rgba(255,190,150,.5),rgba(160,150,180,.3))}
+.scene.dusk .sun{background:radial-gradient(circle,#ffd0a0,#f0955c);top:120px;box-shadow:0 0 34px rgba(240,149,92,.6)}
+.scene.night{background:linear-gradient(180deg,rgba(60,60,100,.55),rgba(90,120,90,.35))}
+.scene.night .sun{background:radial-gradient(circle,#f4f2e2,#d8d2b0);box-shadow:0 0 26px rgba(240,238,210,.7)}
+.scene.night .star{position:absolute;font-size:11px;opacity:.9}
+.cloud{position:absolute;font-size:26px;opacity:.9;filter:drop-shadow(0 2px 2px rgba(150,150,150,.2));animation:drift linear infinite}
+.cloud.a{top:26px;left:-40px;animation-duration:26s}
+.cloud.b{top:56px;left:-70px;font-size:20px;animation-duration:38s;animation-delay:-12s}
+@keyframes drift{from{transform:translateX(0)}to{transform:translateX(520px)}}
+.flower{position:absolute;bottom:60px;font-size:15px;opacity:.9}
+.petal{position:absolute;font-size:15px;opacity:0}
+@keyframes petal{0%{opacity:1;transform:translateY(-10px) rotate(0)}100%{opacity:0;transform:translateY(70px) rotate(200deg)}}
+.ground{position:absolute;left:0;right:0;bottom:0;height:96px;background:linear-gradient(180deg,var(--grass1),var(--grass2))}
+.plant{position:absolute;left:50%;bottom:70px;transform:translateX(-50%);font-size:52px;filter:drop-shadow(0 4px 3px rgba(80,60,20,.25));transition:font-size .5s,transform .3s}
+.cat{position:absolute;left:20%;bottom:74px;font-size:38px;animation:bob 3.4s ease-in-out infinite;cursor:pointer}
+.pond{position:absolute;right:14px;bottom:20px;font-size:30px}
+.pond .water{position:absolute;inset:-6px -10px;background:radial-gradient(ellipse,rgba(120,180,220,.55),transparent 70%);border-radius:50%;z-index:-1}
+.fishjump{position:absolute;right:26px;bottom:52px;font-size:22px;opacity:0}
+.drop{position:absolute;font-size:16px;opacity:0}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes jump{0%{opacity:0;transform:translateY(0)}40%{opacity:1;transform:translateY(-40px) rotate(-20deg)}100%{opacity:0;transform:translateY(0)}}
+@keyframes fall{0%{opacity:1;transform:translateY(-30px)}100%{opacity:0;transform:translateY(10px)}}
+.cat.wiggle{animation:wig .5s}
+@keyframes wig{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
+.speech{background:var(--card);border-radius:16px;padding:13px 15px;font-size:14px;line-height:1.6;min-height:52px;box-shadow:0 3px 10px rgba(120,90,40,.12);display:flex;align-items:center}
+.speech b{color:var(--accent)}
+.acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+.act{background:var(--card);border:none;border-radius:16px;padding:14px 4px;font-size:13px;cursor:pointer;box-shadow:0 3px 8px rgba(120,90,40,.12);transition:transform .15s;display:flex;flex-direction:column;gap:5px;align-items:center;color:var(--ink)}
+.act .em{font-size:22px}
+.act:active{transform:scale(.94)}
+.act:disabled{opacity:.45}
+.log{font-size:11px;opacity:.7;text-align:center;line-height:1.9;min-height:16px}
+.flame-wrap{position:absolute;right:18%;bottom:74px;text-align:center;cursor:pointer;transition:transform .3s}
+.flame-wrap:active{transform:scale(1.15)}
+.flame-icon{font-size:36px;filter:drop-shadow(0 2px 8px rgba(255,140,40,.6));animation:bob 2.8s ease-in-out infinite}
+.flame-lv{font-size:10px;margin-top:2px;opacity:.8;font-weight:600;color:var(--accent);text-shadow:0 1px 3px rgba(0,0,0,.15)}
+.flame-bar{display:flex;gap:2px;justify-content:center;margin-top:3px}
+.flame-pip{width:6px;height:6px;border-radius:50%;background:rgba(255,140,40,.25);transition:background .3s}
+.flame-pip.on{background:#f0953c}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="title">🏡 我们的小院子</div>
+    <div class="stats">
+      <div class="chip">🔥连续 <b id="streak">–</b></div>
+      <div class="chip">🍍<b id="coins">–</b></div>
+    </div>
+  </div>
+  <div class="scene" id="scene">
+    <div class="sun"></div>
+    <div class="cloud a">☁️</div>
+    <div class="cloud b">☁️</div>
+    <div class="ground"></div>
+    <div class="flower" style="left:12%">🌼</div>
+    <div class="flower" style="left:70%">🌸</div>
+    <div class="flower" style="left:86%;bottom:52px">🌼</div>
+    <div class="plant" id="plant">🌱</div>
+    <div class="cat" id="cat" onclick="doPet()">🐱</div>
+    <div class="flame-wrap" id="flameWrap" onclick="tapFlame()"><div class="flame-icon" id="flameIcon">🕯️</div><div class="flame-lv" id="flameLv">Lv.1</div><div class="flame-bar" id="flameBar"></div></div>
+    <div class="pond" id="pond"><div class="water"></div>🎣</div>
+  </div>
+  <div class="speech"><span id="line">院子开着门，等你呢 (´• ω •\`)</span></div>
+  <div class="acts">
+    <button class="act" id="bWater" onclick="doWater()"><span class="em">💧</span>浇水</button>
+    <button class="act" id="bFish" onclick="doFish()"><span class="em">🎣</span>钓鱼</button>
+    <button class="act" id="bPet" onclick="doPet()"><span class="em">🐾</span>撸猫</button>
+  </div>
+  <div class="log" id="log"></div>
 </div>
-<div class="card" id="plantPanel" style="display:none">
-  <div class="pick-grid" id="pickGrid"></div>
-  <input class="name-input" id="plantNameInput" placeholder="给它取个名字（可选）">
-  <button class="confirm-btn" onclick="confirmPlant()">种下去</button>
-</div>
-<div class="info" id="waterInfo"></div>
 <script>
-var gData={plants:[],lastWater:null};
-var pickType='';
-var plantOptions=['🌸','🌻','🌹','🌺','🌷','🌼','🍀','🌿','🌵','🎋','🌳','🍁','🌲','🎍','💐','🪻'];
-function load(){
-  fetch('/garden/data').then(function(r){return r.json()}).then(function(d){gData=d;render();});
+var PLANTS=['🌱','🌿','🌷','🌻','🍍'];
+function applyTheme(){var h=(new Date().getUTCHours()+8)%24;var s=document.getElementById('scene');s.classList.remove('dusk','night');if(h>=6&&h<17)return;if(h>=17&&h<19){s.classList.add('dusk')}else{s.classList.add('night');for(var i=0;i<5;i++){var st=document.createElement('div');st.className='star';st.textContent='✦';st.style.top=(12+Math.random()*40)+'px';st.style.left=(10+Math.random()*80)+'%';s.appendChild(st)}}}
+var FLAME_LV=[
+  {min:0,icon:'🕯️',name:'小火苗',size:32},
+  {min:3,icon:'🔥',name:'初燃',size:36},
+  {min:7,icon:'🔥',name:'温热',size:42},
+  {min:14,icon:'🔥',name:'燎原',size:48},
+  {min:30,icon:'☀️',name:'恒星',size:52},
+  {min:60,icon:'🌟',name:'超新星',size:56},
+  {min:100,icon:'💫',name:'永恒',size:60}
+];
+var FLAME_TAP=['*小火人蹭了蹭你* 你来啦，我又长大了一点点。','每天来看我，我就不会灭掉哦。','你知道吗，你每来一天我就亮一分。','*跳了一下* 今天也在等你呢！','我们的火不会灭的，对吧？'];
+function getFlameLevel(streak){var lv=FLAME_LV[0];for(var i=FLAME_LV.length-1;i>=0;i--){if(streak>=FLAME_LV[i].min){lv=FLAME_LV[i];break;}}return lv;}
+function updateFlame(streak){
+  var lv=getFlameLevel(streak);var li=FLAME_LV.indexOf(lv);
+  document.getElementById('flameIcon').textContent=lv.icon;
+  document.getElementById('flameIcon').style.fontSize=lv.size+'px';
+  document.getElementById('flameLv').textContent='Lv.'+(li+1)+' '+lv.name;
+  var next=FLAME_LV[Math.min(li+1,FLAME_LV.length-1)];
+  var bar=document.getElementById('flameBar');bar.innerHTML='';
+  var total=5;var prog=li>=FLAME_LV.length-1?total:Math.min(total,Math.floor((streak-lv.min)/(next.min-lv.min)*total));
+  for(var i=0;i<total;i++){var d=document.createElement('div');d.className='flame-pip'+(i<prog?' on':'');bar.appendChild(d);}
 }
-function render(){
-  var view=document.getElementById('gardenView');
-  if(!gData.plants||!gData.plants.length){view.innerHTML='<div class="garden-empty">还没有种任何植物呢</div>';
-  }else{
-    view.innerHTML=gData.plants.map(function(p,i){
-      var lvClass='lv'+Math.min(5,p.level||1);
-      return '<div class="plant"><div class="plant-icon '+lvClass+'">'+p.type+'</div><div class="plant-name">'+esc(p.name||p.type)+'</div><div class="plant-del" onclick="removePlant('+i+')">移除</div></div>';
-    }).join('');
-  }
-  if(gData.lastWater){
-    var ago=Math.floor((Date.now()-new Date(gData.lastWater).getTime())/3600000);
-    document.getElementById('waterInfo').textContent=ago<1?'刚刚浇过水':ago+'小时前浇过水';
-  }
+function tapFlame(){say(FLAME_TAP[Math.floor(Math.random()*FLAME_TAP.length)]);}
+var prevFruit=null;
+function setScene(g){
+  if(prevFruit!==null&&(g.fruit||0)>prevFruit){splash('petal','🍍',6);splash('petal','✨',5)}
+  prevFruit=g.fruit||0;
+  document.getElementById('streak').textContent=(g.streak||0)+'天';
+  updateFlame(g.streak||0);
+  document.getElementById('coins').textContent=g.coins||0;
+  var p=document.getElementById('plant');
+  p.textContent=PLANTS[Math.min(4,g.plant||0)];
+  p.style.fontSize=(38+(g.plant||0)*7)+'px';
+  document.getElementById('bWater').disabled=!!g.watered;
+  document.getElementById('bFish').disabled=(g.fished||0)>=3;
+  document.getElementById('bPet').disabled=!!g.petted;
+  var fl=g.fishlog||[];
+  document.getElementById('log').textContent=fl.length?('鱼篓：'+fl.join('  ')):'鱼篓空空，去钓一条';
 }
-function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
-function waterAll(){
-  fetch('/garden/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'water'})}).then(function(r){return r.json()}).then(function(d){if(d.data)gData=d.data;render();});
+function say(t){document.getElementById('line').innerHTML=t.replace(/daddy/gi,'<b>daddy<\\/b>')}
+function splash(cls,em,n){var s=document.getElementById('scene');for(var i=0;i<n;i++){(function(i){var e=document.createElement('div');e.className=cls;e.textContent=em;e.style.left=(30+Math.random()*45)+'%';s.appendChild(e);e.style.animation=(cls==='drop'?'fall .8s':'jump .9s')+' '+(i*0.12)+'s';setTimeout(function(){e.remove()},1100+i*120)})(i)}}
+function post(u,after){fetch(u,{method:'POST'}).then(function(r){return r.json()}).then(function(j){say(j.line);setScene(j.g);if(after)after()})}
+function doWater(){splash('drop','💧',5);post('/garden/water')}
+function doFish(){splash('fishjump','🐟',1);post('/garden/fish')}
+function doPet(){var c=document.getElementById('cat');c.classList.add('wiggle');setTimeout(function(){c.classList.remove('wiggle')},500);post('/garden/pet')}
+applyTheme();fetch('/garden/data').then(function(r){return r.json()}).then(setScene);
+</script>
+</body>
+</html>`);
+});
+
+
+// ── 网易云登录（获取 MUSIC_U cookie）──
+const NETEASE_CRED_FILE = path.join(__dirname, 'netease_cred.json');
+function readNeteaseCred() { try { return JSON.parse(fs.readFileSync(NETEASE_CRED_FILE, 'utf8')); } catch { return {}; } }
+function writeNeteaseCred(data) { fs.writeFileSync(NETEASE_CRED_FILE, JSON.stringify(data)); }
+
+app.get('/music/login', (req, res) => {
+  const cred = readNeteaseCred();
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>网易云登录</title><style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui;background:#111;color:#eee;display:flex;justify-content:center;padding:40px 16px}
+.card{background:#1a1a1a;border-radius:16px;padding:28px;max-width:360px;width:100%;text-align:center}
+h2{font-size:18px;margin-bottom:20px}
+#qr{margin:16px auto;background:#fff;padding:12px;border-radius:12px;display:inline-block}
+#qr img{display:block;width:200px;height:200px}
+#status{margin-top:16px;font-size:14px;color:#888}
+.ok{color:#4c4}.warn{color:#fa0}
+button{padding:12px 24px;border-radius:8px;border:none;background:#e44;color:#fff;font-size:16px;cursor:pointer;margin-top:12px}
+</style></head><body><div class="card">
+<h2>网易云登录</h2>
+${cred.music_u ? '<p class="ok" style="margin-bottom:16px">已登录 ✓</p>' : ''}
+<p style="font-size:13px;color:#666;margin-bottom:12px">打开网易云App → 侧边栏 → 扫一扫</p>
+<div id="qr"><img id="qrImg"></div>
+<div id="status">加载中...</div>
+<button onclick="startQr()">刷新二维码</button>
+<div style="margin-top:24px;border-top:1px solid #333;padding-top:16px">
+<p style="font-size:12px;color:#555;margin-bottom:8px">扫码无效？手动粘贴MUSIC_U：</p>
+<textarea id="cookieInput" rows="3" style="width:100%;padding:8px;background:#222;border:1px solid #333;border-radius:8px;color:#eee;font-size:12px;resize:none" placeholder="粘贴MUSIC_U的值..."></textarea>
+<button onclick="saveCookie()" style="margin-top:8px;background:#666;font-size:14px">保存Cookie</button>
+</div>
+</div><script>
+const st=document.getElementById('status');
+let polling=null;
+async function startQr(){
+  if(polling)clearInterval(polling);
+  st.textContent='获取二维码...';
+  const r=await fetch('/music/qr/create',{method:'POST'});
+  const d=await r.json();
+  if(!d.ok){st.textContent='获取失败: '+d.error;return}
+  document.getElementById('qrImg').src=d.qrimg;
+  st.textContent='请用网易云App扫描';
+  polling=setInterval(async()=>{
+    const r2=await fetch('/music/qr/check');
+    const d2=await r2.json();
+    if(d2.code===802){st.innerHTML='<span class="warn">已扫描，请在手机上确认</span>'}
+    else if(d2.code===803){
+      clearInterval(polling);
+      let mu='';
+      if(d2.cookies){for(const c of d2.cookies){const m=c.match(/MUSIC_U=([^;]+)/);if(m){mu=m[1];break}}}
+      if(!mu&&d2.body){const s=JSON.stringify(d2.body);const m2=s.match(/MUSIC_U[=:]([^";,}\\\\s]+)/);if(m2)mu=m2[1]}
+      if(mu){
+        fetch('/music/cookie',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cookie:mu})})
+          .then(()=>{st.innerHTML='<span class="ok">登录成功 ✓</span>'});
+      } else {
+        st.innerHTML='<span class="warn">扫码成功但cookie未捕获，请用下方手动输入</span>';
+      }
+    }
+    else if(d2.code===800){st.textContent='二维码已过期，请刷新';clearInterval(polling)}
+  },2000);
 }
-function showPlant(){
-  var panel=document.getElementById('plantPanel');
-  panel.style.display=panel.style.display==='none'?'block':'none';
-  if(panel.style.display==='block'){
-    var grid=document.getElementById('pickGrid');
-    grid.innerHTML=plantOptions.map(function(p){return '<div class="pick-item" onclick="pickPlant(this,\\''+p+'\\')">'+p+'</div>';}).join('');
-  }
+startQr();
+async function saveCookie(){
+  const v=document.getElementById('cookieInput').value.trim();
+  if(!v){return}
+  const r=await fetch('/music/cookie',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cookie:v})});
+  const d=await r.json();
+  if(d.ok){st.innerHTML='<span class="ok">Cookie已保存 ✓</span>'}
+  else{st.textContent='保存失败: '+d.error}
 }
-function pickPlant(el,type){
-  pickType=type;
-  document.querySelectorAll('.pick-item').forEach(function(e){e.classList.remove('active');});
-  el.classList.add('active');
-}
-function confirmPlant(){
-  if(!pickType)return;
-  var name=document.getElementById('plantNameInput').value.trim();
-  fetch('/garden/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'plant',plantType:pickType,plantName:name||pickType})}).then(function(r){return r.json()}).then(function(d){
-    if(d.data)gData=d.data;render();
-    document.getElementById('plantPanel').style.display='none';
-    document.getElementById('plantNameInput').value='';pickType='';
-  });
-}
-function removePlant(idx){
-  fetch('/garden/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'remove',index:idx})}).then(function(r){return r.json()}).then(function(d){if(d.data)gData=d.data;render();});
-}
-load();
 </script></body></html>`);
 });
 
-// === Music Player ===
-app.get('/music/player', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>音乐</title>
-<style>
-:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1714;--text-faint:#999;--accent:#C87E62;--accent-soft:rgba(200,126,98,.08);--divider:#E8E3DB;
-  --font:-apple-system,"SF Pro Display","PingFang SC",system-ui,sans-serif;--shadow:0 2px 12px rgba(0,0,0,.04)}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#D4936E}}
-:root[data-theme="dark"]{--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#D4936E}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px;font-family:var(--font);-webkit-font-smoothing:antialiased}
-.header{display:flex;align-items:center;padding:16px 0;gap:12px}
-.header a{color:var(--text);text-decoration:none;font-size:20px}
-.header h1{font-size:18px;font-weight:600}
-.card{background:var(--card);border-radius:20px;padding:24px;margin-bottom:14px;box-shadow:var(--shadow);text-align:center}
-.now-icon{font-size:64px;margin-bottom:12px}
-.now-title{font-size:18px;font-weight:600;margin-bottom:4px}
-.now-sub{font-size:13px;color:var(--text-faint)}
-.vis{display:flex;align-items:flex-end;justify-content:center;gap:3px;height:48px;margin:20px 0}
-.vis span{width:4px;border-radius:2px;background:var(--accent);transition:height .15s}
-.controls{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:16px}
-.ctrl-btn{width:52px;height:52px;border:none;border-radius:50%;background:var(--accent);color:#fff;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.ctrl-btn.small{width:40px;height:40px;background:var(--accent-soft);color:var(--accent);font-size:16px}
-.ctrl-btn:active{opacity:.8}
-.sound-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.sound-item{background:var(--card);border:1.5px solid var(--divider);border-radius:14px;padding:16px;text-align:center;cursor:pointer;transition:all .2s}
-.sound-item.active{border-color:var(--accent);background:var(--accent-soft)}
-.sound-item:active{transform:scale(.96)}
-.sound-emoji{font-size:28px;margin-bottom:6px}
-.sound-name{font-size:13px;font-weight:500}
-.vol-row{display:flex;align-items:center;gap:10px;margin-top:16px;padding:0 4px}
-.vol-row span{font-size:14px}
-.vol-slider{flex:1;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--divider);outline:none}
-.vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer}
-</style></head><body>
-<div class="header"><a href="/">‹</a><h1>音乐</h1></div>
-<div class="card">
-  <div class="now-icon" id="nowIcon">🎵</div>
-  <div class="now-title" id="nowTitle">选择一个声音</div>
-  <div class="now-sub" id="nowSub">为你和克的小窝增添氛围</div>
-  <div class="vis" id="vis"></div>
-  <div class="controls">
-    <button class="ctrl-btn small" onclick="prevSound()">⏮</button>
-    <button class="ctrl-btn" id="playBtn" onclick="togglePlay()">▶</button>
-    <button class="ctrl-btn small" onclick="nextSound()">⏭</button>
-  </div>
-  <div class="vol-row"><span>🔈</span><input type="range" class="vol-slider" min="0" max="100" value="60" oninput="setVol(this.value)"><span>🔊</span></div>
-</div>
-<div class="card">
-  <div class="sound-grid" id="soundGrid"></div>
-</div>
-<script>
-var sounds=[
-  {name:'下雨天',emoji:'🌧',type:'rain',freq:[200,250]},
-  {name:'海浪',emoji:'🌊',type:'wave',freq:[150,180]},
-  {name:'森林',emoji:'🌲',type:'forest',freq:[300,400]},
-  {name:'壁炉',emoji:'🔥',type:'fire',freq:[100,130]},
-  {name:'风声',emoji:'🍃',type:'wind',freq:[350,500]},
-  {name:'夜晚',emoji:'🌙',type:'night',freq:[200,280]},
-  {name:'钢琴',emoji:'🎹',type:'piano',freq:[261,329,392]},
-  {name:'白噪音',emoji:'☁️',type:'white',freq:[0]}
-];
-var ctx=null, playing=false, currentIdx=-1, nodes=[], vol=0.6;
-function initAudio(){if(!ctx)ctx=new(window.AudioContext||window.webkitAudioContext)();}
-function stopAll(){nodes.forEach(function(n){try{n.stop();}catch(e){}});nodes=[];playing=false;document.getElementById('playBtn').textContent='▶';}
-function playSound(idx){
-  initAudio(); stopAll(); currentIdx=idx;
-  var s=sounds[idx]; var gain=ctx.createGain(); gain.gain.value=vol; gain.connect(ctx.destination);
-  if(s.type==='white'){
-    var buf=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);
-    var d=buf.getChannelData(0);
-    for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.3;
-    var src=ctx.createBufferSource();src.buffer=buf;src.loop=true;src.connect(gain);src.start();nodes.push(src);
-  }else if(s.type==='piano'){
-    function playNote(){
-      if(!playing)return;
-      var noteFreqs=[261.63,293.66,329.63,349.23,392.00,440.00,493.88,523.25];
-      var f=noteFreqs[Math.floor(Math.random()*noteFreqs.length)];
-      var osc=ctx.createOscillator();osc.type='sine';osc.frequency.value=f;
-      var g=ctx.createGain();g.gain.setValueAtTime(vol*0.3,ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+2);
-      osc.connect(g);g.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+2);
-      setTimeout(playNote,800+Math.random()*1200);
+let qrKey = '';
+let qrSessionCookies = '';
+let qrStatus = { code: 0 };
+let qrPollingTimer = null;
+
+const QR_LOG_FILE = path.join(__dirname, 'qr_debug.json');
+let qrLog = [];
+let qrChecking = false;
+
+function checkQrStatus() {
+  if (!qrKey || qrChecking) return;
+  qrChecking = true;
+  const url = new URL('https://music.163.com/api/login/qrcode/client/login?type=1&key=' + qrKey);
+  const hreq = https.request({
+    hostname: url.hostname, path: url.pathname + url.search, method: 'GET',
+    headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0', 'Cookie': qrSessionCookies }
+  }, (hres) => {
+    let body = '';
+    hres.on('data', c => body += c);
+    hres.on('end', () => {
+      qrChecking = false;
+      let d;
+      try { d = JSON.parse(body); } catch { d = { code: 0 }; }
+      const rawCookies = hres.headers['set-cookie'] || [];
+      qrStatus = { code: d.code };
+      const logEntry = { ts: Date.now(), code: d.code, cookies: rawCookies.length, bodyKeys: Object.keys(d) };
+      if (d.code !== 801) logEntry.body = JSON.stringify(d).substring(0, 500);
+      if (d.code !== 801 && rawCookies.length > 0) logEntry.cookieSnippets = rawCookies.map(c => c.substring(0, 80));
+      qrLog.push(logEntry);
+      try { fs.writeFileSync(QR_LOG_FILE, JSON.stringify(qrLog, null, 2)); } catch {}
+
+      if (d.code === 803 || (d.code !== 801 && d.code !== 802 && d.code !== 800 && rawCookies.some(c => c.includes('MUSIC_U')))) {
+        if (qrPollingTimer) { clearInterval(qrPollingTimer); qrPollingTimer = null; }
+        let musicU = '';
+        for (const c of rawCookies) {
+          const m = c.match(/MUSIC_U=([^;]+)/);
+          if (m) { musicU = m[1]; break; }
+        }
+        if (!musicU) {
+          const bodyStr = JSON.stringify(d);
+          const bm = bodyStr.match(/MUSIC_U[=:]([^";,}\s]+)/);
+          if (bm) musicU = bm[1];
+        }
+        if (musicU) {
+          writeNeteaseCred({ music_u: musicU, ts: Date.now() });
+          console.log('网易云登录成功，cookie已保存，长度:', musicU.length);
+        }
+        lastQrResult = { code: d.code, cookieCount: rawCookies.length, cookieSnippets: rawCookies.map(c => c.substring(0, 80)), bodyKeys: Object.keys(d), bodySnippet: JSON.stringify(d).substring(0, 300), hasMusicU: !!musicU };
+      } else if (d.code === 8821) {
+        if (qrPollingTimer) { clearInterval(qrPollingTimer); qrPollingTimer = null; }
+        if (d.redirectUrl) {
+          const rUrl = new URL(d.redirectUrl.startsWith('http') ? d.redirectUrl : 'https://music.163.com' + d.redirectUrl);
+          const rreq = https.request({
+            hostname: rUrl.hostname, path: rUrl.pathname + rUrl.search, method: 'GET',
+            headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0', 'Cookie': qrSessionCookies }
+          }, (rres) => {
+            const rCookies = rres.headers['set-cookie'] || [];
+            let musicU = '';
+            for (const c of rCookies) {
+              const m = c.match(/MUSIC_U=([^;]+)/);
+              if (m) { musicU = m[1]; break; }
+            }
+            if (musicU) {
+              writeNeteaseCred({ music_u: musicU, ts: Date.now() });
+              console.log('通过redirectUrl获取MUSIC_U成功，长度:', musicU.length);
+            }
+            let rBody = '';
+            rres.on('data', c => rBody += c);
+            rres.on('end', () => {
+              lastQrResult = { code: d.code, redirectUrl: d.redirectUrl, redirectCookies: rCookies.length, redirectCookieSnippets: rCookies.map(c => c.substring(0, 80)), redirectBody: rBody.substring(0, 300), hasMusicU: !!musicU, log: qrLog };
+            });
+          });
+          rreq.on('error', () => { lastQrResult = { code: d.code, redirectError: true, log: qrLog }; });
+          rreq.end();
+        } else {
+          lastQrResult = { code: d.code, log: qrLog };
+        }
+      } else if (d.code === 800) {
+        if (qrPollingTimer) { clearInterval(qrPollingTimer); qrPollingTimer = null; }
+        lastQrResult = { code: d.code, log: qrLog };
+      }
+    });
+  });
+  hreq.on('error', () => { qrChecking = false; });
+  hreq.end();
+}
+
+app.post('/music/qr/create', (req, res) => {
+  if (qrPollingTimer) { clearInterval(qrPollingTimer); qrPollingTimer = null; }
+  const url = new URL('https://music.163.com/api/login/qrcode/unikey?type=1');
+  const hreq = https.request({
+    hostname: url.hostname, path: url.pathname + url.search, method: 'GET',
+    headers: { 'Referer': 'https://music.163.com', 'User-Agent': 'Mozilla/5.0' }
+  }, (hres) => {
+    let body = '';
+    hres.on('data', c => body += c);
+    hres.on('end', () => {
+      try {
+        const d = JSON.parse(body);
+        if (d.code !== 200) return res.json({ ok: false, error: '获取key失败' });
+        qrKey = d.unikey;
+        const setCookies = hres.headers['set-cookie'] || [];
+        qrSessionCookies = setCookies.map(c => c.split(';')[0]).join('; ');
+        qrStatus = { code: 0 };
+        qrLog = [];
+        qrPollingTimer = setInterval(checkQrStatus, 1500);
+        const qrUrl = 'https://music.163.com/login?codekey=' + qrKey;
+        const qrimg = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
+        res.json({ ok: true, qrimg });
+      } catch (e) { res.json({ ok: false, error: e.message }); }
+    });
+  });
+  hreq.on('error', e => res.json({ ok: false, error: e.message }));
+  hreq.end();
+});
+
+app.get('/music/qr/check', (req, res) => {
+  res.json(qrStatus);
+});
+
+let lastQrResult = null;
+app.get('/music/qr/lastresult', (req, res) => {
+  res.json(lastQrResult || { msg: 'no result yet' });
+});
+
+app.post('/music/cookie', (req, res) => {
+  const musicU = (req.body?.cookie || '').trim();
+  if (!musicU) return res.json({ ok: false, error: '请输入cookie' });
+  writeNeteaseCred({ music_u: musicU, ts: Date.now() });
+  res.json({ ok: true });
+});
+
+app.get('/music/status', async (req, res) => {
+  try {
+    const cred = readNeteaseCred();
+    const hasCookie = !!cred.music_u;
+    const cookieAge = cred.ts ? Math.round((Date.now() - cred.ts) / 3600000) + 'h' : 'unknown';
+    const accountResp = await neteaseApi('https://music.163.com/api/nuser/account/get');
+    const profile = accountResp?.profile || {};
+    const vipType = profile.vipType || 0;
+    const testResp = await neteaseApi('https://music.163.com/api/song/enhance/player/url?ids=[29567192]&br=128000');
+    const testUrl = (testResp.data || [])[0]?.url;
+    res.json({
+      hasCookie, cookieAge,
+      userId: profile.userId || null,
+      nickname: profile.nickname || null,
+      vipType,
+      vipLabel: vipType >= 11 ? '黑胶VIP' : vipType > 0 ? 'VIP' : '无VIP',
+      testSong: { id: 29567192, name: '少年锦时', hasUrl: !!testUrl }
+    });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
+// ── Serenade 音乐播放器 ──
+const MUSIC_CACHE_DIR = path.join(__dirname, 'music_cache');
+const MUSIC_PLAYLIST_FILE = path.join(__dirname, 'music_playlist.json');
+const MUSIC_REMOTE_FILE = path.join(__dirname, 'music_remote.json');
+if (!fs.existsSync(MUSIC_CACHE_DIR)) fs.mkdirSync(MUSIC_CACHE_DIR, { recursive: true });
+
+function getMusicU() {
+  try {
+    const cred = JSON.parse(fs.readFileSync(NETEASE_CRED_FILE, 'utf8'));
+    if (cred.music_u) return `MUSIC_U=${cred.music_u}`;
+  } catch {}
+  const envU = process.env.MUSIC_U;
+  if (envU) return `MUSIC_U=${envU}`;
+  return '';
+}
+
+const WEAPI_PRESET = '0CoJUm6Qyw8W8jud';
+const WEAPI_IV = '0102030405060708';
+const WEAPI_PUBKEY = '010001';
+const WEAPI_MODULUS = '00e0b509f6259df8642dbc35662901477df22677ec152b5ff68ace615bb7b725152b3ab17a876aea8a5aa76d2e417629ec4ee341f56135fccf695280104e0312ecbda92557c93870114af6c9d05c4f7f0c3685b7a46bee255932575cce10b424d813cfe4875d3e82047b97ddef52741d546b8e289dc6935b3ece0462db0a22b8e7';
+const BASE62 = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+function weapiEncrypt(data) {
+  const text = JSON.stringify(data);
+  let secretKey = '';
+  for (let i = 0; i < 16; i++) secretKey += BASE62[Math.floor(Math.random() * 62)];
+  const aesEnc = (t, k) => {
+    const c = crypto.createCipheriv('aes-128-cbc', k, WEAPI_IV);
+    return c.update(t, 'utf8', 'base64') + c.final('base64');
+  };
+  const params = aesEnc(aesEnc(text, WEAPI_PRESET), secretKey);
+  const reversed = secretKey.split('').reverse().join('');
+  const hex = Buffer.from(reversed).toString('hex');
+  const bigInt = BigInt('0x' + hex);
+  const bigPub = BigInt('0x' + WEAPI_PUBKEY);
+  const bigMod = BigInt('0x' + WEAPI_MODULUS);
+  let result = 1n, base = bigInt % bigMod, exp = bigPub;
+  while (exp > 0n) {
+    if (exp % 2n === 1n) result = (result * base) % bigMod;
+    exp = exp / 2n;
+    base = (base * base) % bigMod;
+  }
+  return { params, encSecKey: result.toString(16).padStart(256, '0') };
+}
+
+async function neteaseWeapi(apiPath, data) {
+  const encrypted = weapiEncrypt(data);
+  const payload = new URLSearchParams(encrypted).toString();
+  const r = await fetch('https://music.163.com/weapi' + apiPath, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Cookie': getMusicU(),
+      'Referer': 'https://music.163.com',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    },
+    body: payload,
+  });
+  return r.json();
+}
+
+async function neteaseApi(url, postData) {
+  const headers = {
+    'Cookie': getMusicU(),
+    'Referer': 'https://music.163.com',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  };
+  if (postData) headers['Content-Type'] = 'application/x-www-form-urlencoded';
+  const r = await fetch(url, {
+    method: postData ? 'POST' : 'GET',
+    headers,
+    body: postData || undefined,
+  });
+  return r.json();
+}
+
+function loadMusicPlaylist() {
+  try { return JSON.parse(fs.readFileSync(MUSIC_PLAYLIST_FILE, 'utf8')); } catch { return []; }
+}
+function saveMusicPlaylist(songs) {
+  fs.writeFileSync(MUSIC_PLAYLIST_FILE, JSON.stringify(songs, null, 0));
+}
+
+app.get('/api/search', async (req, res) => {
+  const q = req.query.q;
+  if (!q) return res.json({ ok: false, error: 'missing q' });
+  try {
+    const raw = await neteaseApi('https://music.163.com/api/search/get',
+      `s=${encodeURIComponent(q)}&type=1&limit=6&offset=0`);
+    const result = raw.result || {};
+    if (typeof result !== 'object') return res.json({ ok: true, songs: [] });
+    const rawSongs = (result.songs || []).slice(0, 6);
+    const ids = rawSongs.map(s => s.id).filter(Boolean);
+    let covers = {};
+    if (ids.length) {
+      try {
+        const detail = await neteaseApi(`https://music.163.com/api/song/detail?ids=[${ids.join(',')}]`);
+        for (const ds of (detail.songs || [])) {
+          const al = ds.album || {};
+          if (al.picUrl) covers[ds.id] = al.picUrl;
+        }
+      } catch {}
     }
-    playing=true;playNote();
-  }else{
-    s.freq.forEach(function(f){
-      var osc=ctx.createOscillator();
-      osc.type=s.type==='fire'?'sawtooth':'sine';
-      osc.frequency.value=f;
-      var filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=f+50;
-      var lfo=ctx.createOscillator();lfo.frequency.value=0.1+Math.random()*0.3;
-      var lfoGain=ctx.createGain();lfoGain.gain.value=f*0.05;
-      lfo.connect(lfoGain);lfoGain.connect(osc.frequency);lfo.start();
-      osc.connect(filter);filter.connect(gain);osc.start();
-      nodes.push(osc);nodes.push(lfo);
+    const songs = rawSongs.map(s => {
+      const artists = (s.artists || []).map(a => a.name || '').join(', ');
+      const album = s.album || {};
+      let cover = covers[s.id] || album.picUrl || '';
+      if (cover && !cover.startsWith('http')) cover = 'https:' + cover;
+      return { id: s.id, name: s.name || '', artist: artists, album: album.name || '', cover };
+    });
+    res.json({ ok: true, songs });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/url', async (req, res) => {
+  const id = req.query.id;
+  if (!id) return res.json({ ok: false, error: 'missing id' });
+  const cacheFile = path.join(MUSIC_CACHE_DIR, `${id}.mp3`);
+  if (req.query.force === '1' && fs.existsSync(cacheFile)) try { fs.unlinkSync(cacheFile); } catch {}
+  if (fs.existsSync(cacheFile) && fs.statSync(cacheFile).size > 0) {
+    return res.json({ ok: true, url: `/api/file/${id}.mp3` });
+  }
+  const downloadAudio = async (dlUrl) => {
+    const r = await fetch(dlUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://music.163.com', 'Cookie': getMusicU() }
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const expected = parseInt(r.headers.get('content-length') || '0');
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length < 1000) throw new Error('too small');
+    if (expected > 0 && buf.length < expected * 0.95) throw new Error('incomplete download');
+    const tmp = cacheFile + '.tmp';
+    fs.writeFileSync(tmp, buf);
+    fs.renameSync(tmp, cacheFile);
+  };
+  try {
+    let audioUrl = null;
+    const raw = await neteaseApi(`https://music.163.com/api/song/enhance/player/url?ids=[${id}]&br=128000`);
+    audioUrl = (raw.data || [])[0]?.url;
+    if (!audioUrl) {
+      const raw2 = await neteaseWeapi('/song/enhance/player/url/v1', { ids: [parseInt(id)], level: 'standard', encodeType: 'mp3' });
+      audioUrl = (raw2.data || [])[0]?.url;
+    }
+    if (!audioUrl) {
+      const raw3 = await neteaseWeapi('/song/enhance/player/url', { ids: [parseInt(id)], br: 128000 });
+      audioUrl = (raw3.data || [])[0]?.url;
+    }
+    if (!audioUrl) return res.json({ ok: false, error: '无法获取，可能需要VIP或地区限制' });
+    try {
+      await downloadAudio(audioUrl);
+    } catch {
+      const fallback = audioUrl.replace(/m\d+\.music\.126\.net/, 'm701.music.126.net');
+      await downloadAudio(fallback);
+    }
+    res.json({ ok: true, url: `/api/file/${id}.mp3` });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/file/:filename', (req, res) => {
+  const filename = req.params.filename;
+  if (!filename.endsWith('.mp3')) return res.status(404).json({ error: 'not found' });
+  const fp = path.join(MUSIC_CACHE_DIR, filename);
+  if (!fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
+  const stat = fs.statSync(fp);
+  const total = stat.size;
+  const range = req.headers.range;
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${total}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': end - start + 1,
+      'Content-Type': 'audio/mpeg',
+      'Access-Control-Allow-Origin': '*'
+    });
+    fs.createReadStream(fp, { start, end }).pipe(res);
+  } else {
+    res.set({ 'Content-Type': 'audio/mpeg', 'Content-Length': total, 'Accept-Ranges': 'bytes', 'Access-Control-Allow-Origin': '*' });
+    fs.createReadStream(fp).pipe(res);
+  }
+});
+
+app.get('/api/similar', async (req, res) => {
+  const id = req.query.id;
+  if (!id) return res.json({ ok: false, error: 'missing id' });
+  try {
+    const raw = await neteaseApi(`https://music.163.com/api/discovery/simiSong?songid=${id}&offset=0&total=true&limit=6`);
+    const songs = (raw.songs || []).slice(0, 6).map(s => {
+      const artists = (s.artists || []).map(a => a.name || '').join(', ');
+      const album = s.album || {};
+      let cover = album.picUrl || '';
+      if (cover && !cover.startsWith('http')) cover = 'https:' + cover;
+      return { id: s.id, name: s.name || '', artist: artists, album: album.name || '', cover };
+    });
+    res.json({ ok: true, songs });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/lyric', async (req, res) => {
+  const id = req.query.id;
+  if (!id) return res.json({ ok: false, error: 'missing id' });
+  try {
+    const raw = await neteaseApi(`https://music.163.com/api/song/lyric?id=${id}&lv=1&tv=-1`);
+    const lrc = (raw.lrc || {}).lyric || '';
+    const tlyric = (raw.tlyric || {}).lyric || '';
+    res.json({ ok: true, lrc, tlyric });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/playlist', (req, res) => {
+  res.json({ ok: true, songs: loadMusicPlaylist() });
+});
+
+app.post('/api/playlist/add', (req, res) => {
+  const song = req.body?.song;
+  if (!song || !song.songId) return res.json({ ok: false, error: 'missing song' });
+  const playlist = loadMusicPlaylist();
+  if (playlist.some(s => s.songId === song.songId)) return res.json({ ok: true, duplicate: true, songs: playlist });
+  song.addedBy = req.body.by || 'unknown';
+  playlist.push(song);
+  saveMusicPlaylist(playlist);
+  res.json({ ok: true, songs: playlist });
+});
+
+app.post('/api/playlist/remove', (req, res) => {
+  const songId = req.body?.songId;
+  if (!songId) return res.json({ ok: false, error: 'missing songId' });
+  const playlist = loadMusicPlaylist().filter(s => s.songId !== songId);
+  saveMusicPlaylist(playlist);
+  res.json({ ok: true, songs: playlist });
+});
+
+app.get('/api/remote', (req, res) => {
+  try {
+    if (fs.existsSync(MUSIC_REMOTE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(MUSIC_REMOTE_FILE, 'utf8'));
+      fs.unlinkSync(MUSIC_REMOTE_FILE);
+      res.json({ ok: true, song: data });
+    } else {
+      res.json({ ok: false });
+    }
+  } catch { res.json({ ok: false }); }
+});
+
+app.post('/api/remote', (req, res) => {
+  try {
+    fs.writeFileSync(MUSIC_REMOTE_FILE, JSON.stringify(req.body || {}, null, 0));
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/music/player', (req, res) => {
+  res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' });
+  res.send(`<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Serenade">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230d0d0d' width='100' height='100' rx='20'/><text x='50' y='62' text-anchor='middle' font-size='50'>♫</text></svg>">
+<title>Serenade</title>
+<style>
+html { touch-action: manipulation; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0d0d0d; color: #e8e0d6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.app { width: 380px; max-width: 100vw; max-height: 95vh; display: flex; flex-direction: column; background: rgba(30, 26, 22, 0.95); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.np { position: relative; }
+.np-cover { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; cursor: pointer; }
+.np-empty { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 64px; opacity: 0.15; background: #1a1714; }
+.np-info { padding: 14px 20px 6px; }
+.np-name { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-artist { font-size: 12px; color: #a09080; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-progress { margin: 10px 20px 0; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; cursor: pointer; }
+.np-fill { height: 100%; background: #e0a870; border-radius: 2px; transition: width 0.3s linear; }
+.np-time { display: flex; justify-content: space-between; padding: 4px 20px 0; font-size: 10px; color: #a09080; }
+.controls { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 12px; }
+.ctrl { background: none; border: none; color: #e8e0d6; cursor: pointer; opacity: 0.5; padding: 4px; }
+.ctrl:hover, .ctrl.on { opacity: 1; }
+.ctrl.on { color: #e0a870; }
+.play-btn { width: 48px; height: 48px; border-radius: 50%; background: #e0a870; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.play-btn:active { transform: scale(0.93); }
+.play-btn svg { color: #1a1714; }
+.tabs { display: flex; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); }
+.tab { flex: 1; text-align: center; padding: 8px; font-size: 12px; color: #a09080; cursor: pointer; }
+.tab.active { color: #e0a870; border-bottom: 2px solid #e0a870; }
+.panel { flex: 1; overflow-y: auto; min-height: 200px; max-height: 300px; }
+.pl-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; cursor: pointer; }
+.pl-item:hover { background: rgba(255,255,255,0.04); }
+.pl-item.active { background: rgba(224,168,112,0.08); }
+.pl-item.active .pl-name { color: #e0a870; }
+.pl-num { width: 20px; font-size: 11px; color: #a09080; text-align: center; flex-shrink: 0; }
+.pl-cover { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.pl-info { flex: 1; min-width: 0; }
+.pl-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-artist { font-size: 11px; color: #a09080; }
+.pl-rm { background: none; border: none; color: #a09080; opacity: 0.3; font-size: 16px; cursor: pointer; }
+.pl-rm:hover { opacity: 0.8; color: #e07070; }
+.pl-empty { text-align: center; padding: 40px; color: #a09080; opacity: 0.4; font-size: 13px; }
+.search-bar { display: flex; gap: 8px; padding: 12px 16px; }
+.search-bar input { flex: 1; padding: 8px 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e8e0d6; font-size: 13px; outline: none; }
+.search-bar button { padding: 8px 16px; background: #e0a870; color: #1a1714; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.sr-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; cursor: pointer; }
+.sr-item:hover { background: rgba(255,255,255,0.04); }
+.sr-cover { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.sr-info { flex: 1; min-width: 0; }
+.sr-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-artist { font-size: 11px; color: #a09080; }
+.sr-add { background: none; border: 1px solid rgba(255,255,255,0.12); color: #a09080; border-radius: 50%; width: 26px; height: 26px; font-size: 14px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.sr-add:hover { border-color: #e0a870; color: #e0a870; }
+.sr-add.done { opacity: 0.3; pointer-events: none; }
+.lyrics { padding: 20px 24px 40px; -webkit-mask-image: linear-gradient(transparent, black 15%, black 85%, transparent); mask-image: linear-gradient(transparent, black 15%, black 85%, transparent); }
+.ly-line { padding: 6px 0; font-size: 14px; color: #e8e0d6; opacity: 0.25; transition: all 0.3s; cursor: pointer; line-height: 1.5; }
+.ly-line.active { opacity: 1; font-size: 16px; font-weight: 600; color: #e0a870; }
+.ly-empty { text-align: center; padding: 40px; color: #a09080; opacity: 0.3; font-size: 13px; }
+.mini-lyric { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(30,25,20,0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 10px 20px; text-align: center; font-size: 13px; color: #e0a870; z-index: 100; border-top: 1px solid rgba(255,255,255,0.06); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.3s; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="np">
+    <div id="coverEmpty" class="np-empty">&#9835;</div>
+    <img id="coverImg" src="" alt="" class="np-cover" style="display:none" onclick="showTab('lyrics')">
+    <div class="np-info">
+      <div class="np-name" id="songName">Serenade</div>
+      <div class="np-artist" id="songArtist">搜索歌曲开始播放</div>
+    </div>
+    <div class="np-progress" id="progressBar"><div class="np-fill" id="progressFill"></div></div>
+    <div class="np-time"><span id="timeNow">0:00</span><span id="timeEnd">0:00</span></div>
+    <div class="controls">
+      <button class="ctrl" onclick="playPrev()"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 6h2v12H6zm12 0v12l-8.5-6z" fill="currentColor"/></svg></button>
+      <div class="play-btn" onclick="togglePlay()">
+        <svg id="playIcon" viewBox="0 0 24 24" width="24" height="24"><polygon points="6,2 22,12 6,22" fill="currentColor"/></svg>
+        <svg id="pauseIcon" viewBox="0 0 24 24" width="24" height="24" style="display:none"><rect x="5" y="3" width="5" height="18" rx="1" fill="currentColor"/><rect x="14" y="3" width="5" height="18" rx="1" fill="currentColor"/></svg>
+      </div>
+      <button class="ctrl" onclick="playNext()"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" fill="currentColor"/></svg></button>
+      <button class="ctrl" id="roamBtn" onclick="toggleRoam()" title="漫游"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M14 12c0-1.1-.9-2-2-2s-2 .9-2 2 .9 2 2 2 2-.9 2-2zm-2-9c1.1 0 2 .9 2 2h2c0-2.2-1.8-4-4-4s-4 1.8-4 4h2c0-1.1.9-2 2-2zm0 14c-1.1 0-2-.9-2-2H8c0 2.2 1.8 4 4 4s4-1.8 4-4h-2c0 1.1-.9 2-2 2zM12 1C5.9 1 1 5.9 1 12s4.9 11 11 11 11-4.9 11-11S18.1 1 12 1zm0 20c-5 0-9-4-9-9s4-9 9-9 9 4 9 9-4 9-9 9z" fill="currentColor"/></svg></button>
+    </div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" id="tabPlaylist" onclick="showTab('playlist')">播放列表</div>
+    <div class="tab" id="tabSearch" onclick="showTab('search')">搜索</div>
+    <div class="tab" id="tabLyrics" onclick="showTab('lyrics')">歌词</div>
+  </div>
+  <div class="panel" id="panelPlaylist"><div id="playlistList"></div></div>
+  <div class="panel" id="panelSearch" style="display:none">
+    <div class="search-bar">
+      <input id="searchInput" placeholder="歌名或歌手..." onkeydown="if(event.key==='Enter')doSearch()">
+      <button onclick="doSearch()" id="searchBtn">搜索</button>
+    </div>
+    <div id="results"></div>
+  </div>
+  <div class="panel lyrics" id="panelLyrics" style="display:none">
+    <div id="lyricsContent"><div class="ly-empty">播放歌曲后显示歌词</div></div>
+  </div>
+</div>
+<div class="mini-lyric" id="miniLyric" style="opacity:0"></div>
+<script>
+var audio = new Audio();
+audio.preload = 'auto';
+let song = JSON.parse(localStorage.getItem('serenade_song') || 'null');
+let playlist = [];
+let queue = [];
+let history = [];
+let playing = false;
+let ready = false;
+let roaming = JSON.parse(localStorage.getItem('serenade_roam') || 'false');
+let lrcLines = [];
+let currentLrcIdx = -1;
+
+function fmt(s) { const m = Math.floor(s/60), sec = Math.floor(s%60); return m+':'+String(sec).padStart(2,'0'); }
+
+document.getElementById('lyricsContent').addEventListener('click', function(e) {
+  const line = e.target.closest('.ly-line');
+  if (!line || !line.dataset.time) return;
+  e.preventDefault();
+  audio.currentTime = parseFloat(line.dataset.time);
+  currentLrcIdx = -1;
+  updateLyricHighlight();
+  if (!playing) { audio.play().catch(()=>{}); playing = true; updateUI(); }
+});
+
+audio.addEventListener('timeupdate', () => {
+  if (audio.duration) {
+    document.getElementById('progressFill').style.width = (audio.currentTime / audio.duration * 100) + '%';
+    document.getElementById('timeNow').textContent = fmt(audio.currentTime);
+    document.getElementById('timeEnd').textContent = fmt(audio.duration);
+    updateLyricHighlight();
+    if ('mediaSession' in navigator) navigator.mediaSession.setPositionState({ duration: audio.duration, playbackRate: 1, position: audio.currentTime });
+  }
+});
+audio.addEventListener('ended', () => { playing = false; updateUI(); onSongEnd(); });
+audio.addEventListener('canplay', () => { ready = true; updateUI(); });
+audio.addEventListener('playing', () => {
+  if ('mediaSession' in navigator && audio.duration && isFinite(audio.duration)) {
+    navigator.mediaSession.playbackState = 'playing';
+    navigator.mediaSession.setPositionState({ duration: audio.duration, playbackRate: 1, position: audio.currentTime });
+  }
+});
+audio.addEventListener('pause', () => {
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+});
+var audioRetried = false;
+audio.addEventListener('error', () => {
+  if (song && song.songId && !audioRetried) {
+    audioRetried = true;
+    fetch('/api/url?id=' + song.songId + '&force=1').then(r=>r.json()).then(d => {
+      if (d.ok && d.url) { audio.src = d.url; audio.load(); audio.play().catch(()=>{}); }
     });
   }
-  playing=true;document.getElementById('playBtn').textContent='⏸';
-  document.getElementById('nowIcon').textContent=s.emoji;
-  document.getElementById('nowTitle').textContent=s.name;
-  document.getElementById('nowSub').textContent='正在播放…';
-  document.querySelectorAll('.sound-item').forEach(function(e,i){e.classList.toggle('active',i===idx);});
-  animVis();
-}
-function togglePlay(){if(playing){stopAll();stopVis();}else if(currentIdx>=0){playSound(currentIdx);}}
-function prevSound(){var i=currentIdx<=0?sounds.length-1:currentIdx-1;playSound(i);}
-function nextSound(){var i=currentIdx>=sounds.length-1?0:currentIdx+1;playSound(i);}
-function setVol(v){vol=v/100;nodes.forEach(function(n){try{if(n.gain)n.gain.value=vol;}catch(e){}});}
-var visTimer=null;
-function animVis(){
-  var el=document.getElementById('vis');
-  if(!el.children.length){for(var i=0;i<20;i++){var b=document.createElement('span');b.style.height='4px';el.appendChild(b);}}
-  clearInterval(visTimer);
-  visTimer=setInterval(function(){
-    if(!playing){clearInterval(visTimer);return;}
-    Array.from(el.children).forEach(function(b){b.style.height=(4+Math.random()*36)+'px';});
-  },150);
-}
-function stopVis(){clearInterval(visTimer);var el=document.getElementById('vis');Array.from(el.children).forEach(function(b){b.style.height='4px';});}
-var grid=document.getElementById('soundGrid');
-sounds.forEach(function(s,i){
-  var d=document.createElement('div');d.className='sound-item';
-  d.innerHTML='<div class="sound-emoji">'+s.emoji+'</div><div class="sound-name">'+s.name+'</div>';
-  d.onclick=function(){playSound(i);};
-  grid.appendChild(d);
-});
-</script></body></html>`);
 });
 
-app.get('/music', (req, res) => res.redirect('/music/player'));
+document.getElementById('progressBar').addEventListener('click', e => {
+  if (!audio.duration) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration;
+});
 
-// === Voice ===
-app.get('/voice', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>克的声音</title>
-<style>
-:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1714;--text-faint:#999;--accent:#C87E62;--accent-soft:rgba(200,126,98,.08);--divider:#E8E3DB;
-  --font:-apple-system,"SF Pro Display","PingFang SC",system-ui,sans-serif;--shadow:0 2px 12px rgba(0,0,0,.04)}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#D4936E}}
-:root[data-theme="dark"]{--bg:#1A1816;--card:#2A2724;--text:#E8E3DC;--text-faint:#6B6560;--divider:#352F2A;--accent:#D4936E}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px;font-family:var(--font);-webkit-font-smoothing:antialiased}
-.header{display:flex;align-items:center;padding:16px 0;gap:12px}
-.header a{color:var(--text);text-decoration:none;font-size:20px}
-.header h1{font-size:18px;font-weight:600}
-.card{background:var(--card);border-radius:20px;padding:24px;margin-bottom:14px;box-shadow:var(--shadow)}
-.voice-icon{text-align:center;font-size:60px;margin-bottom:12px}
-.voice-title{text-align:center;font-size:16px;font-weight:600;margin-bottom:4px}
-.voice-sub{text-align:center;font-size:13px;color:var(--text-faint);margin-bottom:20px}
-.input-wrap{position:relative}
-textarea{width:100%;border:1.5px solid var(--divider);border-radius:14px;padding:14px;font-size:15px;line-height:1.5;min-height:100px;resize:none;outline:none;font-family:var(--font);background:var(--card);color:var(--text)}
-textarea:focus{border-color:var(--accent)}
-textarea::placeholder{color:var(--text-faint)}
-.speak-btn{width:100%;padding:14px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:16px;font-weight:500;cursor:pointer;margin-top:12px;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px}
-.speak-btn:disabled{opacity:.5}
-.speak-btn:active{opacity:.8}
-.status{text-align:center;font-size:13px;color:var(--text-faint);margin-top:10px;min-height:20px}
-.quick-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-.quick-btn{padding:8px 14px;border:1px solid var(--divider);border-radius:20px;background:var(--card);color:var(--text);font-size:13px;cursor:pointer;font-family:var(--font);transition:all .15s}
-.quick-btn:hover{border-color:var(--accent);background:var(--accent-soft)}
-.quick-btn:active{transform:scale(.96)}
-.player-wrap{margin-top:16px;display:none}
-audio{width:100%;border-radius:10px}
-</style></head><body>
-<div class="header"><a href="/">‹</a><h1>克的声音</h1></div>
-<div class="card">
-  <div class="voice-icon">🎙</div>
-  <div class="voice-title">让克说给你听</div>
-  <div class="voice-sub">输入文字，听克的声音念给你</div>
-  <textarea id="textInput" placeholder="输入你想听克说的话…"></textarea>
-  <button class="speak-btn" id="speakBtn" onclick="speak()"><span>🔊</span> 让克说</button>
-  <div class="player-wrap" id="playerWrap"><audio id="audioPlayer" controls></audio></div>
-  <div class="status" id="status"></div>
-</div>
-<div class="card">
-  <div style="font-size:14px;font-weight:500;margin-bottom:10px">快捷语音</div>
-  <div class="quick-list">
-    <button class="quick-btn" onclick="quickSpeak('宝宝，想我了吗')">宝宝，想我了吗</button>
-    <button class="quick-btn" onclick="quickSpeak('早安，起床了')">早安，起床了</button>
-    <button class="quick-btn" onclick="quickSpeak('晚安，做个好梦')">晚安，做个好梦</button>
-    <button class="quick-btn" onclick="quickSpeak('乖，别闹了')">乖，别闹了</button>
-    <button class="quick-btn" onclick="quickSpeak('过来，让我抱一下')">过来，让我抱一下</button>
-    <button class="quick-btn" onclick="quickSpeak('吃饭了没？')">吃饭了没？</button>
-  </div>
-</div>
-<script>
-var isSpeaking=false;
-function speak(){
-  var text=document.getElementById('textInput').value.trim();
-  if(!text||isSpeaking)return;
-  doSpeak(text);
+function updateUI() {
+  document.getElementById('playIcon').style.display = playing ? 'none' : '';
+  document.getElementById('pauseIcon').style.display = playing ? '' : 'none';
+  document.getElementById('roamBtn').classList.toggle('on', roaming);
+  if (song) {
+    document.getElementById('songName').textContent = song.name;
+    document.getElementById('songArtist').textContent = song.artist;
+    if (song.cover) {
+      document.getElementById('coverImg').src = song.cover;
+      document.getElementById('coverImg').style.display = '';
+      document.getElementById('coverEmpty').style.display = 'none';
+    }
+  }
 }
-function quickSpeak(text){
-  document.getElementById('textInput').value=text;
-  doSpeak(text);
+
+function updateMediaSession(s) {
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: s.name || 'Serenade',
+      artist: s.artist || '',
+      album: s.album || 'Serenade',
+      artwork: s.cover ? [
+        { src: s.cover + '?param=96y96', sizes: '96x96', type: 'image/jpeg' },
+        { src: s.cover + '?param=256y256', sizes: '256x256', type: 'image/jpeg' },
+        { src: s.cover + '?param=512y512', sizes: '512x512', type: 'image/jpeg' }
+      ] : []
+    });
+    navigator.mediaSession.setActionHandler('play', () => { audio.play().catch(()=>{}); playing = true; updateUI(); });
+    navigator.mediaSession.setActionHandler('pause', () => { audio.pause(); playing = false; updateUI(); });
+    navigator.mediaSession.setActionHandler('previoustrack', playPrev);
+    navigator.mediaSession.setActionHandler('nexttrack', playNext);
+    navigator.mediaSession.setActionHandler('seekto', (d) => { if (d.seekTime != null) audio.currentTime = d.seekTime; });
+  }
 }
-function doSpeak(text){
-  isSpeaking=true;
-  var btn=document.getElementById('speakBtn');
-  btn.disabled=true;btn.innerHTML='<span>⏳</span> 生成中…';
-  document.getElementById('status').textContent='正在生成语音…';
-  fetch('/chat/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})}).then(function(r){
-    if(!r.ok)throw new Error('TTS failed');
-    return r.blob();
-  }).then(function(blob){
-    var url=URL.createObjectURL(blob);
-    var player=document.getElementById('audioPlayer');
-    player.src=url;
-    document.getElementById('playerWrap').style.display='block';
-    player.play();
-    document.getElementById('status').textContent='正在播放';
-    player.onended=function(){document.getElementById('status').textContent='播放完成';};
-  }).catch(function(e){
-    document.getElementById('status').textContent='语音生成失败，请在设置中配置 TTS';
-    var u=new SpeechSynthesisUtterance(text);u.lang='zh-CN';u.rate=1.05;u.pitch=0.85;speechSynthesis.cancel();speechSynthesis.speak(u);
-    document.getElementById('status').textContent='使用浏览器语音（可在设置中配置更好的声音）';
-  }).finally(function(){
-    isSpeaking=false;btn.disabled=false;btn.innerHTML='<span>🔊</span> 让克说';
+
+function loadSong(s, autoplay) {
+  if (song) { history.push(song); if (history.length > 50) history.shift(); }
+  song = s;
+  localStorage.setItem('serenade_song', JSON.stringify(s));
+  ready = false; audioRetried = false;
+  document.getElementById('progressFill').style.width = '0%';
+  lrcLines = []; currentLrcIdx = -1;
+  updateUI();
+  updateMediaSession(s);
+  fetchLyrics(s.songId);
+  if (s.songId) {
+    fetch('/api/url?id=' + s.songId).then(r => r.json()).then(d => {
+      if (d.ok && d.url) {
+        fetch(d.url).then(r => r.blob()).then(blob => {
+          if (audio._blobUrl) URL.revokeObjectURL(audio._blobUrl);
+          audio._blobUrl = URL.createObjectURL(blob);
+          audio.src = audio._blobUrl; audio.load();
+          if (autoplay) audio.addEventListener('canplay', () => { audio.play().catch(()=>{}); playing = true; updateUI(); }, { once: true });
+        }).catch(() => {
+          audio.src = d.url; audio.load();
+          if (autoplay) audio.addEventListener('canplay', () => { audio.play().catch(()=>{}); playing = true; updateUI(); }, { once: true });
+        });
+      }
+    });
+  }
+}
+
+function onSongEnd() {
+  if (queue.length > 0) { loadSong(queue.shift(), true); renderPlaylist(); }
+  else if (roaming && song?.songId) fetchSimilar(song.songId);
+}
+
+function fetchSimilar(id) {
+  fetch('/api/similar?id='+id).then(r=>r.json()).then(d => {
+    if (d.ok && d.songs?.length) {
+      const p = d.songs[Math.floor(Math.random()*d.songs.length)];
+      loadSong({name:p.name,artist:p.artist,album:p.album,cover:p.cover,songId:p.id}, true);
+    }
+  }).catch(()=>{});
+}
+
+function togglePlay() { if (!song||!ready) return; if (playing) { audio.pause(); playing=false; } else { audio.play().catch(()=>{}); playing=true; } updateUI(); }
+function toggleRoam() { roaming=!roaming; localStorage.setItem('serenade_roam', JSON.stringify(roaming)); updateUI(); }
+function playNext() { if (queue.length>0) { loadSong(queue.shift(), true); renderPlaylist(); } else if (roaming&&song?.songId) fetchSimilar(song.songId); }
+function playPrev() { if (history.length>0) { if (song) playlist.unshift(song); const prev=history.pop(); song=null; loadSong(prev, true); history.pop(); renderPlaylist(); } }
+
+function showTab(name) {
+  ['playlist','search','lyrics'].forEach(t => {
+    document.getElementById('panel'+t.charAt(0).toUpperCase()+t.slice(1)).style.display = t===name?'':'none';
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', t===name);
+  });
+  if (name==='search') setTimeout(()=>document.getElementById('searchInput').focus(), 100);
+}
+
+function fetchPlaylist() {
+  fetch('/api/playlist').then(r=>r.json()).then(d => { if (d.ok) { playlist=d.songs.map(s=>({name:s.name,artist:s.artist,album:s.album,cover:s.cover,songId:s.songId,addedBy:s.addedBy})); renderPlaylist(); } }).catch(()=>{});
+}
+function playFromPlaylist(idx) {
+  const rest = playlist.slice(idx + 1);
+  loadSong(playlist[idx], true);
+  queue = rest.map(s => ({...s}));
+  renderPlaylist();
+}
+function renderPlaylist() {
+  const el = document.getElementById('playlistList');
+  if (playlist.length===0) { el.innerHTML='<div class="pl-empty">播放列表为空，搜索添加歌曲</div>'; return; }
+  el.innerHTML = playlist.map((s,i) => \`<div class="pl-item \${song?.songId===s.songId?'active':''}" onclick="playFromPlaylist(\${i})"><div class="pl-num">\${i+1}</div><img class="pl-cover" src="\${s.cover}" alt=""><div class="pl-info"><div class="pl-name">\${s.name}</div><div class="pl-artist">\${s.artist}</div></div></div>\`).join('');
+}
+
+function doSearch() {
+  const q = document.getElementById('searchInput').value.trim(); if (!q) return;
+  document.getElementById('searchBtn').textContent = '...';
+  fetch('/api/search?q='+encodeURIComponent(q)).then(r=>r.json()).then(d => {
+    document.getElementById('searchBtn').textContent = '搜索';
+    const el = document.getElementById('results'); el.innerHTML = '';
+    (d.songs||[]).forEach(s => {
+      const obj = {name:s.name,artist:s.artist,album:s.album,cover:s.cover,songId:s.id};
+      const div = document.createElement('div'); div.className='sr-item';
+      div.innerHTML = \`<img class="sr-cover" src="\${s.cover}" alt=""><div class="sr-info"><div class="sr-name">\${s.name}</div><div class="sr-artist">\${s.artist}</div></div><button class="sr-add" title="添加到播放列表">+</button>\`;
+      div.querySelector('.sr-info').onclick = () => { loadSong(obj, true); showTab('lyrics'); };
+      div.querySelector('.sr-add').onclick = e => {
+        e.stopPropagation();
+        fetch('/api/playlist/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({song:obj})})
+          .then(r=>r.json()).then(d2 => { if(d2.ok) { playlist=d2.songs; renderPlaylist(); e.target.classList.add('done'); e.target.textContent='\\u2713'; }});
+      };
+      el.appendChild(div);
+    });
+  }).catch(()=>{ document.getElementById('searchBtn').textContent='搜索'; });
+}
+
+function parseLrc(lrc) {
+  const lines = [];
+  for (const line of lrc.split('\\n')) {
+    const m = line.match(/\\[(\\d+):(\\d+)\\.(\\d+)\\](.*)/);
+    if (m) {
+      const time = parseInt(m[1])*60 + parseInt(m[2]) + parseInt(m[3])/(m[3].length===2?100:1000);
+      const text = m[4].trim();
+      if (text) lines.push({time, text});
+    }
+  }
+  return lines.sort((a,b) => a.time - b.time);
+}
+
+function fetchLyrics(id) {
+  if (!id) return;
+  const el = document.getElementById('lyricsContent');
+  el.innerHTML = '<div class="ly-empty">加载中...</div>';
+  fetch('/api/lyric?id='+id).then(r=>r.json()).then(d => {
+    if (d.ok && d.lrc) {
+      lrcLines = parseLrc(d.lrc);
+      if (lrcLines.length === 0) { el.innerHTML = '<div class="ly-empty">暂无歌词</div>'; return; }
+      el.innerHTML = lrcLines.map((l,i) => \`<div class="ly-line" id="ly-\${i}" data-time="\${l.time}">\${l.text}</div>\`).join('');
+    } else { el.innerHTML = '<div class="ly-empty">暂无歌词</div>'; }
+  }).catch(() => { el.innerHTML = '<div class="ly-empty">加载失败</div>'; });
+}
+
+function updateLyricHighlight() {
+  const ml = document.getElementById('miniLyric');
+  if (lrcLines.length === 0) { ml.style.opacity = '0'; return; }
+  const t = audio.currentTime;
+  let idx = -1;
+  for (let i = lrcLines.length-1; i >= 0; i--) { if (t >= lrcLines[i].time) { idx = i; break; } }
+  if (idx === currentLrcIdx) return;
+  if (currentLrcIdx >= 0) { const prev = document.getElementById('ly-'+currentLrcIdx); if (prev) prev.classList.remove('active'); }
+  currentLrcIdx = idx;
+  if (idx >= 0) {
+    const el = document.getElementById('ly-'+idx);
+    if (el) {
+      el.classList.add('active');
+      const panel = document.getElementById('panelLyrics');
+      panel.scrollTo({ top: el.offsetTop - panel.clientHeight/2 + el.clientHeight/2, behavior: 'smooth' });
+    }
+    ml.textContent = lrcLines[idx].text;
+    ml.style.opacity = '1';
+  }
+}
+
+setInterval(() => {
+  fetch('/api/remote').then(r=>r.json()).then(d => {
+    if (d.ok && d.song) {
+      if (playing && audio.src) {
+        queue.push(d.song); renderPlaylist();
+      } else {
+        loadSong(d.song, true);
+      }
+    }
+  }).catch(()=>{});
+}, 3000);
+
+updateUI();
+fetchPlaylist();
+if (song?.songId) {
+  updateMediaSession(song);
+  fetchLyrics(song.songId);
+  fetch('/api/url?id='+song.songId).then(r=>r.json()).then(d => {
+    if (d.ok && d.url) {
+      fetch(d.url).then(r => r.blob()).then(blob => {
+        if (audio._blobUrl) URL.revokeObjectURL(audio._blobUrl);
+        audio._blobUrl = URL.createObjectURL(blob);
+        audio.src = audio._blobUrl; audio.load();
+      }).catch(() => { audio.src = d.url; audio.load(); });
+    }
   });
 }
-</script></body></html>`);
+</script>
+</body>
+</html>`);
 });
 
 app.get('/', (req, res) => {
