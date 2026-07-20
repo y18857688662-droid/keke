@@ -4073,7 +4073,10 @@ async function setupPush(){
   if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
   try{
     var reg=await navigator.serviceWorker.getRegistration('/sw.js');
-    if(reg){var sub=await reg.pushManager.getSubscription();if(sub){var pb=document.getElementById('pushBtn');if(pb){pb.textContent='通知已开启';pb.classList.add('done');}}}
+    if(reg){var sub=await reg.pushManager.getSubscription();if(sub){
+      await fetch('/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sub)});
+      var pb=document.getElementById('pushBtn');if(pb){pb.textContent='通知已开启';pb.classList.add('done');}
+    }}
   }catch(e){}
 })();
 
