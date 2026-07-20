@@ -1144,6 +1144,11 @@ app.post('/chat/reply', (req, res) => {
   res.json({ ok: true, time });
 });
 
+app.post('/chat/typing', (req, res) => {
+  sseBroadcast({ type: 'typing', active: true });
+  res.json({ ok: true });
+});
+
 app.get('/chat/history', (req, res) => {
   const chat = readChat();
   res.json({ messages: chat.slice(-50) });
@@ -4005,6 +4010,22 @@ var pollKnown = 0;
 evtSource.onmessage = function(e) {
   try {
     var data = JSON.parse(e.data);
+    if (data.type === 'typing' && data.active) {
+      if (!document.getElementById('typing-indicator')) {
+        var keData = localStorage.getItem('avatar_ke');
+        var avaHtml = keData ? '<img src="'+keData+'" style="width:100%;height:100%;object-fit:cover">' : '<svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#F0EBE4"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#C87E62" opacity=".6"/></svg>';
+        var typingEl = document.createElement('div');
+        typingEl.className = 'msg-group ke';
+        typingEl.id = 'typing-indicator';
+        typingEl.innerHTML = '<div class="msg-avatar">'+avaHtml+'</div><div class="msg-col"><div class="msg-bubble" style="color:var(--text-soft)">正在输入中...</div></div>';
+        msgContainer.appendChild(typingEl);
+        scrollBottom();
+      }
+    }
+    if (data.type === 'message' && data.role === 'assistant') {
+      var ti = document.getElementById('typing-indicator');
+      if (ti) ti.remove();
+    }
     if (data.type === 'message' && data.role === 'assistant' && !sending) {
       lastMsgCount++;
       pollKnown++;
