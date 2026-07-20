@@ -1151,6 +1151,7 @@ app.post('/chat/proactive', (req, res) => {
 });
 
 app.get('/chat/history', (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   const chat = readChat();
   res.json({ messages: chat.slice(-50) });
 });
@@ -3793,6 +3794,7 @@ var thinkingStore = {};
 var msgContainer = document.getElementById('messages');
 var inputField = document.querySelector('.input-field');
 var sending = false;
+var lastMsgCount = 0;
 
 var since = new Date(2026, 5, 14);
 var now = new Date();
@@ -3949,7 +3951,7 @@ function scrollBottom() {
 }
 
 function loadHistory() {
-  fetch('/chat/history').then(function(r){return r.json()}).then(function(data) {
+  fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
     if (data.messages && data.messages.length) {
       renderAll(data.messages);
       pollKnown = data.messages.length;
@@ -4048,7 +4050,7 @@ evtSource.onmessage = function(e) {
   } catch(err) {}
 };
 setInterval(function() {
-  fetch('/chat/history').then(function(r){return r.json()}).then(function(data) {
+  fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
     if (!data.messages) return;
     var count = data.messages.length;
     if (pollKnown >= 0 && count > pollKnown) {
@@ -4065,6 +4067,45 @@ setInterval(function() {
     pollKnown = count;
   }).catch(function(){});
 }, 2000);
+
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible') {
+    fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
+      if (!data.messages) return;
+      renderAll(data.messages);
+      pollKnown = data.messages.length;
+    }).catch(function(){});
+    if (evtSource.readyState === 2) {
+      evtSource.close();
+      evtSource = new EventSource('/chat/stream');
+      evtSource.onmessage = function(e) {
+        try {
+          var data = JSON.parse(e.data);
+          if (data.type === 'typing' && data.active) {
+            var hs = document.querySelector('.header-status');
+            if (hs) hs.innerHTML = '<span class="status-dot"></span>正在输入中...';
+          }
+          if (data.type === 'message' && data.role === 'assistant') {
+            var hs2 = document.querySelector('.header-status');
+            if (hs2) hs2.innerHTML = '<span class="status-dot"></span>在线';
+          }
+          if (data.type === 'message' && data.role === 'assistant' && !sending) {
+            lastMsgCount++;
+            pollKnown++;
+            var replyMsg = {role:'assistant', content: data.content, time: data.time};
+            msgContainer.appendChild(renderTime(data.time));
+            msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length));
+            scrollBottom();
+          }
+        } catch(err) {}
+      };
+      evtSource.onerror = function() {
+        var hs = document.querySelector('.header-status');
+        if (hs) hs.innerHTML = '<span class="status-dot" style="background:#ccc"></span>重连中...';
+      };
+    }
+  }
+});
 
 function openThinking(idx) {
   var text = thinkingStore[idx] || '';
