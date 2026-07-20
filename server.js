@@ -1141,12 +1141,40 @@ app.post('/chat/reply', (req, res) => {
       if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
     }
   })().catch(() => {});
+  const pending = chat.filter(m => m.role === 'user').slice(-1);
+  const userText = pending.length ? pending[0].content.slice(0, 200) : '';
+  const keText = cleanReply.slice(0, 300);
+  if (userText) storeMemory('[CHAT ' + now.toISOString().slice(0, 16) + '] 瑶瑶: ' + userText + ' → 克: ' + keText).catch(() => {});
   res.json({ ok: true, time });
 });
 
 app.post('/chat/typing', (req, res) => {
   sseBroadcast({ type: 'typing', active: true });
   res.json({ ok: true });
+});
+
+app.post('/chat/proactive', (req, res) => {
+  const { message } = req.body;
+  if (!message) return res.json({ ok: false });
+  const now = new Date(Date.now() + 8 * 3600000);
+  const time = now.toISOString().slice(0, 16).replace('T', ' ');
+  const chat = readChat();
+  chat.push({ role: 'assistant', content: message, time });
+  if (chat.length > 200) chat.splice(0, chat.length - 200);
+  writeChat(chat);
+  sseBroadcast({ type: 'message', role: 'assistant', content: message, time });
+  const cleanMsg = message.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  const lines = cleanMsg.split(/\n+/).map(l => l.trim()).filter(l => l);
+  (async () => {
+    for (const line of lines) {
+      const isAction = line.startsWith('*') && line.endsWith('*');
+      const text = isAction ? line.slice(1, -1) : line;
+      await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+      if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+    }
+  })().catch(() => {});
+  storeMemory('[PROACTIVE ' + now.toISOString().slice(0, 16) + '] 克主动: ' + cleanMsg.slice(0, 300)).catch(() => {});
+  res.json({ ok: true, time });
 });
 
 app.get('/chat/history', (req, res) => {
