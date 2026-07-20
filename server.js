@@ -1213,6 +1213,7 @@ app.post('/chat/tts', async (req, res) => {
 });
 
 app.get('/chat', (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.send(`<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -4020,7 +4021,7 @@ inputField.addEventListener('keydown', function(e) {
 });
 
 var evtSource = new EventSource('/chat/stream');
-var pollKnown = 0;
+var pollKnown = -1;
 evtSource.onerror = function() {
   var hs = document.querySelector('.header-status');
   if (hs) hs.innerHTML = '<span class="status-dot" style="background:#ccc"></span>重连中...';
@@ -4050,7 +4051,7 @@ setInterval(function() {
   fetch('/chat/history').then(function(r){return r.json()}).then(function(data) {
     if (!data.messages) return;
     var count = data.messages.length;
-    if (pollKnown > 0 && count > pollKnown) {
+    if (pollKnown >= 0 && count > pollKnown) {
       var newMsgs = data.messages.slice(pollKnown);
       for (var i = 0; i < newMsgs.length; i++) {
         var m = newMsgs[i];
@@ -4063,7 +4064,7 @@ setInterval(function() {
     }
     pollKnown = count;
   }).catch(function(){});
-}, 3000);
+}, 2000);
 
 function openThinking(idx) {
   var text = thinkingStore[idx] || '';
