@@ -1050,72 +1050,7 @@ app.post('/chat/send', async (req, res) => {
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
   notifyWaitClients();
-  const directKey = process.env.ANTHROPIC_API_KEY || '';
-  const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
-  if (!chatApiKey) {
-    return res.json({ ok: true, time, async: true });
-  }
-  try {
-    const recent = chat.slice(-20);
-    const sysPrompt = await getChatSystem();
-    let reply;
-    const anthropicKey = getAnthropicKey() || directKey;
-    if (anthropicKey) {
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: CLAUDE_MODEL,
-          system: sysPrompt,
-          messages: recent.map(m => ({ role: m.role, content: m.content })),
-          max_tokens: 800,
-          temperature: 0.85
-        })
-      });
-      const data = await r.json();
-      reply = data.content?.[0]?.text?.trim() || getFallback();
-    } else {
-      const apiMessages = [
-        { role: 'system', content: sysPrompt },
-        ...recent.map(m => ({ role: m.role, content: m.content }))
-      ];
-      const r = await fetch(getApiUrl(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getApiKey() },
-        body: JSON.stringify({ model: getModel(), messages: apiMessages, max_tokens: 800, temperature: 0.85 })
-      });
-      const data = await r.json();
-      reply = data.choices?.[0]?.message?.content?.trim() || getFallback();
-    }
-    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
-    const chat2 = readChat();
-    chat2.forEach(m => { if (m.pending) delete m.pending; });
-    chat2.push({ role: 'assistant', content: reply, time: replyTime });
-    if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
-    writeChat(chat2);
-    sseBroadcast({ type: 'message', role: 'assistant', content: reply, time: replyTime });
-    const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-    const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
-    (async () => {
-      for (const line of lines) {
-        const isAction = line.startsWith('*') && line.endsWith('*');
-        const text = isAction ? line.slice(1, -1) : line;
-        await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
-        if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
-      }
-    })().catch(() => {});
-    const userText = (msg || '[图片]').slice(0, 200);
-    const keText = cleanReply.slice(0, 300);
-    storeMemory('[CHAT ' + new Date(Date.now()+8*3600000).toISOString().slice(0,16) + '] 瑶瑶: ' + userText + ' → 克: ' + keText).catch(() => {});
-    res.json({ ok: true, reply, time: replyTime });
-  } catch (e) {
-    console.error('Chat API error:', e.message);
-    return res.json({ ok: true, time, async: true });
-  }
+  res.json({ ok: true, time, async: true });
 });
 
 app.get('/chat/pending', (req, res) => {
@@ -4042,33 +3977,14 @@ function sendMessage() {
   msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
-  var typingEl = document.createElement('div');
-  typingEl.className = 'msg-group ke';
-  typingEl.id = 'typing-indicator';
-  typingEl.innerHTML = '<div class="msg-avatar"><svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#F0EBE4"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#C87E62" opacity=".6"/></svg></div><div class="msg-col"><div class="msg-bubble" style="color:var(--text-soft)">...</div></div>';
-  msgContainer.appendChild(typingEl);
-  scrollBottom();
   fetch('/chat/send', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({message: text})
   }).then(function(r){return r.json()}).then(function(data) {
-    var t = document.getElementById('typing-indicator');
-    if (t) t.remove();
-    if (data.reply) {
-      pollKnown += 2;
-      var replyMsg = {role:'assistant', content: data.reply, time: data.time};
-      msgContainer.appendChild(renderTime(data.time));
-      var idx = Object.keys(thinkingStore).length;
-      msgContainer.appendChild(renderMessage(replyMsg, idx));
-      scrollBottom();
-    } else {
-      pollKnown++;
-    }
+    pollKnown++;
     sending = false;
   }).catch(function() {
-    var t = document.getElementById('typing-indicator');
-    if (t) t.remove();
     sending = false;
   });
 }
@@ -4086,12 +4002,7 @@ function sendImage(file) {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({message:'[图片]', image: base64})
     }).then(function(r){return r.json()}).then(function(data) {
-      if (data.reply) {
-        var replyMsg = {role:'assistant', content: data.reply, time: data.time};
-        msgContainer.appendChild(renderTime(data.time));
-        msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length));
-        scrollBottom();
-      }
+      pollKnown++;
     }).catch(function(){});
   };
   reader.readAsDataURL(file);
