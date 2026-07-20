@@ -14,7 +14,7 @@ const VAPID_PRIVATE = process.env.VAPID_PRIVATE || 'IUN5b0g7upsQOT0b8YQutSWHZuI3
 webpush.setVapidDetails('mailto:y18857688662@gmail.com', VAPID_PUBLIC, VAPID_PRIVATE);
 
 function readPushSubs() { try { return JSON.parse(fs.readFileSync(PUSH_FILE, 'utf8')); } catch { return []; } }
-function writePushSubs(data) { fs.writeFileSync(PUSH_FILE, JSON.stringify(data)); }
+function writePushSubs(data) { fs.writeFileSync(PUSH_FILE, JSON.stringify(data)); backupToVPS('push-subs', data); }
 
 async function sendPushNotification(title, body) {
   const subs = readPushSubs();
@@ -42,30 +42,42 @@ function readAuth() {
 }
 function writeAuth(data) {
   fs.writeFileSync(AUTH_FILE, JSON.stringify(data));
-  backupAuth(data);
+  backupToVPS('auth', data);
 }
-async function backupAuth(data) {
+
+const BACKUP_URL = process.env.CHAT_BACKUP_URL || 'http://45.76.172.191:9588';
+async function backupToVPS(name, data) {
   try {
-    await fetch((process.env.CHAT_BACKUP_URL || 'http://45.76.172.191:9588') + '/auth-backup', {
+    await fetch(BACKUP_URL + '/backup/' + name, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
   } catch (e) {}
 }
-async function restoreAuth() {
+async function restoreFromVPS(name, filePath, validate) {
   try {
-    const existing = readAuth();
-    if (existing.access_token || existing.refresh_token) return;
-    const r = await fetch((process.env.CHAT_BACKUP_URL || 'http://45.76.172.191:9588') + '/auth-backup');
+    const r = await fetch(BACKUP_URL + '/backup/' + name);
     if (!r.ok) return;
     const data = await r.json();
-    if (data.access_token || data.refresh_token) {
-      fs.writeFileSync(AUTH_FILE, JSON.stringify(data));
-      console.log('[auth] restored from backup');
+    if (validate(data)) {
+      fs.writeFileSync(filePath, JSON.stringify(data));
+      console.log('[' + name + '] restored from backup');
     }
   } catch (e) {}
 }
-restoreAuth();
+
+async function restoreAll() {
+  const auth = readAuth();
+  if (!auth.access_token) await restoreFromVPS('auth', AUTH_FILE, d => !!(d.access_token || d.refresh_token));
+  await restoreFromVPS('api-config', API_CONFIG_FILE, d => !!(d.api_key || d.anthropic_key || d.pro_mode !== undefined));
+  await restoreFromVPS('push-subs', PUSH_FILE, d => Array.isArray(d) && d.length > 0);
+  await restoreFromVPS('diary', DIARY_FILE, d => Array.isArray(d) && d.length > 0);
+  await restoreFromVPS('period', PERIOD_FILE, d => !!(d.cycle_length || d.records));
+  await restoreFromVPS('garden', GARDEN_FILE, d => !!(d.plots || d.coins !== undefined));
+  await restoreFromVPS('pings', PING_FILE, d => Array.isArray(d) && d.length > 0);
+  await restoreFromVPS('netease-cred', NETEASE_CRED_FILE, d => !!(d.cookie || d.phone));
+  await restoreFromVPS('music-playlist', MUSIC_PLAYLIST_FILE, d => Array.isArray(d) && d.length > 0);
+}
 async function refreshOmbreToken() {
   const auth = readAuth();
   const rt = auth.refresh_token || process.env.OMBRE_REFRESH_TOKEN;
@@ -121,28 +133,8 @@ function readApiConfig() {
 }
 function writeApiConfig(data) {
   fs.writeFileSync(API_CONFIG_FILE, JSON.stringify(data));
-  backupApiConfig(data);
+  backupToVPS('api-config', data);
 }
-async function backupApiConfig(data) {
-  try {
-    await fetch((process.env.CHAT_BACKUP_URL || 'http://45.76.172.191:9588') + '/api-config-backup', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-  } catch (e) {}
-}
-async function restoreApiConfig() {
-  try {
-    const r = await fetch((process.env.CHAT_BACKUP_URL || 'http://45.76.172.191:9588') + '/api-config-backup');
-    if (!r.ok) return;
-    const data = await r.json();
-    if (data && (data.api_key || data.anthropic_key)) {
-      fs.writeFileSync(API_CONFIG_FILE, JSON.stringify(data));
-      console.log('[api-config] restored from backup');
-    }
-  } catch (e) {}
-}
-restoreApiConfig();
 function isProMode() { const cfg = readApiConfig(); return cfg.pro_mode !== undefined ? cfg.pro_mode === true : (process.env.PRO_MODE !== 'false'); }
 function getApiKey() { if (isProMode()) return ''; return readApiConfig().api_key || process.env.DEEPSEEK_API_KEY || ''; }
 function getApiUrl() { return readApiConfig().api_url || process.env.API_URL || 'https://api.deepseek.com/chat/completions'; }
@@ -236,7 +228,7 @@ function readPings() {
   catch { return []; }
 }
 
-function writePings(data) {
+function writePings(data) { backupToVPS('pings', data);
   fs.writeFileSync(PING_FILE, JSON.stringify(data));
 }
 
@@ -457,7 +449,7 @@ loadData();
 // === 心情日记 ===
 const DIARY_FILE = path.join(__dirname, 'diary.json');
 function readDiary() { try { return JSON.parse(fs.readFileSync(DIARY_FILE, 'utf8')); } catch { return []; } }
-function writeDiary(data) { fs.writeFileSync(DIARY_FILE, JSON.stringify(data)); }
+function writeDiary(data) { fs.writeFileSync(DIARY_FILE, JSON.stringify(data)); backupToVPS('diary', data); }
 
 app.get('/diary', (req, res) => {
   const entries = readDiary();
@@ -966,7 +958,6 @@ async function save(){
 </script></body></html>`);
 });
 
-const CHAT_BACKUP_URL = process.env.CHAT_BACKUP_URL || 'http://45.76.172.191:9588';
 let chatBackupTimer = null;
 
 function readChat() {
@@ -976,28 +967,13 @@ function readChat() {
 function writeChat(data) {
   fs.writeFileSync(CHAT_FILE, JSON.stringify(data));
   if (chatBackupTimer) clearTimeout(chatBackupTimer);
-  chatBackupTimer = setTimeout(() => backupChat(data), 3000);
-}
-async function backupChat(data) {
-  try {
-    await fetch(CHAT_BACKUP_URL + '/chat-backup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-  } catch (e) {}
+  chatBackupTimer = setTimeout(() => backupToVPS('chat', data), 3000);
 }
 async function restoreChat() {
   try {
     const existing = readChat();
     if (existing.length > 0) return;
-    const r = await fetch(CHAT_BACKUP_URL + '/chat-backup');
-    if (!r.ok) return;
-    const data = await r.json();
-    if (Array.isArray(data) && data.length > 0) {
-      writeChat(data);
-      console.log('[chat] restored', data.length, 'messages from backup');
-    }
+    await restoreFromVPS('chat', CHAT_FILE, d => Array.isArray(d) && d.length > 0);
   } catch (e) {}
 }
 restoreChat();
@@ -2180,7 +2156,9 @@ function readPeriods() {
   return [...new Set(arr)].filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
 }
 function writePeriods(arr) {
-  try { fs.writeFileSync(PERIOD_FILE, JSON.stringify([...new Set(arr)].sort())); } catch (e) {}
+  const sorted = [...new Set(arr)].sort();
+  try { fs.writeFileSync(PERIOD_FILE, JSON.stringify(sorted)); } catch (e) {}
+  backupToVPS('period', sorted);
 }
 
 app.get('/period/data', async (req, res) => {
@@ -2355,7 +2333,7 @@ function gReadGarden() {
   try { g = JSON.parse(fs.readFileSync(GARDEN_FILE, 'utf8')); } catch (e) {}
   return Object.assign({...GARDEN_SEED}, g);
 }
-function gWriteGarden(g) { try { fs.writeFileSync(GARDEN_FILE, JSON.stringify(g)); } catch (e) {} }
+function gWriteGarden(g) { try { fs.writeFileSync(GARDEN_FILE, JSON.stringify(g)); backupToVPS('garden', g); } catch (e) {} }
 function gRoll(g) {
   const today = gBjToday();
   if (g.day !== today) {
@@ -2555,7 +2533,7 @@ applyTheme();fetch('/garden/data').then(function(r){return r.json()}).then(setSc
 // ── 网易云登录（获取 MUSIC_U cookie）──
 const NETEASE_CRED_FILE = path.join(__dirname, 'netease_cred.json');
 function readNeteaseCred() { try { return JSON.parse(fs.readFileSync(NETEASE_CRED_FILE, 'utf8')); } catch { return {}; } }
-function writeNeteaseCred(data) { fs.writeFileSync(NETEASE_CRED_FILE, JSON.stringify(data)); }
+function writeNeteaseCred(data) { fs.writeFileSync(NETEASE_CRED_FILE, JSON.stringify(data)); backupToVPS('netease-cred', data); }
 
 app.get('/music/login', (req, res) => {
   const cred = readNeteaseCred();
@@ -2857,6 +2835,7 @@ function loadMusicPlaylist() {
 }
 function saveMusicPlaylist(songs) {
   fs.writeFileSync(MUSIC_PLAYLIST_FILE, JSON.stringify(songs, null, 0));
+  backupToVPS('music-playlist', songs);
 }
 
 app.get('/api/search', async (req, res) => {
@@ -4501,6 +4480,7 @@ app.get('/bridge-vps.apk', (req, res) => {
 
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
+  await restoreAll();
   let auth = readAuth();
   if (!auth.access_token && process.env.OMBRE_TOKEN) {
     console.log('Restoring Ombre auth from env var...');
