@@ -3979,10 +3979,13 @@ inputField.addEventListener('keydown', function(e) {
 });
 
 var evtSource = new EventSource('/chat/stream');
+var sseAlive = false;
 evtSource.onmessage = function(e) {
+  sseAlive = true;
   try {
     var data = JSON.parse(e.data);
     if (data.type === 'message' && data.role === 'assistant' && !sending) {
+      lastMsgCount++;
       var replyMsg = {role:'assistant', content: data.content, time: data.time};
       msgContainer.appendChild(renderTime(data.time));
       msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length));
@@ -3990,6 +3993,26 @@ evtSource.onmessage = function(e) {
     }
   } catch(err) {}
 };
+var pollKnown = 0;
+setInterval(function() {
+  if (sseAlive) return;
+  fetch('/chat/history').then(function(r){return r.json()}).then(function(data) {
+    if (!data.messages) return;
+    var count = data.messages.length;
+    if (pollKnown > 0 && count > pollKnown) {
+      var newMsgs = data.messages.slice(pollKnown);
+      for (var i = 0; i < newMsgs.length; i++) {
+        var m = newMsgs[i];
+        if (m.role === 'assistant') {
+          msgContainer.appendChild(renderTime(m.time));
+          msgContainer.appendChild(renderMessage(m, Object.keys(thinkingStore).length));
+          scrollBottom();
+        }
+      }
+    }
+    pollKnown = count;
+  }).catch(function(){});
+}, 3000);
 
 function openThinking(idx) {
   var text = thinkingStore[idx] || '';
