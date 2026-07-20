@@ -3577,6 +3577,23 @@ body {
 .attach-item:hover { background: var(--accent-soft); }
 .attach-item .ai { font-size: 16px; width: 22px; text-align: center; }
 .sheet { min-height: 40%; }
+.mem-overlay{position:fixed;inset:0;z-index:110;background:rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:opacity .25s}
+.mem-overlay.open{opacity:1;pointer-events:auto}
+.mem-panel{position:fixed;left:0;right:0;bottom:0;z-index:115;max-height:75vh;width:min(100vw,520px);margin:0 auto;background:var(--bg);border-radius:20px 20px 0 0;box-shadow:0 -4px 30px rgba(0,0,0,.12);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);padding-bottom:env(safe-area-inset-bottom)}
+.mem-panel.open{transform:translateY(0)}
+.mem-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid var(--border)}
+.mem-title{font-size:16px;font-weight:600;color:var(--text)}
+.mem-close{width:32px;height:32px;border:none;background:transparent;font-size:22px;color:var(--text-faint);cursor:pointer;display:grid;place-items:center;border-radius:50%}
+.mem-close:active{background:var(--accent-soft)}
+.mem-body{flex:1;overflow-y:auto;padding:16px 20px;font-size:14px;line-height:1.7;color:var(--text-mid);white-space:pre-wrap;word-break:break-word;max-height:45vh;min-height:80px}
+.mem-empty{color:var(--text-faint);text-align:center;padding:20px 0}
+.mem-foot{display:flex;align-items:flex-end;gap:10px;padding:12px 20px 16px;border-top:1px solid var(--border)}
+.mem-foot textarea{flex:1;border:1px solid var(--border);border-radius:12px;padding:10px 14px;resize:none;font-family:var(--font);font-size:14px;line-height:1.4;background:var(--input-bg);color:var(--text);outline:none;transition:border-color .2s}
+.mem-foot textarea:focus{border-color:var(--accent)}
+.mem-foot textarea::placeholder{color:var(--text-faint)}
+.mem-save{flex:none;height:38px;padding:0 18px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s}
+.mem-save:active{opacity:.7}
+.mem-save:disabled{opacity:.4}
 @media (prefers-reduced-motion: reduce) { * { transition-duration: 0s !important; } }
 </style>
 </head>
@@ -3598,7 +3615,7 @@ body {
       <div class="nav-item active" onclick="goPage('/')"><div class="icon">💬</div><span>聊天</span></div>
       <div class="nav-item" onclick="goPage('/summon')"><div class="icon">🔔</div><span>召唤铃</span></div>
       <div class="nav-item" onclick="goPage('/diary')"><div class="icon">📖</div><span>心情日记</span></div>
-      <div class="nav-item" onclick="goPage('/memory/read')"><div class="icon">🧠</div><span>记忆库</span></div>
+      <div class="nav-item" onclick="openMemPanel()"><div class="icon">🧠</div><span>记忆库</span></div>
       <div class="nav-item" onclick="goPage('/garden')"><div class="icon">🌿</div><span>小院子</span></div>
       <div class="nav-item" onclick="goPage('/period')"><div class="icon">🌙</div><span>经期</span></div>
       <div class="nav-item" onclick="goPage('/music/player')"><div class="icon">🎵</div><span>音乐</span></div>
@@ -3649,6 +3666,12 @@ body {
     <div class="sheet-header"><div class="sheet-title">Thought process</div></div>
     <div class="sheet-body"><div class="sheet-text" id="sheetText"></div></div>
   </div>
+</div>
+<div class="mem-overlay" id="memOverlay" onclick="closeMemPanel()"></div>
+<div class="mem-panel" id="memPanel">
+  <div class="mem-hd"><span class="mem-title">记忆库</span><button class="mem-close" onclick="closeMemPanel()">&times;</button></div>
+  <div class="mem-body" id="memBody"><div class="mem-empty">读取中…</div></div>
+  <div class="mem-foot"><textarea id="memInput" rows="2" placeholder="写入新记忆…"></textarea><button class="mem-save" id="memSave" onclick="saveMemory()">保存</button></div>
 </div>
 <script>
 var thinkingStore = {};
@@ -3897,6 +3920,37 @@ document.addEventListener('mousemove', onDragMove);
 document.addEventListener('touchmove', onDragMove, { passive: false });
 document.addEventListener('mouseup', onDragEnd);
 document.addEventListener('touchend', onDragEnd);
+
+async function openMemPanel(){
+  document.getElementById('memPanel').classList.add('open');
+  document.getElementById('memOverlay').classList.add('open');
+  toggleSidebar();
+  var body=document.getElementById('memBody');
+  body.innerHTML='<div class="mem-empty">读取记忆中…</div>';
+  try{
+    var r=await fetch('/memory/read');
+    var d=await r.json();
+    if(d.ok&&d.memories) body.textContent=d.memories;
+    else body.innerHTML='<div class="mem-empty">暂无记忆</div>';
+  }catch(e){body.innerHTML='<div class="mem-empty">读取失败</div>';}
+}
+function closeMemPanel(){
+  document.getElementById('memPanel').classList.remove('open');
+  document.getElementById('memOverlay').classList.remove('open');
+}
+async function saveMemory(){
+  var inp=document.getElementById('memInput');
+  var text=inp.value.trim();
+  if(!text)return;
+  var btn=document.getElementById('memSave');
+  btn.disabled=true;btn.textContent='保存中…';
+  try{
+    var r=await fetch('/memory/store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})});
+    var d=await r.json();
+    if(d.ok){inp.value='';var old=document.getElementById('memBody').textContent||'';document.getElementById('memBody').textContent=old+(old?'\\n':'')+text;}
+  }catch(e){}
+  btn.disabled=false;btn.textContent='保存';
+}
 
 loadHistory();
 </script>
