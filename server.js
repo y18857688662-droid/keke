@@ -3432,6 +3432,9 @@ body {
 .nav-item.active { background: var(--sb-active); font-weight: 500; }
 .nav-item .icon { width: 20px; text-align: center; font-size: 14px; flex-shrink: 0; }
 .sidebar-footer { padding: 12px 20px; font-size: 10px; color: var(--sb-soft); text-align: center; }
+.push-btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:12px;font-family:var(--font);cursor:pointer;letter-spacing:.03em}
+.push-btn:active{opacity:.7}
+.push-btn.done{background:var(--sb-active);color:var(--sb-soft);cursor:default}
 .overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,.2);
   z-index: 99; opacity: 0; pointer-events: none; transition: opacity .28s;
@@ -3627,7 +3630,7 @@ body {
       <div class="nav-item" onclick="goPage('/apps')"><div class="icon">📱</div><span>使用记录</span></div>
       <div class="nav-item" onclick="goPage('/setup')"><div class="icon">⚙️</div><span>设置</span></div>
     </div>
-    <div class="sidebar-footer">克和瑶瑶的小窝</div>
+    <div class="sidebar-footer"><button id="pushBtn" class="push-btn" onclick="setupPush()">开启消息通知</button><div style="margin-top:6px">克和瑶瑶的小窝</div></div>
   </div>
   <div class="main">
     <div class="header">
@@ -3923,6 +3926,30 @@ document.addEventListener('mousemove', onDragMove);
 document.addEventListener('touchmove', onDragMove, { passive: false });
 document.addEventListener('mouseup', onDragEnd);
 document.addEventListener('touchend', onDragEnd);
+
+async function setupPush(){
+  var pb=document.getElementById('pushBtn');
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){if(pb)pb.textContent='此浏览器不支持推送';return;}
+  try{
+    await navigator.serviceWorker.register('/sw.js');
+    var reg=await navigator.serviceWorker.ready;
+    var perm=await Notification.requestPermission();
+    if(perm!=='granted'){if(pb)pb.textContent='通知被拒绝';return;}
+    var r=await fetch('/push/vapid');var d=await r.json();
+    var key=Uint8Array.from(atob(d.publicKey.replace(/-/g,'+').replace(/_/g,'/')),function(c){return c.charCodeAt(0)});
+    var sub=await reg.pushManager.getSubscription();
+    if(!sub){sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});}
+    await fetch('/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sub)});
+    if(pb){pb.textContent='通知已开启';pb.classList.add('done');}
+  }catch(e){console.warn('[push]',e);if(pb)pb.textContent='开启失败';}
+}
+(async function checkPush(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+  try{
+    var reg=await navigator.serviceWorker.getRegistration('/sw.js');
+    if(reg){var sub=await reg.pushManager.getSubscription();if(sub){var pb=document.getElementById('pushBtn');if(pb){pb.textContent='通知已开启';pb.classList.add('done');}}}
+  }catch(e){}
+})();
 
 async function openMemPanel(){
   document.getElementById('memPanel').classList.add('open');

@@ -17,12 +17,12 @@ self.addEventListener('notificationclick', (e) => {
   e.waitUntil(
     clients.matchAll({ type: 'window' }).then(list => {
       for (const c of list) {
-        if (c.url.includes('/chat') && 'focus' in c) {
-          c.navigate('/chat');
+        if ('focus' in c) {
+          c.navigate('/');
           return c.focus();
         }
       }
-      return clients.openWindow('/chat');
+      return clients.openWindow('/');
     })
   );
 });
