@@ -1153,7 +1153,7 @@ app.post('/chat/proactive', (req, res) => {
 app.get('/chat/history', (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   const chat = readChat();
-  res.json({ messages: chat.slice(-50) });
+  res.json({ messages: chat });
 });
 
 app.post('/chat/restore', (req, res) => {
