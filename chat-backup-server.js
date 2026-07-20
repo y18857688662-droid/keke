@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const CHAT_FILE = '/root/chat_backup.json';
 const AUTH_FILE = '/root/auth_backup.json';
+const API_CFG_FILE = '/root/api_config_backup.json';
 const PORT = 9588;
 
 function handleBackup(req, res, file) {
@@ -37,6 +38,7 @@ const server = http.createServer((req, res) => {
 
   if (req.url === '/chat-backup') handleBackup(req, res, CHAT_FILE);
   else if (req.url === '/auth-backup') handleBackup(req, res, AUTH_FILE);
+  else if (req.url === '/api-config-backup') handleBackup(req, res, API_CFG_FILE);
   else { res.writeHead(404); res.end('not found'); }
 });
 
