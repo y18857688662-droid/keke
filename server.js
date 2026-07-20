@@ -33,8 +33,8 @@ const APP_NOTIFY_FILE = path.join(__dirname, 'app_notify.json');
 const AUTH_FILE = path.join(__dirname, 'ombre_auth.json');
 
 const OMBRE_URL = 'https://ombre-brain-production-9daa.up.railway.app';
-const OMBRE_CLIENT_ID = 'D0QB90mzcLjuIVpV6JxEqA';
-const OMBRE_REDIRECT = process.env.OMBRE_REDIRECT || 'https://keke-production-ec29.up.railway.app/auth/callback';
+const OMBRE_REDIRECT = process.env.OMBRE_REDIRECT || 'https://keke-production.up.railway.app/auth/callback';
+let OMBRE_CLIENT_ID = null;
 
 function readAuth() {
   try { return JSON.parse(fs.readFileSync(AUTH_FILE, 'utf8')); }
@@ -71,13 +71,15 @@ async function refreshOmbreToken() {
   const rt = auth.refresh_token || process.env.OMBRE_REFRESH_TOKEN;
   if (!rt) return false;
   try {
+    const cid = auth.client_id || OMBRE_CLIENT_ID;
+    if (!cid) return false;
     const r = await fetch(`${OMBRE_URL}/oauth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: rt,
-        client_id: OMBRE_CLIENT_ID
+        client_id: cid
       })
     });
     const data = await r.json();
@@ -583,7 +585,22 @@ function getPkceStore() { try { return JSON.parse(fs.readFileSync(PKCE_FILE, 'ut
 function savePkce(state, verifier) { const s = getPkceStore(); s[state] = verifier; fs.writeFileSync(PKCE_FILE, JSON.stringify(s)); }
 function popPkce(state) { const s = getPkceStore(); const v = s[state]; delete s[state]; fs.writeFileSync(PKCE_FILE, JSON.stringify(s)); return v; }
 
-app.get('/auth/start', (req, res) => {
+app.get('/auth/start', async (req, res) => {
+  try {
+    const regRes = await fetch(`${OMBRE_URL}/oauth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        redirect_uris: [OMBRE_REDIRECT],
+        client_name: 'keke-chat'
+      })
+    });
+    const regData = await regRes.json();
+    OMBRE_CLIENT_ID = regData.client_id;
+  } catch (e) {
+    console.error('OAuth register failed:', e);
+    return res.send('记忆库连接失败，请稍后重试');
+  }
   const verifier = crypto.randomBytes(32).toString('base64url');
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
   const state = crypto.randomBytes(16).toString('hex');
@@ -620,6 +637,7 @@ app.get('/auth/callback', async (req, res) => {
     if (data.access_token) {
       const authData = { access_token: data.access_token, ts: Date.now() };
       if (data.refresh_token) authData.refresh_token = data.refresh_token;
+      if (OMBRE_CLIENT_ID) authData.client_id = OMBRE_CLIENT_ID;
       writeAuth(authData);
       console.log('Ombre auth saved', data.refresh_token ? '(with refresh token)' : '(no refresh token)');
       res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
