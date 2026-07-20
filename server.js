@@ -3958,13 +3958,13 @@ inputField.addEventListener('keydown', function(e) {
 });
 
 var evtSource = new EventSource('/chat/stream');
-var sseAlive = false;
+var pollKnown = 0;
 evtSource.onmessage = function(e) {
-  sseAlive = true;
   try {
     var data = JSON.parse(e.data);
     if (data.type === 'message' && data.role === 'assistant' && !sending) {
       lastMsgCount++;
+      pollKnown++;
       var replyMsg = {role:'assistant', content: data.content, time: data.time};
       msgContainer.appendChild(renderTime(data.time));
       msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length));
@@ -3972,9 +3972,7 @@ evtSource.onmessage = function(e) {
     }
   } catch(err) {}
 };
-var pollKnown = 0;
 setInterval(function() {
-  if (sseAlive) return;
   fetch('/chat/history').then(function(r){return r.json()}).then(function(data) {
     if (!data.messages) return;
     var count = data.messages.length;
