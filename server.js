@@ -1037,7 +1037,7 @@ app.post('/chat/send', async (req, res) => {
   if (image) console.log('[chat] received image, size:', Math.round(image.length/1024) + 'kb');
   if (!msg && !image) return res.json({ ok: false, error: 'empty message' });
   const now = new Date(Date.now() + 8 * 3600000);
-  const time = now.toISOString().slice(11, 16);
+  const time = now.toISOString().slice(0, 16).replace('T', ' ');
   const chat = readChat();
   if (image) {
     chat.push({ role: 'user', content: '[图片]', image, time, pending: true });
@@ -1087,7 +1087,7 @@ app.post('/chat/send', async (req, res) => {
       const data = await r.json();
       reply = data.choices?.[0]?.message?.content?.trim() || getFallback();
     }
-    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(11, 16);
+    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
     const chat2 = readChat();
     chat2.forEach(m => { if (m.pending) delete m.pending; });
     chat2.push({ role: 'assistant', content: reply, time: replyTime });
@@ -1124,7 +1124,7 @@ app.post('/chat/reply', (req, res) => {
   const { reply } = req.body;
   if (!reply) return res.json({ ok: false });
   const now = new Date(Date.now() + 8 * 3600000);
-  const time = now.toISOString().slice(11, 16);
+  const time = now.toISOString().slice(0, 16).replace('T', ' ');
   const chat = readChat();
   chat.forEach(m => { if (m.pending) delete m.pending; });
   chat.push({ role: 'assistant', content: reply, time });
@@ -3888,18 +3888,52 @@ function renderMessage(msg, idx) {
   return group;
 }
 
+function formatTimeDisplay(t) {
+  if (!t) return '';
+  if (t.length <= 5) return t;
+  var parts = t.split(' ');
+  if (parts.length < 2) return t;
+  var datePart = parts[0];
+  var timePart = parts[1];
+  var today = new Date(Date.now() + 8 * 3600000);
+  var todayStr = today.toISOString().slice(0, 10);
+  var yesterday = new Date(Date.now() + 8 * 3600000 - 86400000);
+  var yesterdayStr = yesterday.toISOString().slice(0, 10);
+  if (datePart === todayStr) return timePart;
+  if (datePart === yesterdayStr) return '昨天 ' + timePart;
+  var dp = datePart.split('-');
+  if (dp.length === 3) {
+    var thisYear = today.toISOString().slice(0, 4);
+    if (dp[0] === thisYear) return parseInt(dp[1]) + '月' + parseInt(dp[2]) + '日 ' + timePart;
+    return dp[0] + '年' + parseInt(dp[1]) + '月' + parseInt(dp[2]) + '日 ' + timePart;
+  }
+  return t;
+}
 function renderTime(t) {
   var el = document.createElement('div');
   el.className = 'msg-time';
-  el.textContent = t;
+  el.textContent = formatTimeDisplay(t);
   return el;
 }
 
+function shouldShowTime(cur, prev) {
+  if (!cur) return false;
+  if (!prev) return true;
+  if (cur.length <= 5 || prev.length <= 5) return cur !== prev;
+  var curDate = cur.split(' ')[0];
+  var prevDate = prev.split(' ')[0];
+  if (curDate !== prevDate) return true;
+  var c = cur.split(' ')[1] || cur;
+  var p = prev.split(' ')[1] || prev;
+  var cm = parseInt(c.split(':')[0]) * 60 + parseInt(c.split(':')[1]);
+  var pm = parseInt(p.split(':')[0]) * 60 + parseInt(p.split(':')[1]);
+  return Math.abs(cm - pm) >= 5;
+}
 function renderAll(messages) {
   msgContainer.innerHTML = '';
   var lastTime = '';
   messages.forEach(function(msg, i) {
-    if (msg.time && msg.time !== lastTime) {
+    if (msg.time && shouldShowTime(msg.time, lastTime)) {
       msgContainer.appendChild(renderTime(msg.time));
       lastTime = msg.time;
     }
@@ -3938,7 +3972,7 @@ function sendMessage() {
   sending = true;
   inputField.value = '';
   inputField.style.height = 'auto';
-  var userMsg = {role:'user', content: text, time: new Date(Date.now()+8*3600000).toISOString().slice(11,16)};
+  var userMsg = {role:'user', content: text, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
   msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
@@ -3974,7 +4008,7 @@ function sendImage(file) {
   var reader = new FileReader();
   reader.onload = function(e) {
     var base64 = e.target.result;
-    var userMsg = {role:'user', content:'[图片]', image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(11,16)};
+    var userMsg = {role:'user', content:'[图片]', image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
     msgContainer.appendChild(renderTime(userMsg.time));
     msgContainer.appendChild(renderMessage(userMsg, -1));
     scrollBottom();
