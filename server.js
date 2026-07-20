@@ -964,10 +964,25 @@ function readChat() {
   try { return JSON.parse(fs.readFileSync(CHAT_FILE, 'utf8')); }
   catch { return []; }
 }
-function writeChat(data) {
+async function archiveOldMessages(removed) {
+  if (!removed || removed.length === 0) return;
+  try {
+    const r = await fetch(BACKUP_URL + '/backup/chat-archive');
+    let archive = [];
+    if (r.ok) { try { archive = await r.json(); } catch {} }
+    if (!Array.isArray(archive)) archive = [];
+    archive = archive.concat(removed);
+    await fetch(BACKUP_URL + '/backup/chat-archive', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(archive)
+    });
+  } catch (e) { console.warn('[archive] failed:', e.message); }
+}
+function writeChat(data, archived) {
   fs.writeFileSync(CHAT_FILE, JSON.stringify(data));
   if (chatBackupTimer) clearTimeout(chatBackupTimer);
   chatBackupTimer = setTimeout(() => backupToVPS('chat', data), 3000);
+  if (archived && archived.length > 0) archiveOldMessages(archived);
 }
 async function restoreChat() {
   try {
@@ -1047,8 +1062,9 @@ app.post('/chat/send', async (req, res) => {
   } else {
     chat.push({ role: 'user', content: msg, time, pending: true });
   }
-  if (chat.length > 200) chat.splice(0, chat.length - 200);
-  writeChat(chat);
+  let archived = [];
+  if (chat.length > 200) archived = chat.splice(0, chat.length - 200);
+  writeChat(chat, archived);
   notifyWaitClients();
   res.json({ ok: true, time, async: true });
 });
@@ -1101,8 +1117,9 @@ app.post('/chat/reply', (req, res) => {
   const chat = readChat();
   chat.forEach(m => { if (m.pending) delete m.pending; });
   chat.push({ role: 'assistant', content: reply, time });
-  if (chat.length > 200) chat.splice(0, chat.length - 200);
-  writeChat(chat);
+  let archived = [];
+  if (chat.length > 200) archived = chat.splice(0, chat.length - 200);
+  writeChat(chat, archived);
   sseBroadcast({ type: 'message', role: 'assistant', content: reply, time });
   const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
@@ -1133,8 +1150,9 @@ app.post('/chat/proactive', (req, res) => {
   const time = now.toISOString().slice(0, 16).replace('T', ' ');
   const chat = readChat();
   chat.push({ role: 'assistant', content: message, time });
-  if (chat.length > 200) chat.splice(0, chat.length - 200);
-  writeChat(chat);
+  let archived = [];
+  if (chat.length > 200) archived = chat.splice(0, chat.length - 200);
+  writeChat(chat, archived);
   sseBroadcast({ type: 'message', role: 'assistant', content: message, time });
   const cleanMsg = message.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const lines = cleanMsg.split(/\n+/).map(l => l.trim()).filter(l => l);
@@ -1154,6 +1172,21 @@ app.get('/chat/history', (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   const chat = readChat();
   res.json({ messages: chat });
+});
+
+app.get('/chat/archive', async (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  try {
+    const r = await fetch(BACKUP_URL + '/backup/chat-archive');
+    if (!r.ok) return res.json({ messages: [] });
+    const archive = await r.json();
+    if (!Array.isArray(archive)) return res.json({ messages: [] });
+    const before = parseInt(req.query.before) || archive.length;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const end = Math.min(before, archive.length);
+    const start = Math.max(end - limit, 0);
+    res.json({ messages: archive.slice(start, end), remaining: start });
+  } catch (e) { res.json({ messages: [] }); }
 });
 
 app.post('/chat/restore', (req, res) => {
@@ -3933,8 +3966,14 @@ function shouldShowTime(cur, prev) {
   var pm = parseInt(p.split(':')[0]) * 60 + parseInt(p.split(':')[1]);
   return Math.abs(cm - pm) >= 5;
 }
+var archiveRemaining = -1;
 function renderAll(messages) {
   msgContainer.innerHTML = '';
+  var wrap = document.createElement('div');
+  wrap.id = 'loadMoreWrap';
+  wrap.style.cssText = 'text-align:center;padding:12px 0;display:none';
+  wrap.innerHTML = '<button id="loadMoreBtn" onclick="loadArchive()" style="background:none;border:1px solid var(--border);color:var(--text-mid);padding:6px 20px;border-radius:16px;font-size:13px;cursor:pointer">加载更多</button>';
+  msgContainer.appendChild(wrap);
   var lastTime = '';
   messages.forEach(function(msg, i) {
     if (msg.time && shouldShowTime(msg.time, lastTime)) {
@@ -3944,6 +3983,53 @@ function renderAll(messages) {
     msgContainer.appendChild(renderMessage(msg, i));
   });
   scrollBottom();
+  checkArchive();
+}
+function checkArchive() {
+  fetch('/chat/archive?limit=1&_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
+    if (data.messages && data.messages.messages) data = data.messages;
+    var total = (data.remaining || 0) + (data.messages ? data.messages.length : 0);
+    if (total > 0) {
+      archiveRemaining = data.remaining + data.messages.length;
+      var w = document.getElementById('loadMoreWrap');
+      if (w) w.style.display = '';
+    }
+  }).catch(function(){});
+}
+function loadArchive() {
+  var btn = document.getElementById('loadMoreBtn');
+  if (btn) btn.textContent = '加载中...';
+  var before = archiveRemaining >= 0 ? archiveRemaining : undefined;
+  var url = '/chat/archive?limit=50&_t=' + Date.now();
+  if (before !== undefined) url += '&before=' + before;
+  fetch(url).then(function(r){return r.json()}).then(function(data) {
+    if (!data.messages || data.messages.length === 0) {
+      var w = document.getElementById('loadMoreWrap');
+      if (w) w.style.display = 'none';
+      return;
+    }
+    archiveRemaining = data.remaining || 0;
+    var scrollH = msgContainer.scrollHeight;
+    var scrollT = msgContainer.scrollTop;
+    var wrap = document.getElementById('loadMoreWrap');
+    var ref = wrap ? wrap.nextSibling : msgContainer.firstChild;
+    var lastTime = '';
+    data.messages.forEach(function(msg, i) {
+      if (msg.time && shouldShowTime(msg.time, lastTime)) {
+        msgContainer.insertBefore(renderTime(msg.time), ref);
+        lastTime = msg.time;
+      }
+      msgContainer.insertBefore(renderMessage(msg, -(data.messages.length - i)), ref);
+    });
+    msgContainer.scrollTop = scrollT + (msgContainer.scrollHeight - scrollH);
+    if (archiveRemaining <= 0) {
+      if (wrap) wrap.style.display = 'none';
+    } else {
+      if (btn) btn.textContent = '加载更多';
+    }
+  }).catch(function(){
+    if (btn) btn.textContent = '加载失败，点击重试';
+  });
 }
 
 function scrollBottom() {
