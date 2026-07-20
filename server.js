@@ -3329,9 +3329,9 @@ app.get('/', (req, res) => {
   --voice-bar: #A09A94; --radius: 18px;
   --font: -apple-system, "SF Pro Display", "SF Pro Text", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
   --sheet-bg: #FDFCFA;
-  --sb-bg: #F5F1EC; --sb-text: #1A1714;
+  --sb-bg: #FDFCFA; --sb-text: #1A1714;
   --sb-soft: #A09A94; --sb-border: #E5E0D8;
-  --sb-hover: rgba(200,126,98,.06);
+  --sb-hover: rgba(0,0,0,.04); --sb-active: rgba(0,0,0,.06);
 }
 :root[data-theme="dark"] {
   --bg: #1A1816; --surface: #2A2724;
@@ -3342,9 +3342,9 @@ app.get('/', (req, res) => {
   --accent-soft: rgba(212,147,110,.1);
   --input-bg: #2A2724; --online: #6DBB7A;
   --voice-bar: #6B6560; --sheet-bg: #211F1C;
-  --sb-bg: #211F1C; --sb-text: #E8E3DC;
+  --sb-bg: #1A1816; --sb-text: #E8E3DC;
   --sb-soft: #6B6560; --sb-border: #352F2A;
-  --sb-hover: rgba(212,147,110,.08);
+  --sb-hover: rgba(255,255,255,.04); --sb-active: rgba(255,255,255,.07);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -3356,9 +3356,9 @@ app.get('/', (req, res) => {
     --accent-soft: rgba(212,147,110,.1);
     --input-bg: #2A2724; --online: #6DBB7A;
     --voice-bar: #6B6560; --sheet-bg: #211F1C;
-    --sb-bg: #211F1C; --sb-text: #E8E3DC;
+    --sb-bg: #1A1816; --sb-text: #E8E3DC;
     --sb-soft: #6B6560; --sb-border: #352F2A;
-    --sb-hover: rgba(212,147,110,.08);
+    --sb-hover: rgba(255,255,255,.04); --sb-active: rgba(255,255,255,.07);
   }
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -3426,7 +3426,7 @@ body {
   color: var(--sb-text); font-size: 14px;
 }
 .nav-item:hover { background: var(--sb-hover); }
-.nav-item.active { background: var(--sb-hover); color: var(--accent); font-weight: 500; }
+.nav-item.active { background: var(--sb-active); font-weight: 500; }
 .nav-item .icon { width: 20px; text-align: center; font-size: 14px; flex-shrink: 0; }
 .sidebar-footer { padding: 12px 20px; font-size: 10px; color: var(--sb-soft); text-align: center; }
 .overlay {
@@ -3599,10 +3599,10 @@ body {
       <div class="nav-item" onclick="goPage('/summon')"><div class="icon">🔔</div><span>召唤铃</span></div>
       <div class="nav-item" onclick="goPage('/diary')"><div class="icon">📖</div><span>心情日记</span></div>
       <div class="nav-item" onclick="goPage('/memory/read')"><div class="icon">🧠</div><span>记忆库</span></div>
-      <div class="nav-item" onclick="goPage('/garden')"><div class="icon">🌸</div><span>小院子</span></div>
-      <div class="nav-item" onclick="goPage('/period')"><div class="icon">🩷</div><span>经期记录</span></div>
+      <div class="nav-item" onclick="goPage('/garden')"><div class="icon">🌿</div><span>小院子</span></div>
+      <div class="nav-item" onclick="goPage('/period')"><div class="icon">🌙</div><span>经期</span></div>
       <div class="nav-item" onclick="goPage('/music/player')"><div class="icon">🎵</div><span>音乐</span></div>
-      <div class="nav-item" onclick="goPage('/voice')"><div class="icon">🎙</div><span>克的声音</span></div>
+      <div class="nav-item" onclick="goPage('/voice')"><div class="icon">🎙</div><span>声音</span></div>
       <div class="nav-item" onclick="goPage('/screen')"><div class="icon">🖥</div><span>屏幕共享</span></div>
       <div class="nav-item" onclick="goPage('/apps')"><div class="icon">📱</div><span>使用记录</span></div>
       <div class="nav-item" onclick="goPage('/setup')"><div class="icon">⚙️</div><span>设置</span></div>
