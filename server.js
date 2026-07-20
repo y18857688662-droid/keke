@@ -1049,6 +1049,7 @@ app.post('/chat/send', async (req, res) => {
   }
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
+  notifyWaitClients();
   const directKey = process.env.ANTHROPIC_API_KEY || '';
   const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
   if (!chatApiKey) {
@@ -1122,6 +1123,40 @@ app.get('/chat/pending', (req, res) => {
   const pending = chat.filter(m => m.pending);
   res.json({ messages: pending });
 });
+
+const waitClients = new Set();
+app.get('/chat/wait-pending', (req, res) => {
+  const chat = readChat();
+  const pending = chat.filter(m => m.pending);
+  if (pending.length > 0) return res.json({ messages: pending });
+  const client = { res, resolved: false };
+  waitClients.add(client);
+  const timeout = setTimeout(() => {
+    if (!client.resolved) {
+      client.resolved = true;
+      waitClients.delete(client);
+      res.json({ messages: [] });
+    }
+  }, 290000);
+  req.on('close', () => {
+    client.resolved = true;
+    waitClients.delete(client);
+    clearTimeout(timeout);
+  });
+});
+function notifyWaitClients() {
+  if (waitClients.size === 0) return;
+  const chat = readChat();
+  const pending = chat.filter(m => m.pending);
+  if (pending.length === 0) return;
+  for (const client of waitClients) {
+    if (!client.resolved) {
+      client.resolved = true;
+      try { client.res.json({ messages: pending }); } catch {}
+    }
+  }
+  waitClients.clear();
+}
 
 app.post('/chat/reply', (req, res) => {
   const { reply } = req.body;
