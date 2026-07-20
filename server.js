@@ -1128,6 +1128,16 @@ app.get('/chat/history', (req, res) => {
   res.json({ messages: chat.slice(-50) });
 });
 
+app.post('/chat/restore', (req, res) => {
+  const existing = readChat();
+  if (existing.length > 0) return res.json({ ok: false, reason: 'not_empty' });
+  const msgs = req.body.messages;
+  if (!Array.isArray(msgs) || msgs.length === 0) return res.json({ ok: false });
+  const clean = msgs.slice(-200).map(m => ({ role: m.role, content: m.content, time: m.time || '' }));
+  writeChat(clean);
+  res.json({ ok: true, count: clean.length });
+});
+
 app.post('/chat/tts', async (req, res) => {
   const text = (req.body.text || '').trim().slice(0, 500);
   if (!text) return res.status(400).json({ error: 'empty' });
@@ -3880,6 +3890,18 @@ function loadHistory() {
   fetch('/chat/history').then(function(r){return r.json()}).then(function(data) {
     if (data.messages && data.messages.length) {
       renderAll(data.messages);
+      pollKnown = data.messages.length;
+    } else {
+      var local = [];
+      try { local = JSON.parse(localStorage.getItem('ke_chat') || '[]'); } catch(e) {}
+      if (local.length > 0) {
+        renderAll(local);
+        pollKnown = local.length;
+        fetch('/chat/restore', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({messages: local})
+        }).catch(function(){});
+      }
     }
   }).catch(function(){});
 }
