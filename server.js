@@ -1021,7 +1021,10 @@ app.get('/chat/stream', (req, res) => {
   res.flushHeaders();
   res.write('data: {"type":"connected"}\n\n');
   sseClients.add(res);
-  req.on('close', () => sseClients.delete(res));
+  const heartbeat = setInterval(() => {
+    try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); }
+  }, 25000);
+  req.on('close', () => { clearInterval(heartbeat); sseClients.delete(res); });
 });
 
 function sseBroadcast(event) {
@@ -4018,11 +4021,14 @@ function sendMessage() {
     var t = document.getElementById('typing-indicator');
     if (t) t.remove();
     if (data.reply) {
+      pollKnown += 2;
       var replyMsg = {role:'assistant', content: data.reply, time: data.time};
       msgContainer.appendChild(renderTime(data.time));
       var idx = Object.keys(thinkingStore).length;
       msgContainer.appendChild(renderMessage(replyMsg, idx));
       scrollBottom();
+    } else {
+      pollKnown++;
     }
     sending = false;
   }).catch(function() {
@@ -4069,6 +4075,10 @@ inputField.addEventListener('keydown', function(e) {
 
 var evtSource = new EventSource('/chat/stream');
 var pollKnown = 0;
+evtSource.onerror = function() {
+  var hs = document.querySelector('.header-status');
+  if (hs) hs.innerHTML = '<span class="status-dot" style="background:#ccc"></span>重连中...';
+};
 evtSource.onmessage = function(e) {
   try {
     var data = JSON.parse(e.data);
