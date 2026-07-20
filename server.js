@@ -33,7 +33,7 @@ const APP_NOTIFY_FILE = path.join(__dirname, 'app_notify.json');
 const AUTH_FILE = path.join(__dirname, 'ombre_auth.json');
 
 const OMBRE_URL = 'https://ombre-brain-production-9daa.up.railway.app';
-const OMBRE_REDIRECT = process.env.OMBRE_REDIRECT || 'https://keke-production.up.railway.app/auth/callback';
+const OMBRE_REDIRECT = process.env.OMBRE_REDIRECT || 'https://keke-production-ec29.up.railway.app/auth/callback';
 let OMBRE_CLIENT_ID = null;
 
 function readAuth() {
