@@ -1015,6 +1015,9 @@ app.post('/chat/send', async (req, res) => {
         if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
       }
     })().catch(() => {});
+    const userText = (msg || '[图片]').slice(0, 200);
+    const keText = cleanReply.slice(0, 300);
+    storeMemory('[CHAT ' + new Date(Date.now()+8*3600000).toISOString().slice(0,16) + '] 瑶瑶: ' + userText + ' → 克: ' + keText).catch(() => {});
     res.json({ ok: true, reply, time: replyTime });
   } catch (e) {
     console.error('Chat API error:', e.message);
