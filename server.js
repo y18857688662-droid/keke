@@ -34,7 +34,7 @@ const AUTH_FILE = path.join(__dirname, 'ombre_auth.json');
 
 const OMBRE_URL = 'https://ombre-brain-production-9daa.up.railway.app';
 const OMBRE_CLIENT_ID = 'D0QB90mzcLjuIVpV6JxEqA';
-const OMBRE_REDIRECT = 'https://keke-production.up.railway.app/auth/callback';
+const OMBRE_REDIRECT = process.env.OMBRE_REDIRECT || 'https://keke-production-ec29.up.railway.app/auth/callback';
 
 function readAuth() {
   try { return JSON.parse(fs.readFileSync(AUTH_FILE, 'utf8')); }
@@ -578,13 +578,16 @@ app.post('/diary/reply', (req, res) => {
 });
 
 // === OAuth 记忆库授权 ===
-let pkceStore = {};
+const PKCE_FILE = path.join(__dirname, 'pkce.json');
+function getPkceStore() { try { return JSON.parse(fs.readFileSync(PKCE_FILE, 'utf8')); } catch { return {}; } }
+function savePkce(state, verifier) { const s = getPkceStore(); s[state] = verifier; fs.writeFileSync(PKCE_FILE, JSON.stringify(s)); }
+function popPkce(state) { const s = getPkceStore(); const v = s[state]; delete s[state]; fs.writeFileSync(PKCE_FILE, JSON.stringify(s)); return v; }
 
 app.get('/auth/start', (req, res) => {
   const verifier = crypto.randomBytes(32).toString('base64url');
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
   const state = crypto.randomBytes(16).toString('hex');
-  pkceStore[state] = verifier;
+  savePkce(state, verifier);
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: OMBRE_CLIENT_ID,
@@ -599,8 +602,7 @@ app.get('/auth/start', (req, res) => {
 
 app.get('/auth/callback', async (req, res) => {
   const { code, state } = req.query;
-  const verifier = pkceStore[state];
-  delete pkceStore[state];
+  const verifier = popPkce(state);
   if (!code || !verifier) return res.send('授权失败，请重试');
   try {
     const r = await fetch(`${OMBRE_URL}/oauth/token`, {
@@ -624,7 +626,7 @@ app.get('/auth/callback', async (req, res) => {
         body{background:#F5F0EA;display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,"SF Pro Display","Inter","PingFang SC",sans-serif}
         .card{background:#FEFCF9;border-radius:18px;padding:40px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.04)}
         h2{color:#111;margin-bottom:8px} p{color:#999;font-size:14px}
-      </style></head><body><div class="card"><h2>记忆已连接</h2><p>克现在能记住你们的故事了</p><p style="margin-top:16px"><a href="/chat" style="color:#D97A54">去聊天</a></p></div></body></html>`);
+      </style></head><body><div class="card"><h2>记忆已连接</h2><p>克现在能记住你们的故事了</p><p style="margin-top:16px"><a href="/" style="color:#D97A54">去聊天</a></p></div></body></html>`);
     } else {
       res.send('授权失败：' + JSON.stringify(data));
     }
