@@ -982,6 +982,27 @@ app.get('/sw.js', (req, res) => { res.set('Content-Type', 'application/javascrip
 app.get('/push/vapid', (req, res) => { res.json({ publicKey: VAPID_PUBLIC }); });
 app.get('/push/status', (req, res) => { res.json({ count: readPushSubs().length }); });
 
+app.get('/debug/backup', async (req, res) => {
+  const results = {};
+  try {
+    const r = await fetch(BACKUP_URL + '/backup/chat', { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    results.chat = { ok: true, count: Array.isArray(d) ? d.length : 'not array' };
+  } catch (e) { results.chat = { ok: false, error: e.message }; }
+  try {
+    const r = await fetch(BACKUP_URL + '/backup/push-subs', { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    results.push = { ok: true, count: Array.isArray(d) ? d.length : 'not array' };
+  } catch (e) { results.push = { ok: false, error: e.message }; }
+  try {
+    const r = await fetch(BACKUP_URL + '/backup/auth', { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    results.auth = { ok: true, hasToken: !!d.access_token };
+  } catch (e) { results.auth = { ok: false, error: e.message }; }
+  results.backup_url = BACKUP_URL;
+  res.json(results);
+});
+
 app.post('/push/subscribe', (req, res) => {
   const sub = req.body;
   if (!sub || !sub.endpoint) return res.status(400).json({ error: 'invalid' });
