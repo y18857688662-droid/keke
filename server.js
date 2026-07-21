@@ -4106,9 +4106,9 @@ function sendImage(file) {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({message:'[图片]', image: base64})
     }).then(function(r){return r.json()}).then(function(data) {
-      if (!data.ok) addSystemMsg('图片发送失败');
+      if (!data.ok) alert('图片发送失败');
       pollKnown++;
-    }).catch(function(){ addSystemMsg('图片发送失败，请重试'); });
+    }).catch(function(){ alert('图片发送失败，请重试'); });
   });
 }
 
