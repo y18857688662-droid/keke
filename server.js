@@ -4078,10 +4078,25 @@ function sendMessage() {
   });
 }
 
+function compressImage(file, maxDim, quality) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', quality));
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
 function sendImage(file) {
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var base64 = e.target.result;
+  compressImage(file, 800, 0.6).then(function(base64) {
     var userMsg = {role:'user', content:'[图片]', image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
     msgContainer.appendChild(renderTime(userMsg.time));
     msgContainer.appendChild(renderMessage(userMsg, -1));
@@ -4091,10 +4106,10 @@ function sendImage(file) {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({message:'[图片]', image: base64})
     }).then(function(r){return r.json()}).then(function(data) {
+      if (!data.ok) addSystemMsg('图片发送失败');
       pollKnown++;
-    }).catch(function(){});
-  };
-  reader.readAsDataURL(file);
+    }).catch(function(){ addSystemMsg('图片发送失败，请重试'); });
+  });
 }
 
 document.getElementById('photoInput').addEventListener('change', function() {
