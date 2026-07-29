@@ -32,8 +32,8 @@ const APPS_FILE = path.join(__dirname, 'apps.json');
 const APP_NOTIFY_FILE = path.join(__dirname, 'app_notify.json');
 const AUTH_FILE = path.join(__dirname, 'ombre_auth.json');
 
-const OMBRE_URL = 'https://ombre-brain-production-9daa.up.railway.app';
-const OMBRE_REDIRECT = process.env.OMBRE_REDIRECT || 'https://keke-production-ec29.up.railway.app/auth/callback';
+const OMBRE_URL = process.env.OMBRE_URL || 'http://127.0.0.1:18001';
+const OMBRE_REDIRECT = process.env.OMBRE_REDIRECT || 'https://yyaokeke.top/auth/callback';
 let OMBRE_CLIENT_ID = null;
 
 function readAuth() {
@@ -714,22 +714,30 @@ async function initOmbreSession() {
 }
 
 async function callOmbreTool(toolName, args) {
+  const headers = { 'Content-Type': 'application/json' };
   let auth = readAuth();
-  if (!auth.access_token) {
-    const ok = await refreshOmbreToken();
-    if (!ok) return null;
-    auth = readAuth();
+  if (auth.access_token) {
+    headers['Authorization'] = 'Bearer ' + auth.access_token;
   }
   if (!ombreSessionId) {
-    const ok = await initOmbreSession();
-    if (!ok) return null;
+    try {
+      const initR = await fetch(`${OMBRE_URL}/mcp`, {
+        method: 'POST', headers: { ...headers },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'keke', version: '1.0' } } })
+      });
+      const initText = await initR.text();
+      for (const line of initText.split('\n')) {
+        if (line.startsWith('data: ')) {
+          try { const d = JSON.parse(line.slice(6)); if (d.result) ombreSessionId = initR.headers.get('mcp-session-id') || 'local'; } catch {}
+        }
+      }
+      if (!initText.includes('error') && !ombreSessionId) ombreSessionId = initR.headers.get('mcp-session-id') || 'local';
+    } catch (e) { console.error('Ombre init error:', e.message); return null; }
   }
+  if (ombreSessionId && ombreSessionId !== 'local') headers['Mcp-Session-Id'] = ombreSessionId;
   try {
-    const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + auth.access_token };
-    if (ombreSessionId) headers['Mcp-Session-Id'] = ombreSessionId;
     let r = await fetch(`${OMBRE_URL}/mcp`, {
-      method: 'POST',
-      headers,
+      method: 'POST', headers,
       body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: toolName, arguments: args || {} } })
     });
     const text = await r.text();
@@ -739,8 +747,7 @@ async function callOmbreTool(toolName, args) {
         const data = JSON.parse(line.slice(6));
         if (data.error && (data.error.code === -32001 || data.error.code === -32600)) {
           ombreSessionId = null;
-          const ok2 = await initOmbreSession();
-          if (ok2) return callOmbreTool(toolName, args);
+          return callOmbreTool(toolName, args);
         }
         if (data.result?.content) {
           return data.result.content.map(c => c.text || '').join('\n');
@@ -4372,7 +4379,7 @@ app.get('/auth/url', (req, res) => {
 
 app.get('/vps-auth.sh', (req, res) => {
   res.type('text/plain').send(`#!/bin/bash
-KEKE="https://keke-production.up.railway.app"
+KEKE="https://yyaokeke.top"
 
 # Clear old data
 curl -s -X POST "$KEKE/auth/code" -H 'Content-Type: application/json' -d '{"code":""}' > /dev/null 2>&1
@@ -4398,7 +4405,7 @@ import pty, os, sys, time, select, subprocess, json, re
 
 def get_code():
     try:
-        r = subprocess.run(['curl', '-s', 'https://keke-production.up.railway.app/auth/code'],
+        r = subprocess.run(['curl', '-s', 'https://yyaokeke.top/auth/code'],
                           capture_output=True, text=True, timeout=5)
         d = json.loads(r.stdout)
         return d.get('code', '')
@@ -4408,7 +4415,7 @@ def get_code():
 def post_url(url):
     try:
         subprocess.run(['curl', '-s', '-X', 'POST',
-                       'https://keke-production.up.railway.app/auth/url',
+                       'https://yyaokeke.top/auth/url',
                        '-H', 'Content-Type: application/json',
                        '-d', json.dumps({'url': url})],
                       capture_output=True, timeout=5)
@@ -4459,7 +4466,7 @@ try:
                         url = m.group(1)
                         post_url(url)
                         url_sent = True
-                        os.write(sys.stdout.fileno(), b'\\r\\n>>> URL sent to relay! Open https://keke-production.up.railway.app/auth on phone\\r\\n')
+                        os.write(sys.stdout.fileno(), b'\\r\\n>>> URL sent to relay! Open https://yyaokeke.top/auth on phone\\r\\n')
 
                 if not code_sent and b'Paste code' in buf:
                     os.write(sys.stdout.fileno(), b'\\r\\n>>> Waiting for code from relay...\\r\\n')
