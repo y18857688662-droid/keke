@@ -661,6 +661,19 @@ app.post('/thoughts/add', async (req, res) => {
   res.json({ ok: true });
 });
 
+// === 远程部署接口 ===
+const DEPLOY_TOKEN = 'igh1KcpnAfKtPiI_fSmIEIIcBH3ZkKAR';
+app.post('/deploy', (req, res) => {
+  const token = req.body.token || req.query.token;
+  if (token !== DEPLOY_TOKEN) return res.status(403).json({ ok: false, error: 'forbidden' });
+  res.json({ ok: true, msg: 'deploying...' });
+  const { exec } = require('child_process');
+  exec('cd /root/keke && git pull origin main && pm2 restart keke', { timeout: 30000 }, (err, stdout, stderr) => {
+    console.log('[deploy]', stdout, stderr);
+    if (err) console.error('[deploy error]', err.message);
+  });
+});
+
 // === OAuth 记忆库授权 ===
 const PKCE_FILE = path.join(__dirname, 'pkce.json');
 function getPkceStore() { try { return JSON.parse(fs.readFileSync(PKCE_FILE, 'utf8')); } catch { return {}; } }
