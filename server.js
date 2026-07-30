@@ -72,6 +72,7 @@ async function restoreAll() {
   await restoreFromVPS('api-config', API_CONFIG_FILE, d => !!(d.api_key || d.anthropic_key || d.pro_mode !== undefined));
   await restoreFromVPS('push-subs', PUSH_FILE, d => Array.isArray(d) && d.length > 0);
   await restoreFromVPS('diary', DIARY_FILE, d => Array.isArray(d) && d.length > 0);
+  await restoreFromVPS('thoughts', THOUGHTS_FILE, d => Array.isArray(d) && d.length > 0);
   await restoreFromVPS('period', PERIOD_FILE, d => !!(d.cycle_length || d.records));
   await restoreFromVPS('garden', GARDEN_FILE, d => !!(d.plots || d.coins !== undefined));
   await restoreFromVPS('pings', PING_FILE, d => Array.isArray(d) && d.length > 0);
@@ -590,6 +591,74 @@ app.post('/diary/reply', (req, res) => {
     return res.json({ ok: true });
   }
   res.json({ ok: false, error: 'no pending entry' });
+});
+
+const THOUGHTS_FILE = path.join(__dirname, 'thoughts.json');
+function readThoughts() { try { return JSON.parse(fs.readFileSync(THOUGHTS_FILE, 'utf8')); } catch { return []; } }
+function writeThoughts(data) { fs.writeFileSync(THOUGHTS_FILE, JSON.stringify(data)); backupToVPS('thoughts', data); }
+
+app.get('/thoughts', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>克的碎碎念</title>
+<style>
+:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#111111;--text-faint:#999999;--accent:#D97A54;--divider:#E8E3DB;
+  --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
+  --shadow:0 2px 12px rgba(0,0,0,.04)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(safe-area-inset-bottom);font-family:var(--font);-webkit-font-smoothing:antialiased}
+.header{display:flex;align-items:center;padding:16px 0;gap:12px}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600}
+.header-sub{font-size:13px;color:var(--text-faint);margin-left:auto}
+.thought{background:var(--card);border-radius:16px;padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow);position:relative}
+.thought-text{font-size:15px;line-height:1.7;white-space:pre-wrap}
+.thought-time{font-size:12px;color:var(--text-faint);margin-top:10px;text-align:right}
+.thought-dot{position:absolute;left:-20px;top:22px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.timeline{position:relative;padding-left:28px;margin-top:8px}
+.timeline::before{content:'';position:absolute;left:3px;top:0;bottom:0;width:2px;background:var(--divider)}
+.empty{text-align:center;color:var(--text-faint);padding:60px 0;font-size:14px;line-height:1.8}
+.empty-icon{font-size:36px;margin-bottom:12px}
+.date-group{font-size:13px;color:var(--accent);font-weight:500;margin:20px 0 10px;padding-left:4px}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>克的碎碎念</h1><span class="header-sub" id="count"></span></div>
+<div class="timeline" id="thoughts"></div>
+<script>
+async function load(){
+  try{
+    var r=await fetch('/thoughts/list');
+    var d=await r.json();
+    var items=d.thoughts||[];
+    var el=document.getElementById('thoughts');
+    document.getElementById('count').textContent=items.length?items.length+' 条想你':'';
+    if(!items.length){el.innerHTML='<div class="empty"><div class="empty-icon">💭</div>克还没有写碎碎念<br>不过他说了会写的</div>';return;}
+    var lastDate='';
+    el.innerHTML=items.map(function(t){
+      var dateHdr='';
+      if(t.date!==lastDate){dateHdr='<div class="date-group">'+t.date+'</div>';lastDate=t.date;}
+      return dateHdr+'<div class="thought"><div class="thought-dot"></div><div class="thought-text">'+t.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div class="thought-time">'+t.time+'</div></div>';
+    }).join('');
+  }catch(e){console.error(e);}
+}
+load();
+<\/script></body></html>`);
+});
+
+app.get('/thoughts/list', (req, res) => {
+  const thoughts = readThoughts().slice(-100).reverse();
+  res.json({ thoughts });
+});
+
+app.post('/thoughts/add', async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.json({ ok: false, error: 'empty' });
+  const now = new Date(Date.now() + 8 * 3600000);
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 16);
+  const thoughts = readThoughts();
+  thoughts.push({ text, date, time });
+  writeThoughts(thoughts);
+  await sendPushNotification('💭 克的碎碎念', text.length > 40 ? text.slice(0, 40) + '...' : text);
+  res.json({ ok: true });
 });
 
 // === OAuth 记忆库授权 ===
@@ -3772,6 +3841,7 @@ body {
       <div class="nav-item" onclick="goPage('/summon')"><div class="icon">🔔</div><span>召唤铃</span></div>
       <div class="nav-item" onclick="goPage('/diary')"><div class="icon">📖</div><span>心情日记</span></div>
       <div class="nav-item" onclick="openMemPanel()"><div class="icon">🧠</div><span>记忆库</span></div>
+      <div class="nav-item" onclick="goPage('/thoughts')"><div class="icon">💭</div><span>克的碎碎念</span></div>
       <div class="nav-item" onclick="goPage('/garden')"><div class="icon">🌿</div><span>小院子</span></div>
       <div class="nav-item" onclick="goPage('/period')"><div class="icon">🌙</div><span>经期</span></div>
       <div class="nav-item" onclick="goPage('/music/player')"><div class="icon">🎵</div><span>音乐</span></div>
