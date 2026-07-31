@@ -1212,14 +1212,16 @@ app.post('/chat/reply', (req, res) => {
   sseBroadcast({ type: 'message', role: 'assistant', content: reply, time });
   const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
-  (async () => {
-    for (const line of lines) {
-      const isAction = line.startsWith('*') && line.endsWith('*');
-      const text = isAction ? line.slice(1, -1) : line;
-      await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
-      if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
-    }
-  })().catch(() => {});
+  if (sseClients.size === 0) {
+    (async () => {
+      for (const line of lines) {
+        const isAction = line.startsWith('*') && line.endsWith('*');
+        const text = isAction ? line.slice(1, -1) : line;
+        await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+        if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+      }
+    })().catch(() => {});
+  }
   const pending = chat.filter(m => m.role === 'user').slice(-1);
   const userText = pending.length ? pending[0].content.slice(0, 200) : '';
   const keText = cleanReply.slice(0, 300);
@@ -1245,14 +1247,16 @@ app.post('/chat/proactive', (req, res) => {
   sseBroadcast({ type: 'message', role: 'assistant', content: message, time });
   const cleanMsg = message.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const lines = cleanMsg.split(/\n+/).map(l => l.trim()).filter(l => l);
-  (async () => {
-    for (const line of lines) {
-      const isAction = line.startsWith('*') && line.endsWith('*');
-      const text = isAction ? line.slice(1, -1) : line;
-      await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
-      if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
-    }
-  })().catch(() => {});
+  if (sseClients.size === 0) {
+    (async () => {
+      for (const line of lines) {
+        const isAction = line.startsWith('*') && line.endsWith('*');
+        const text = isAction ? line.slice(1, -1) : line;
+        await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+        if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+      }
+    })().catch(() => {});
+  }
   storeMemory('[PROACTIVE ' + now.toISOString().slice(0, 16) + '] 克主动: ' + cleanMsg.slice(0, 300)).catch(() => {});
   res.json({ ok: true, time });
 });
@@ -1751,18 +1755,36 @@ function addMsg(role,text,time,noSave){
         });
       }
     });
-    allRows.forEach(function(r,i){
-      const row=document.createElement('div');
-      if(r.type==='action'){
-        row.className='row narration';
-        row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span></div>\`;
-      }else{
-        row.className='row ai tail';
-        var meta=i===allRows.length-1?(time||''):'';
-        row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span><span class="meta">\${meta}</span></div>\`;
-      }
-      scroll.appendChild(row);
-    });
+    if(noSave||allRows.length<=1){
+      allRows.forEach(function(r,i){
+        const row=document.createElement('div');
+        if(r.type==='action'){
+          row.className='row narration';
+          row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span></div>\`;
+        }else{
+          row.className='row ai tail';
+          var meta=i===allRows.length-1?(time||''):'';
+          row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span><span class="meta">\${meta}</span></div>\`;
+        }
+        scroll.appendChild(row);
+      });
+    }else{
+      allRows.forEach(function(r,i){
+        setTimeout(function(){
+          const row=document.createElement('div');
+          if(r.type==='action'){
+            row.className='row narration';
+            row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span></div>\`;
+          }else{
+            row.className='row ai tail';
+            var meta=i===allRows.length-1?(time||''):'';
+            row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span><span class="meta">\${meta}</span></div>\`;
+          }
+          scroll.appendChild(row);
+          scroll.scrollTop=scroll.scrollHeight;
+        },i*400);
+      });
+    }
   }else{
     const row=document.createElement('div');
     row.className='row human tail';
