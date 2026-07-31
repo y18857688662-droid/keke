@@ -674,6 +674,27 @@ app.post('/deploy', (req, res) => {
   });
 });
 
+// === 头像云端存储 ===
+const AVATAR_DIR = path.join(__dirname, 'avatars');
+if (!fs.existsSync(AVATAR_DIR)) fs.mkdirSync(AVATAR_DIR);
+
+app.post('/avatar/save', (req, res) => {
+  const { who, data } = req.body;
+  if (!who || !data || !['ke', 'yao'].includes(who)) return res.status(400).json({ ok: false });
+  if (data.length > 2 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'too large' });
+  fs.writeFileSync(path.join(AVATAR_DIR, who + '.txt'), data);
+  res.json({ ok: true });
+});
+
+app.get('/avatar/load', (req, res) => {
+  const result = {};
+  for (const who of ['ke', 'yao']) {
+    const fp = path.join(AVATAR_DIR, who + '.txt');
+    if (fs.existsSync(fp)) result[who] = fs.readFileSync(fp, 'utf8');
+  }
+  res.json(result);
+});
+
 // === OAuth 记忆库授权 ===
 const PKCE_FILE = path.join(__dirname, 'pkce.json');
 function getPkceStore() { try { return JSON.parse(fs.readFileSync(PKCE_FILE, 'utf8')); } catch { return {}; } }
@@ -3973,11 +3994,13 @@ function setAvatar(input, imgId, svgId, who) {
     img.src = e.target.result; img.style.display = 'block'; svg.style.display = 'none';
     localStorage.setItem('avatar_' + who, e.target.result);
     syncAvatars(who);
+    fetch('/avatar/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({who:who, data:e.target.result})});
   };
   reader.readAsDataURL(file);
 }
-function syncAvatars(who) {
-  var data = localStorage.getItem('avatar_' + who); if (!data) return;
+function applyAvatar(who, data) {
+  if (!data) return;
+  localStorage.setItem('avatar_' + who, data);
   if (who === 'ke') {
     ['avaKeImg','avaKeHImg'].forEach(function(id) {
       var el = document.getElementById(id); if (el) { el.src = data; el.style.display = 'block'; }
@@ -3991,7 +4014,15 @@ function syncAvatars(who) {
     var sv = document.getElementById('avaYaoSvg'); if (sv) sv.style.display = 'none';
   }
 }
+function syncAvatars(who) {
+  var data = localStorage.getItem('avatar_' + who);
+  if (data) applyAvatar(who, data);
+}
 syncAvatars('ke'); syncAvatars('yao');
+fetch('/avatar/load').then(function(r){return r.json()}).then(function(d){
+  if(d.ke){applyAvatar('ke',d.ke)}
+  if(d.yao){applyAvatar('yao',d.yao)}
+}).catch(function(){});
 
 document.addEventListener('click', function(e) {
   var menu = document.getElementById('attachMenu');
