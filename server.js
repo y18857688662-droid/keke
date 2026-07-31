@@ -3767,6 +3767,7 @@ body {
 .msg-group.yao .msg-bubble { background: var(--bubble-yao); align-self: flex-end; }
 .msg-action { font-size: 12px; color: var(--text-faint); padding: 1px 2px; font-style: italic; }
 .msg-group.yao .msg-action { align-self: flex-end; }
+@keyframes fadeInBubble { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
 .voice-msg {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 13px; border-radius: var(--radius);
@@ -4031,7 +4032,7 @@ document.addEventListener('click', function(e) {
 
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-function renderMessage(msg, idx) {
+function renderMessage(msg, idx, stagger) {
   var isKe = msg.role === 'assistant';
   var who = isKe ? 'ke' : 'yao';
   var content = msg.content || '';
@@ -4061,15 +4062,21 @@ function renderMessage(msg, idx) {
     colHtml += '<div class="msg-bubble"><img src="'+msg.image+'" style="max-width:200px;border-radius:12px;display:block"></div>';
   }
   var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l});
+  var bubbleIdx = 0;
   lines.forEach(function(line) {
+    var delay = stagger ? 'style="opacity:0;animation:fadeInBubble 0.3s ease '+((bubbleIdx)*0.4)+'s forwards"' : '';
     if (line.startsWith('*') && line.endsWith('*') && line.length > 2) {
-      colHtml += '<div class="msg-action">' + escHtml(line.slice(1,-1)) + '</div>';
+      colHtml += '<div class="msg-action" '+delay+'>' + escHtml(line.slice(1,-1)) + '</div>';
     } else {
-      colHtml += '<div class="msg-bubble">' + escHtml(line) + '</div>';
+      colHtml += '<div class="msg-bubble" '+delay+'>' + escHtml(line) + '</div>';
     }
+    bubbleIdx++;
   });
   colHtml += '</div>';
   group.innerHTML = avaHtml + colHtml;
+  if (stagger && lines.length > 1) {
+    setTimeout(function(){ scrollBottom(); }, lines.length * 400 + 100);
+  }
   return group;
 }
 
@@ -4288,7 +4295,7 @@ evtSource.onmessage = function(e) {
       pollKnown++;
       var replyMsg = {role:'assistant', content: data.content, time: data.time};
       msgContainer.appendChild(renderTime(data.time));
-      msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length));
+      msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length, true));
       scrollBottom();
     }
   } catch(err) {}
