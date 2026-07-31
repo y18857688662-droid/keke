@@ -1083,6 +1083,7 @@ async function restoreChat() {
 restoreChat();
 
 app.get('/sw.js', (req, res) => { res.set('Content-Type', 'application/javascript'); res.sendFile(path.join(__dirname, 'sw.js')); });
+app.get('/icon-gy.png', (req, res) => { res.set('Cache-Control', 'public, max-age=86400'); res.sendFile(path.join(__dirname, 'icon-gy.png')); });
 app.get('/push/vapid', (req, res) => { res.json({ publicKey: VAPID_PUBLIC }); });
 app.get('/push/status', (req, res) => { res.json({ count: readPushSubs().length }); });
 
@@ -1351,7 +1352,7 @@ app.get('/chat', (req, res) => {
 <meta name="apple-mobile-web-app-title" content="克">
 <meta name="theme-color" content="#F5F0EA">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E8E3DB'/%3E%3Ctext x='14' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%23D97A54'%3EG%3C/text%3E%3Ctext x='50' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%234A4A4A' text-anchor='end'%3EY%3C/text%3E%3C/svg%3E">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E8E3DB'/%3E%3Ctext x='14' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%23D97A54'%3EG%3C/text%3E%3Ctext x='50' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%234A4A4A' text-anchor='end'%3EY%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="/icon-gy.png">
 <title>克</title>
 <style>
 :root{
@@ -3575,7 +3576,7 @@ app.get('/', (req, res) => {
 <meta name="apple-mobile-web-app-title" content="克">
 <meta name="theme-color" content="#FDFCFA">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E8E3DB'/%3E%3Ctext x='14' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%23D97A54'%3EG%3C/text%3E%3Ctext x='50' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%234A4A4A' text-anchor='end'%3EY%3C/text%3E%3C/svg%3E">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E8E3DB'/%3E%3Ctext x='14' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%23D97A54'%3EG%3C/text%3E%3Ctext x='50' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%234A4A4A' text-anchor='end'%3EY%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="/icon-gy.png">
 <title>克</title>
 <style>
 @charset "UTF-8";
