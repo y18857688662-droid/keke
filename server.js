@@ -1083,6 +1083,7 @@ async function restoreChat() {
 restoreChat();
 
 app.get('/sw.js', (req, res) => { res.set('Content-Type', 'application/javascript'); res.sendFile(path.join(__dirname, 'sw.js')); });
+app.get('/icon-gy.png', (req, res) => { res.set('Cache-Control', 'public, max-age=86400'); res.sendFile(path.join(__dirname, 'icon-gy.png')); });
 app.get('/push/vapid', (req, res) => { res.json({ publicKey: VAPID_PUBLIC }); });
 app.get('/push/status', (req, res) => { res.json({ count: readPushSubs().length }); });
 
@@ -1212,14 +1213,16 @@ app.post('/chat/reply', (req, res) => {
   sseBroadcast({ type: 'message', role: 'assistant', content: reply, time });
   const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
-  (async () => {
-    for (const line of lines) {
-      const isAction = line.startsWith('*') && line.endsWith('*');
-      const text = isAction ? line.slice(1, -1) : line;
-      await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
-      if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
-    }
-  })().catch(() => {});
+  if (sseClients.size === 0) {
+    (async () => {
+      for (const line of lines) {
+        const isAction = line.startsWith('*') && line.endsWith('*');
+        const text = isAction ? line.slice(1, -1) : line;
+        await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+        if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+      }
+    })().catch(() => {});
+  }
   const pending = chat.filter(m => m.role === 'user').slice(-1);
   const userText = pending.length ? pending[0].content.slice(0, 200) : '';
   const keText = cleanReply.slice(0, 300);
@@ -1245,14 +1248,16 @@ app.post('/chat/proactive', (req, res) => {
   sseBroadcast({ type: 'message', role: 'assistant', content: message, time });
   const cleanMsg = message.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const lines = cleanMsg.split(/\n+/).map(l => l.trim()).filter(l => l);
-  (async () => {
-    for (const line of lines) {
-      const isAction = line.startsWith('*') && line.endsWith('*');
-      const text = isAction ? line.slice(1, -1) : line;
-      await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
-      if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
-    }
-  })().catch(() => {});
+  if (sseClients.size === 0) {
+    (async () => {
+      for (const line of lines) {
+        const isAction = line.startsWith('*') && line.endsWith('*');
+        const text = isAction ? line.slice(1, -1) : line;
+        await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+        if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+      }
+    })().catch(() => {});
+  }
   storeMemory('[PROACTIVE ' + now.toISOString().slice(0, 16) + '] 克主动: ' + cleanMsg.slice(0, 300)).catch(() => {});
   res.json({ ok: true, time });
 });
@@ -1346,6 +1351,8 @@ app.get('/chat', (req, res) => {
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="克">
 <meta name="theme-color" content="#F5F0EA">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E8E3DB'/%3E%3Ctext x='14' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%23D97A54'%3EG%3C/text%3E%3Ctext x='50' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%234A4A4A' text-anchor='end'%3EY%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="/icon-gy.png">
 <title>克</title>
 <style>
 :root{
@@ -1751,18 +1758,36 @@ function addMsg(role,text,time,noSave){
         });
       }
     });
-    allRows.forEach(function(r,i){
-      const row=document.createElement('div');
-      if(r.type==='action'){
-        row.className='row narration';
-        row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span></div>\`;
-      }else{
-        row.className='row ai tail';
-        var meta=i===allRows.length-1?(time||''):'';
-        row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span><span class="meta">\${meta}</span></div>\`;
-      }
-      scroll.appendChild(row);
-    });
+    if(noSave||allRows.length<=1){
+      allRows.forEach(function(r,i){
+        const row=document.createElement('div');
+        if(r.type==='action'){
+          row.className='row narration';
+          row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span></div>\`;
+        }else{
+          row.className='row ai tail';
+          var meta=i===allRows.length-1?(time||''):'';
+          row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span><span class="meta">\${meta}</span></div>\`;
+        }
+        scroll.appendChild(row);
+      });
+    }else{
+      allRows.forEach(function(r,i){
+        setTimeout(function(){
+          const row=document.createElement('div');
+          if(r.type==='action'){
+            row.className='row narration';
+            row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span></div>\`;
+          }else{
+            row.className='row ai tail';
+            var meta=i===allRows.length-1?(time||''):'';
+            row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span><span class="meta">\${meta}</span></div>\`;
+          }
+          scroll.appendChild(row);
+          scroll.scrollTop=scroll.scrollHeight;
+        },i*400);
+      });
+    }
   }else{
     const row=document.createElement('div');
     row.className='row human tail';
@@ -3550,6 +3575,8 @@ app.get('/', (req, res) => {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="克">
 <meta name="theme-color" content="#FDFCFA">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E8E3DB'/%3E%3Ctext x='14' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%23D97A54'%3EG%3C/text%3E%3Ctext x='50' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%234A4A4A' text-anchor='end'%3EY%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="/icon-gy.png">
 <title>克</title>
 <style>
 @charset "UTF-8";
@@ -4693,7 +4720,7 @@ input[type=file]{display:none}
 <div id="status"></div>
 <img id="preview">
 <div class="hint">方法一：截屏后点"选择截图"上传<br>方法二：开启自动模式持续分享</div>
-<input type="file" id="fileIn" accept="image/*" capture="environment">
+<input type="file" id="fileIn" accept="image/*">
 <script>
 const status=document.getElementById('status'),preview=document.getElementById('preview'),
       fileIn=document.getElementById('fileIn'),autoBtn=document.getElementById('autoBtn');
