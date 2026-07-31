@@ -4081,11 +4081,9 @@ function formatTimeDisplay(t) {
   var datePart = parts[0];
   var timePart = parts[1];
   var today = new Date(Date.now() + 8 * 3600000);
-  var todayStr = today.toISOString().slice(0, 10);
   var dp = datePart.split('-');
   if (dp.length === 3) {
     var thisYear = today.toISOString().slice(0, 4);
-    if (datePart === todayStr) return '今天 ' + timePart;
     if (dp[0] === thisYear) return parseInt(dp[1]) + '月' + parseInt(dp[2]) + '日 ' + timePart;
     return dp[0] + '年' + parseInt(dp[1]) + '月' + parseInt(dp[2]) + '日 ' + timePart;
   }
