@@ -4693,7 +4693,7 @@ input[type=file]{display:none}
 <div id="status"></div>
 <img id="preview">
 <div class="hint">方法一：截屏后点"选择截图"上传<br>方法二：开启自动模式持续分享</div>
-<input type="file" id="fileIn" accept="image/*" capture="environment">
+<input type="file" id="fileIn" accept="image/*">
 <script>
 const status=document.getElementById('status'),preview=document.getElementById('preview'),
       fileIn=document.getElementById('fileIn'),autoBtn=document.getElementById('autoBtn');
