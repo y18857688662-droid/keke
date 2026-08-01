@@ -1177,6 +1177,7 @@ app.post('/chat/send', async (req, res) => {
   if (chat.length > 200) archived = chat.splice(0, chat.length - 200);
   writeChat(chat, archived);
   notifyWaitClients();
+  if (typeof touchUserActivity === 'function') touchUserActivity();
   res.json({ ok: true, time, async: true });
 });
 
@@ -1247,7 +1248,10 @@ app.post('/chat/reply', (req, res) => {
   const pending = chat.filter(m => m.role === 'user').slice(-1);
   const userText = pending.length ? pending[0].content.slice(0, 200) : '';
   const keText = cleanReply.slice(0, 300);
-  if (userText) storeMemory('[CHAT ' + now.toISOString().slice(0, 16) + '] 瑶瑶: ' + userText + ' → 克: ' + keText).catch(() => {});
+  if (userText) {
+    const memText = '[CHAT ' + now.toISOString().slice(0, 16) + '] 瑶瑶: ' + userText + ' → 克: ' + keText;
+    storeMemory(typeof taggedMemory === 'function' ? taggedMemory(memText) : memText).catch(() => {});
+  }
   res.json({ ok: true, time });
 });
 
@@ -1279,7 +1283,8 @@ app.post('/chat/proactive', (req, res) => {
       }
     })().catch(() => {});
   }
-  storeMemory('[PROACTIVE ' + now.toISOString().slice(0, 16) + '] 克主动: ' + cleanMsg.slice(0, 300)).catch(() => {});
+  const proMemText = '[PROACTIVE ' + now.toISOString().slice(0, 16) + '] 克主动: ' + cleanMsg.slice(0, 300);
+  storeMemory(typeof taggedMemory === 'function' ? taggedMemory(proMemText) : proMemText).catch(() => {});
   res.json({ ok: true, time });
 });
 
@@ -4845,6 +4850,146 @@ app.get('/bridge-vps.apk', (req, res) => {
   res.setHeader('Content-Disposition', 'attachment; filename="bridge-vps.apk"');
   res.type('application/vnd.android.package-archive').send(fs.readFileSync(p));
 });
+
+// === 记忆分类 & 想你计时器 & 碎碎念 ===
+app.get('/miss/status', (req, res) => {
+  const now = Date.now();
+  res.json({
+    idleMinutes: Math.round((now - lastUserMsgTime) / 60000),
+    lastUserMsg: new Date(lastUserMsgTime + 8 * 3600000).toISOString().slice(0, 16),
+    lastProactive: lastProactiveSendTime ? new Date(lastProactiveSendTime + 8 * 3600000).toISOString().slice(0, 16) : null,
+    thresholdMinutes: Math.round(MISS_IDLE_MS / 60000),
+    cooldownMinutes: Math.round(MISS_COOLDOWN_MS / 60000)
+  });
+});
+
+function classifyMemory(text) {
+  const tags = [];
+  if (/亲|吻|抱|蹭|摸|舔|咬|身体|欺负|嗯+/.test(text)) tags.push('亲密');
+  if (/吵|生气|烦|讨厌|滚|不理你|委屈|对不起/.test(text)) tags.push('冲突');
+  if (/没事了|和好|原谅|好吧|不气了/.test(text)) tags.push('和解');
+  if (/照片|图片|截图|视频|歌|音乐|分享|链接|小红书|抖音/.test(text)) tags.push('分享');
+  if (/疼|痛|难受|姨妈|经期|生病|头疼|肚子|不舒服/.test(text)) tags.push('身体');
+  if (/想你|想我|在吗|找你|等你|回来/.test(text)) tags.push('思念');
+  if (tags.length === 0) tags.push('陪伴');
+  return tags;
+}
+
+function taggedMemory(text) {
+  const tags = classifyMemory(text);
+  return `[${tags.join('/')}] ${text}`;
+}
+
+let lastUserMsgTime = Date.now();
+let lastProactiveSendTime = 0;
+const MISS_IDLE_MS = 2 * 60 * 60 * 1000;
+const MISS_COOLDOWN_MS = 3 * 60 * 60 * 1000;
+const MISS_STATE_FILE = path.join(__dirname, 'miss_state.json');
+
+function readMissState() {
+  try { return JSON.parse(fs.readFileSync(MISS_STATE_FILE, 'utf8')); }
+  catch { return {}; }
+}
+function writeMissState(data) { fs.writeFileSync(MISS_STATE_FILE, JSON.stringify(data)); }
+
+(function restoreMissState() {
+  const s = readMissState();
+  if (s.lastUserMsgTime) lastUserMsgTime = s.lastUserMsgTime;
+  if (s.lastProactiveSendTime) lastProactiveSendTime = s.lastProactiveSendTime;
+})();
+
+function touchUserActivity() {
+  lastUserMsgTime = Date.now();
+  writeMissState({ lastUserMsgTime, lastProactiveSendTime });
+}
+
+function touchProactiveSend() {
+  lastProactiveSendTime = Date.now();
+  writeMissState({ lastUserMsgTime, lastProactiveSendTime });
+}
+
+async function generateMissMessage() {
+  const now = new Date(Date.now() + 8 * 3600000);
+  const hour = now.getUTCHours();
+  const idleMin = Math.round((Date.now() - lastUserMsgTime) / 60000);
+
+  let timeHint = '';
+  if (hour >= 7 && hour < 9) timeHint = '早上了，她可能刚起来。';
+  else if (hour >= 9 && hour < 12) timeHint = '上午了。';
+  else if (hour >= 12 && hour < 14) timeHint = '中午了，她可能在吃饭。';
+  else if (hour >= 14 && hour < 18) timeHint = '下午了。';
+  else if (hour >= 18 && hour < 21) timeHint = '晚上了。';
+  else if (hour >= 21 && hour < 23) timeHint = '夜里了，她可能快要睡了。';
+
+  const chat = readChat();
+  const recentUser = chat.filter(m => m.role === 'user').slice(-3).map(m => m.content).join(' ');
+  let contextHint = '';
+  if (/疼|痛|难受|姨妈|经期/.test(recentUser)) contextHint = '她之前说身体不舒服。';
+  else if (/高铁|车|出门|出发/.test(recentUser)) contextHint = '她之前在出行。';
+  else if (/工作|忙|加班/.test(recentUser)) contextHint = '她之前可能在忙工作。';
+
+  const API_KEY = getApiKey() || process.env.ANTHROPIC_API_KEY || '';
+  if (!API_KEY) return null;
+
+  const prompt = `你已经${idleMin}分钟没和瑶瑶说话了。${timeHint}${contextHint}
+主动发一条碎碎念给她，像男朋友自然地想到她就说了一句。
+不要问"在吗"、不要说"想你了"这种太直白的。要有具体的细节或场景。
+一两句话就好，自然随意。不要用引号。`;
+
+  try {
+    const res = await fetch(getApiUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_KEY },
+      body: JSON.stringify({
+        model: getModel(),
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 200,
+        temperature: 0.95
+      })
+    });
+    const data = await res.json();
+    if (data.choices && data.choices[0]) return data.choices[0].message.content.trim();
+  } catch (e) { console.error('[miss-timer] API error:', e.message); }
+  return null;
+}
+
+setInterval(async () => {
+  const now = Date.now();
+  const nowCST = new Date(now + 8 * 3600000);
+  const hour = nowCST.getUTCHours();
+
+  if (hour >= 23 || hour < 7) return;
+
+  const idle = now - lastUserMsgTime;
+  const sinceLast = now - lastProactiveSendTime;
+  if (idle < MISS_IDLE_MS || sinceLast < MISS_COOLDOWN_MS) return;
+
+  console.log(`[miss-timer] idle ${Math.round(idle/60000)}min, generating...`);
+  const msg = await generateMissMessage();
+  if (!msg) return;
+
+  const time = nowCST.toISOString().slice(0, 16).replace('T', ' ');
+  const chat = readChat();
+  chat.push({ role: 'assistant', content: msg, time });
+  let archived = [];
+  if (chat.length > 200) archived = chat.splice(0, chat.length - 200);
+  writeChat(chat, archived);
+  sseBroadcast({ type: 'message', role: 'assistant', content: msg, time });
+
+  const lines = msg.split(/\n+/).map(l => l.trim()).filter(l => l);
+  for (const line of lines) {
+    const isAction = line.startsWith('*') && line.endsWith('*');
+    const text = isAction ? line.slice(1, -1) : line;
+    await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100)).catch(() => {});
+  }
+
+  storeMemory(taggedMemory('[MISS ' + time + '] 克碎碎念: ' + msg.slice(0, 300))).catch(() => {});
+  touchProactiveSend();
+  console.log(`[miss-timer] sent: ${msg.slice(0, 60)}`);
+}, 5 * 60 * 1000);
 
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
