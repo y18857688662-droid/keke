@@ -1844,10 +1844,14 @@ function addMsg(role,text,time,noSave){
       });
     }
   }else{
-    const row=document.createElement('div');
-    row.className='row human tail';
-    row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(text)}</span><span class="meta">\${time||''}</span></div>\`;
-    scroll.appendChild(row);
+    var lines=text.split(/\\n+/).map(function(l){return l.trim()}).filter(Boolean);
+    lines.forEach(function(line,i){
+      const row=document.createElement('div');
+      row.className='row human tail';
+      var meta=i===lines.length-1?(time||''):'';
+      row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(line)}</span><span class="meta">\${meta}</span></div>\`;
+      scroll.appendChild(row);
+    });
   }
   scroll.scrollTop=scroll.scrollHeight;
 }
