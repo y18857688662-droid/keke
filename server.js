@@ -1862,7 +1862,7 @@ function insertNewline(){
 }
 async function send(){
   if(sending)return;
-  const msg=input.value.trim();
+  const msg=input.value.replace(/\/\//g,'\n').trim();
   if(!msg)return;
   input.value='';input.style.height='auto';
   const now=new Date(Date.now()+8*3600000);
