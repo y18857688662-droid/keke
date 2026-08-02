@@ -313,8 +313,8 @@ app.get('/check', (req, res) => {
   res.json({ pings });
 });
 
-app.use(express.json({ limit: '15mb' }));
-app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+app.use(express.json({ limit: '70mb' }));
+app.use(express.urlencoded({ extended: true, limit: '70mb' }));
 
 app.post('/app', (req, res) => {
   const appName = req.body.app || req.query.app;
@@ -3490,7 +3490,7 @@ document.getElementById('photoInput').addEventListener('change', function() {
 });
 
 function sendFile(file) {
-  if (file.size > 10 * 1024 * 1024) { alert('文件太大，最大10MB'); return; }
+  if (file.size > 50 * 1024 * 1024) { alert('文件太大，最大50MB'); return; }
   var reader = new FileReader();
   reader.onload = function() {
     var base64 = reader.result;
