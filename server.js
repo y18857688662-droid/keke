@@ -1165,7 +1165,7 @@ function sseBroadcast(event) {
 }
 
 app.post('/chat/send', async (req, res) => {
-  const msg = req.body.message;
+  const msg = req.body.message ? req.body.message.replace(/\/\//g, '\n') : req.body.message;
   const image = req.body.image;
   if (image) console.log('[chat] received image, size:', Math.round(image.length/1024) + 'kb');
   if (!msg && !image) return res.json({ ok: false, error: 'empty message' });
