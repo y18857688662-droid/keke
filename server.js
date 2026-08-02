@@ -1586,15 +1586,6 @@ body{position:fixed;inset:0;width:100%;
 .composer textarea:focus,.composer textarea:focus-visible{outline:none}
 .photobtn{flex:none;background:none;border:none;cursor:pointer;color:var(--text-faint);padding:4px;display:flex;align-items:center}
 .photobtn:active{color:var(--text)}
-.input-toolbar{position:fixed;left:0;right:0;bottom:70px;z-index:101;
-  width:min(100vw,760px);margin:0 auto;
-  display:flex;gap:8px;padding:6px var(--side-pad);
-  padding-bottom:calc(6px + env(safe-area-inset-bottom))}
-.input-toolbar button{background:var(--card);border:1.5px solid var(--border);
-  border-radius:12px;padding:8px 16px;font-size:14px;font-family:var(--font);
-  color:var(--text);cursor:pointer;white-space:nowrap;
-  box-shadow:0 1px 4px rgba(0,0,0,.08)}
-.input-toolbar button:active{background:var(--accent);color:#fff}
 .chat-img{max-width:min(240px,70vw);border-radius:12px;cursor:pointer;display:block}
 .chat-img-full{position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .chat-img-full img{max-width:95vw;max-height:95vh;border-radius:8px}
@@ -1687,18 +1678,12 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <p>这里只有你和克。<br>说点什么吧。</p>
   </div>
 </main>
-<div class="input-toolbar" id="inputToolbar" style="display:none">
-  <button onclick="insertNewline()">换行 ⏎</button>
-  <button onclick="document.getElementById('photoInput').click()">图片 🖼</button>
-</div>
 <footer class="composer">
   <div class="field">
     <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="sendPhoto(this)">
-    <textarea id="input" rows="1" placeholder="Message..." enterkeyhint="return"
+    <textarea id="input" rows="1" placeholder="Message...  //=换行" enterkeyhint="send"
       oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"
-      onfocus="document.getElementById('inputToolbar').style.display='flex'"
-      onblur="setTimeout(function(){document.getElementById('inputToolbar').style.display='none'},200)"
-      onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!('ontouchstart' in window)){event.preventDefault();send()}"></textarea>
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
   </div>
   <button class="floatbtn send" id="sendBtn" onclick="send()" aria-label="发送">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
@@ -1862,14 +1847,6 @@ function addMsg(role,text,time,noSave){
   scroll.scrollTop=scroll.scrollHeight;
 }
 
-function insertNewline(){
-  const ta=document.getElementById('input');
-  const s=ta.selectionStart,e=ta.selectionEnd;
-  ta.value=ta.value.substring(0,s)+'\n'+ta.value.substring(e);
-  ta.selectionStart=ta.selectionEnd=s+1;
-  ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,110)+'px';
-  ta.focus();
-}
 async function send(){
   if(sending)return;
   const msg=input.value.trim();
