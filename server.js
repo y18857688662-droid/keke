@@ -1689,11 +1689,11 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <button class="photobtn" onclick="document.getElementById('photoInput').click()" aria-label="发照片">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
     </button>
+    <button class="photobtn" onclick="insertNewline()" aria-label="换行" style="font-size:16px;padding:2px 4px;font-weight:600">⏎</button>
     <textarea id="input" rows="1" placeholder="Message..." enterkeyhint="return"
       oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"
       onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!('ontouchstart' in window)){event.preventDefault();send()}"></textarea>
   </div>
-  <button class="newlinebtn" onclick="insertNewline()" aria-label="换行">换行</button>
   <button class="floatbtn send" id="sendBtn" onclick="send()" aria-label="发送">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
   </button>
