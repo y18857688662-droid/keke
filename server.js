@@ -697,7 +697,7 @@ app.post('/deploy', (req, res) => {
   if (token !== DEPLOY_TOKEN) return res.status(403).json({ ok: false, error: 'forbidden' });
   res.json({ ok: true, msg: 'deploying...' });
   const { exec } = require('child_process');
-  exec('cd /root/keke && git pull origin main && echo "client_max_body_size 100m;" > /etc/nginx/conf.d/upload.conf && nginx -s reload && systemctl restart keke', { timeout: 30000 }, (err, stdout, stderr) => {
+  exec('cd /root/keke && git pull origin main && (grep -q client_max_body_size /etc/nginx/nginx.conf || sed -i "s/http {/http {\\n    client_max_body_size 100m;/" /etc/nginx/nginx.conf) && nginx -t && nginx -s reload && systemctl restart keke', { timeout: 30000 }, (err, stdout, stderr) => {
     console.log('[deploy]', stdout, stderr);
     if (err) console.error('[deploy error]', err.message);
   });
