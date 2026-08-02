@@ -316,6 +316,34 @@ app.get('/check', (req, res) => {
 app.use(express.json({ limit: '70mb' }));
 app.use(express.urlencoded({ extended: true, limit: '70mb' }));
 
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+app.post('/chat/upload', express.raw({ type: '*/*', limit: '100mb' }), (req, res) => {
+  try {
+    const fname = decodeURIComponent(req.headers['x-filename'] || 'file');
+    const ext = path.extname(fname) || '';
+    const id = crypto.randomBytes(8).toString('hex');
+    const safeName = id + ext;
+    fs.writeFileSync(path.join(UPLOADS_DIR, safeName), req.body);
+    const url = '/uploads/' + safeName;
+    const now = new Date(Date.now() + 8 * 3600000);
+    const time = now.toISOString().slice(0, 16).replace('T', ' ');
+    const chat = readChat();
+    chat.push({ role: 'user', content: '[文件] ' + fname, fileUrl: url, filename: fname, time, pending: true });
+    let archived = [];
+    if (chat.length > 200) archived = chat.splice(0, chat.length - 200);
+    writeChat(chat, archived);
+    notifyWaitClients();
+    if (typeof touchUserActivity === 'function') touchUserActivity();
+    res.json({ ok: true, url, time });
+  } catch (e) {
+    console.error('[upload]', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 app.post('/app', (req, res) => {
   const appName = req.body.app || req.query.app;
   if (!appName) return res.json({ ok: false, error: 'missing app name' });
@@ -3274,6 +3302,10 @@ function renderMessage(msg, idx, stagger) {
     var fn = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\\'a\\');a.href=\\''+msg.file+'\\';a.download=\\''+escHtml(msg.filename||'file')+'\\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn + '</div>';
   }
+  if (msg.fileUrl) {
+    var fn2 = escHtml(msg.filename || '文件');
+    colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\\'a\\');a.href=\\''+msg.fileUrl+'\\';a.download=\\''+escHtml(msg.filename||'file')+'\\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn2 + '</div>';
+  }
   var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l});
   var bubbleIdx = 0;
   lines.forEach(function(line) {
@@ -3490,25 +3522,20 @@ document.getElementById('photoInput').addEventListener('change', function() {
 });
 
 function sendFile(file) {
-  if (file.size > 50 * 1024 * 1024) { alert('文件太大，最大50MB'); return; }
-  var reader = new FileReader();
-  reader.onload = function() {
-    var base64 = reader.result;
-    var fname = file.name;
-    var userMsg = {role:'user', content:'[文件] ' + fname, file: base64, filename: fname, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
-    msgContainer.appendChild(renderTime(userMsg.time));
-    msgContainer.appendChild(renderMessage(userMsg, -1));
-    scrollBottom();
-    fetch('/chat/send', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({message:'[文件] ' + fname, file: base64, filename: fname})
-    }).then(function(r){return r.json()}).then(function(data) {
-      if (!data.ok) alert('文件发送失败');
-      pollKnown++;
-    }).catch(function(){ alert('文件发送失败，请重试'); });
-  };
-  reader.readAsDataURL(file);
+  if (file.size > 100 * 1024 * 1024) { alert('文件太大，最大100MB'); return; }
+  var fname = file.name;
+  var userMsg = {role:'user', content:'[文件] ' + fname, filename: fname, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
+  msgContainer.appendChild(renderTime(userMsg.time));
+  msgContainer.appendChild(renderMessage(userMsg, -1));
+  scrollBottom();
+  fetch('/chat/upload', {
+    method:'POST',
+    headers:{'X-Filename': encodeURIComponent(fname)},
+    body: file
+  }).then(function(r){return r.json()}).then(function(data) {
+    if (!data.ok) alert('文件发送失败');
+    pollKnown++;
+  }).catch(function(){ alert('文件发送失败，请重试'); });
 }
 document.getElementById('fileInput').addEventListener('change', function() {
   if (this.files[0]) sendFile(this.files[0]);
