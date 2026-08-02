@@ -1586,11 +1586,15 @@ body{position:fixed;inset:0;width:100%;
 .composer textarea:focus,.composer textarea:focus-visible{outline:none}
 .photobtn{flex:none;background:none;border:none;cursor:pointer;color:var(--text-faint);padding:4px;display:flex;align-items:center}
 .photobtn:active{color:var(--text)}
-.newlinebtn{flex:none;background:var(--card);border:1.5px solid var(--border);border-radius:8px;
-  cursor:pointer;color:var(--text);padding:5px 10px;font-size:14px;
-  font-family:var(--font);line-height:1.2;display:flex;align-items:center;gap:3px;
-  white-space:nowrap}
-.newlinebtn:active{background:var(--accent);color:#fff}
+.input-toolbar{position:fixed;left:0;right:0;bottom:70px;z-index:101;
+  width:min(100vw,760px);margin:0 auto;
+  display:flex;gap:8px;padding:6px var(--side-pad);
+  padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+.input-toolbar button{background:var(--card);border:1.5px solid var(--border);
+  border-radius:12px;padding:8px 16px;font-size:14px;font-family:var(--font);
+  color:var(--text);cursor:pointer;white-space:nowrap;
+  box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.input-toolbar button:active{background:var(--accent);color:#fff}
 .chat-img{max-width:min(240px,70vw);border-radius:12px;cursor:pointer;display:block}
 .chat-img-full{position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .chat-img-full img{max-width:95vw;max-height:95vh;border-radius:8px}
@@ -1683,15 +1687,17 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <p>这里只有你和克。<br>说点什么吧。</p>
   </div>
 </main>
+<div class="input-toolbar" id="inputToolbar" style="display:none">
+  <button onclick="insertNewline()">换行 ⏎</button>
+  <button onclick="document.getElementById('photoInput').click()">图片 🖼</button>
+</div>
 <footer class="composer">
   <div class="field">
     <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="sendPhoto(this)">
-    <button class="photobtn" onclick="document.getElementById('photoInput').click()" aria-label="发照片">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-    </button>
-    <button class="photobtn" onclick="insertNewline()" aria-label="换行" style="font-size:16px;padding:2px 4px;font-weight:600">⏎</button>
     <textarea id="input" rows="1" placeholder="Message..." enterkeyhint="return"
       oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"
+      onfocus="document.getElementById('inputToolbar').style.display='flex'"
+      onblur="setTimeout(function(){document.getElementById('inputToolbar').style.display='none'},200)"
       onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!('ontouchstart' in window)){event.preventDefault();send()}"></textarea>
   </div>
   <button class="floatbtn send" id="sendBtn" onclick="send()" aria-label="发送">
