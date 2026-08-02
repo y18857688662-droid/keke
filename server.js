@@ -1586,10 +1586,11 @@ body{position:fixed;inset:0;width:100%;
 .composer textarea:focus,.composer textarea:focus-visible{outline:none}
 .photobtn{flex:none;background:none;border:none;cursor:pointer;color:var(--text-faint);padding:4px;display:flex;align-items:center}
 .photobtn:active{color:var(--text)}
-.newlinebtn{flex:none;background:none;border:1px solid var(--border);border-radius:6px;
-  cursor:pointer;color:var(--text-faint);padding:2px 6px;font-size:12px;
-  font-family:var(--font);line-height:1.2;display:flex;align-items:center}
-.newlinebtn:active{color:var(--text);border-color:var(--text-faint)}
+.newlinebtn{flex:none;background:var(--card);border:1.5px solid var(--border);border-radius:8px;
+  cursor:pointer;color:var(--text);padding:5px 10px;font-size:14px;
+  font-family:var(--font);line-height:1.2;display:flex;align-items:center;gap:3px;
+  white-space:nowrap}
+.newlinebtn:active{background:var(--accent);color:#fff}
 .chat-img{max-width:min(240px,70vw);border-radius:12px;cursor:pointer;display:block}
 .chat-img-full{position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .chat-img-full img{max-width:95vw;max-height:95vh;border-radius:8px}
@@ -1691,8 +1692,8 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <textarea id="input" rows="1" placeholder="Message..." enterkeyhint="return"
       oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"
       onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!('ontouchstart' in window)){event.preventDefault();send()}"></textarea>
-    <button class="newlinebtn" onclick="insertNewline()" aria-label="换行">↵</button>
   </div>
+  <button class="newlinebtn" onclick="insertNewline()" aria-label="换行">换行</button>
   <button class="floatbtn send" id="sendBtn" onclick="send()" aria-label="发送">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
   </button>
