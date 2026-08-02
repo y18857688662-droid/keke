@@ -3532,10 +3532,13 @@ function sendFile(file) {
     method:'POST',
     headers:{'X-Filename': encodeURIComponent(fname)},
     body: file
-  }).then(function(r){return r.json()}).then(function(data) {
-    if (!data.ok) alert('文件发送失败');
+  }).then(function(r){
+    if (!r.ok) { alert('上传失败: HTTP ' + r.status); return {ok:false}; }
+    return r.json();
+  }).then(function(data) {
+    if (data && !data.ok) alert('文件发送失败: ' + (data.error || '未知错误'));
     pollKnown++;
-  }).catch(function(){ alert('文件发送失败，请重试'); });
+  }).catch(function(e){ alert('文件发送失败: ' + e.message); });
 }
 document.getElementById('fileInput').addEventListener('change', function() {
   if (this.files[0]) sendFile(this.files[0]);
