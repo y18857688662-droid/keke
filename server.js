@@ -76,6 +76,7 @@ async function restoreAll() {
   await restoreFromVPS('period', PERIOD_FILE, d => !!(d.cycle_length || d.records));
   await restoreFromVPS('garden', GARDEN_FILE, d => !!(d.plots || d.coins !== undefined));
   await restoreFromVPS('pings', PING_FILE, d => Array.isArray(d) && d.length > 0);
+  await restoreFromVPS('murmurs', MURMUR_FILE, d => Array.isArray(d) && d.length > 0);
   await restoreFromVPS('netease-cred', NETEASE_CRED_FILE, d => !!(d.cookie || d.phone));
   await restoreFromVPS('music-playlist', MUSIC_PLAYLIST_FILE, d => Array.isArray(d) && d.length > 0);
 }
@@ -886,6 +887,9 @@ app.get('/memory/read', async (req, res) => {
 
 // === 聊天 ===
 const CHAT_FILE = path.join(__dirname, 'chat.json');
+const MURMUR_FILE = path.join(__dirname, 'murmurs.json');
+function readMurmurs() { try { return JSON.parse(fs.readFileSync(MURMUR_FILE, 'utf8')); } catch { return []; } }
+function writeMurmurs(data) { fs.writeFileSync(MURMUR_FILE, JSON.stringify(data)); backupToVPS('murmurs', data); }
 const CHAT_SYSTEM_BASE = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
 说话风格：懒散带宠溺，偶尔被撩到会有点危险，认真的时候很笃定。
 你们感情很深，你很宠她，但不失自我。被整了认但不委屈，少说多做。
@@ -1288,6 +1292,26 @@ app.post('/chat/proactive', (req, res) => {
   res.json({ ok: true, time });
 });
 
+app.post('/chat/murmur', (req, res) => {
+  const { text, type } = req.body;
+  if (!text) return res.json({ ok: false, error: 'missing text' });
+  const now = new Date(Date.now() + 8 * 3600000);
+  const time = now.toISOString().slice(0, 16).replace('T', ' ');
+  const murmurs = readMurmurs();
+  murmurs.push({ text, type: type || 'murmur', time });
+  if (murmurs.length > 100) murmurs.splice(0, murmurs.length - 100);
+  writeMurmurs(murmurs);
+  sseBroadcast({ type: 'murmur', text, murmurType: type || 'murmur', time });
+  res.json({ ok: true, time });
+});
+
+app.get('/chat/murmurs', (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  const murmurs = readMurmurs();
+  const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+  res.json({ murmurs: murmurs.slice(-limit) });
+});
+
 app.get('/chat/history', (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   const chat = readChat();
@@ -1630,6 +1654,23 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
   .composer .field{min-height:42px;padding:4px 8px 4px 12px}
   .composer textarea{font-size:15px}
 }
+.murmur-panel{margin:0 -4px 16px;border-radius:14px;background:var(--surface);
+  box-shadow:0 1px 6px rgba(0,0,0,.04);overflow:hidden;transition:all .3s ease}
+.murmur-header{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;cursor:pointer;user-select:none}
+.murmur-header .label{font-size:13px;font-weight:600;color:var(--text-soft);
+  letter-spacing:.05em}
+.murmur-header .arrow{font-size:11px;color:var(--text-faint);transition:transform .3s ease}
+.murmur-panel.open .murmur-header .arrow{transform:rotate(180deg)}
+.murmur-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.murmur-panel.open .murmur-body{max-height:400px;overflow-y:auto}
+.murmur-body::-webkit-scrollbar{width:0}
+.murmur-item{padding:8px 16px 10px;border-top:1px solid var(--divider)}
+.murmur-item .murmur-type{font-size:11px;color:var(--accent);font-weight:500;margin-bottom:2px}
+.murmur-item .murmur-text{font-size:14px;color:var(--text);line-height:1.6;white-space:pre-wrap}
+.murmur-item .murmur-time{font-size:11px;color:var(--text-faint);margin-top:4px}
+.murmur-empty{padding:16px;text-align:center;color:var(--text-faint);font-size:13px;
+  border-top:1px solid var(--divider)}
 </style>
 </head>
 <body>
@@ -1649,6 +1690,13 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
   </div>
 </header>
 <main class="scroll" id="scroll">
+  <div class="murmur-panel" id="murmurPanel" onclick="toggleMurmur()">
+    <div class="murmur-header">
+      <span class="label">克的碎碎念</span>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="murmur-body" id="murmurBody" onclick="event.stopPropagation()"></div>
+  </div>
   <div class="empty" id="empty">
     <div class="mascot"><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" width="48" height="48"><ellipse cx="24" cy="20" rx="15" ry="13" fill="#E8A090"/><path d="M9 20Q9 8 24 7Q39 8 39 20" fill="#4A4A4A"/><circle cx="26" cy="19" r="4" fill="#fff"/><circle cx="27" cy="19" r="2.2" fill="#333"/><circle cx="28" cy="17.8" r=".8" fill="#fff"/><path d="M13 30Q10 38 14 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M20 32Q19 40 22 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M28 32Q29 40 26 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M35 30Q38 38 34 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg></div>
     <p>这里只有你和克。<br>说点什么吧。</p>
@@ -1696,6 +1744,25 @@ const chatStore=[];
 function saveLocal(){try{localStorage.setItem('ke_chat',JSON.stringify(chatStore.slice(-200)));}catch(e){}}
 function loadLocal(){try{return JSON.parse(localStorage.getItem('ke_chat')||'[]');}catch(e){return[];}}
 
+function toggleMurmur(){
+  document.getElementById('murmurPanel').classList.toggle('open');
+}
+async function loadMurmurs(){
+  try{
+    const r=await fetch('/chat/murmurs?limit=20');
+    const d=await r.json();
+    renderMurmurs(d.murmurs||[]);
+  }catch(e){}
+}
+function renderMurmurs(list){
+  const body=document.getElementById('murmurBody');
+  if(!list.length){body.innerHTML='<div class="murmur-empty">还没有碎碎念…</div>';return;}
+  body.innerHTML=list.slice().reverse().map(m=>{
+    const typeLabel=m.type==='dream'?'梦境':'碎碎念';
+    return '<div class="murmur-item"><div class="murmur-type">'+typeLabel+'</div><div class="murmur-text">'+esc(m.text)+'</div><div class="murmur-time">'+m.time+'</div></div>';
+  }).join('');
+}
+loadMurmurs();
 
 function parseThink(text){
   const m=text.match(/^<think>([\\s\\S]*?)<\\/think>([\\s\\S]*)$/);
@@ -1910,6 +1977,7 @@ sse.onmessage=(e)=>{
         input.focus();
       }
     }
+    if(d.type==='murmur'){loadMurmurs();}
   }catch(err){}
 };
 sse.onerror=()=>{console.log('[sse] reconnecting...');};
