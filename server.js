@@ -3468,7 +3468,7 @@ function compressImage(file, maxDim, quality) {
   });
 }
 function sendImage(file) {
-  compressImage(file, 800, 0.6).then(function(base64) {
+  compressImage(file, 1600, 0.85).then(function(base64) {
     var userMsg = {role:'user', content:'[图片]', image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
     msgContainer.appendChild(renderTime(userMsg.time));
     msgContainer.appendChild(renderMessage(userMsg, -1));
