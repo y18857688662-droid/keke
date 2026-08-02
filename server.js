@@ -749,7 +749,7 @@ app.post('/deploy', (req, res) => {
   if (token !== DEPLOY_TOKEN) return res.status(403).json({ ok: false, error: 'forbidden' });
   res.json({ ok: true, msg: 'deploying...' });
   const { exec } = require('child_process');
-  exec('cd /root/keke && git pull origin main && bash fix-nginx.sh && systemctl restart keke', { timeout: 30000 }, (err, stdout, stderr) => {
+  exec('cd /root/keke && git pull origin main; bash fix-nginx.sh; systemctl restart keke', { timeout: 30000 }, (err, stdout, stderr) => {
     console.log('[deploy]', stdout, stderr);
     if (err) console.error('[deploy error]', err.message);
   });
