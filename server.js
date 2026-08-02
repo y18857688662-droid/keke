@@ -313,9 +313,6 @@ app.get('/check', (req, res) => {
   res.json({ pings });
 });
 
-app.use(express.json({ limit: '70mb' }));
-app.use(express.urlencoded({ extended: true, limit: '70mb' }));
-
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 app.use('/uploads', express.static(UPLOADS_DIR));
@@ -343,6 +340,9 @@ app.post('/chat/upload', express.raw({ type: '*/*', limit: '100mb' }), (req, res
     res.status(500).json({ ok: false, error: e.message });
   }
 });
+
+app.use(express.json({ limit: '70mb' }));
+app.use(express.urlencoded({ extended: true, limit: '70mb' }));
 
 app.post('/app', (req, res) => {
   const appName = req.body.app || req.query.app;
