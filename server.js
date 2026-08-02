@@ -313,8 +313,8 @@ app.get('/check', (req, res) => {
   res.json({ pings });
 });
 
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 app.post('/app', (req, res) => {
   const appName = req.body.app || req.query.app;
@@ -1167,13 +1167,18 @@ function sseBroadcast(event) {
 app.post('/chat/send', async (req, res) => {
   const msg = req.body.message ? req.body.message.replace(/\/\//g, '\n') : req.body.message;
   const image = req.body.image;
+  const file = req.body.file;
+  const filename = req.body.filename;
   if (image) console.log('[chat] received image, size:', Math.round(image.length/1024) + 'kb');
-  if (!msg && !image) return res.json({ ok: false, error: 'empty message' });
+  if (file) console.log('[chat] received file:', filename, 'size:', Math.round(file.length/1024) + 'kb');
+  if (!msg && !image && !file) return res.json({ ok: false, error: 'empty message' });
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(0, 16).replace('T', ' ');
   const chat = readChat();
   if (image) {
     chat.push({ role: 'user', content: '[图片]', image, time, pending: true });
+  } else if (file) {
+    chat.push({ role: 'user', content: msg || '[文件]', file, filename, time, pending: true });
   } else {
     chat.push({ role: 'user', content: msg, time, pending: true });
   }
@@ -3132,10 +3137,12 @@ body {
     <div class="input-area" style="position:relative">
       <div class="attach-menu" id="attachMenu">
         <button class="attach-item" onclick="document.getElementById('photoInput').click();toggleAttach()"><span class="ai">📷</span>发照片</button>
+        <button class="attach-item" onclick="document.getElementById('fileInput').click();toggleAttach()"><span class="ai">📎</span>发文件</button>
         <button class="attach-item" onclick="toggleAttach();syncMemory()"><span class="ai">🧠</span>同步记忆库</button>
         <button class="attach-item" onclick="toggleAttach();window.open('/call','_blank')"><span class="ai">📞</span>语音通话</button>
         <button class="attach-item" onclick="toggleAttach();window.open('/screen','_blank')"><span class="ai">🖥</span>屏幕共享</button>
         <input type="file" id="photoInput" accept="image/*" style="display:none">
+        <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md,.json,.csv,.xlsx,.xls,.ppt,.pptx,.zip,.rar" style="display:none">
       </div>
       <div class="input-box">
         <div class="input-field-wrap"><textarea class="input-field" rows="1" placeholder="Message..." oninput="autoResize(this)"></textarea></div>
@@ -3262,6 +3269,10 @@ function renderMessage(msg, idx, stagger) {
   }
   if (msg.image) {
     colHtml += '<div class="msg-bubble"><img src="'+msg.image+'" style="max-width:200px;border-radius:12px;display:block"></div>';
+  }
+  if (msg.file) {
+    var fn = escHtml(msg.filename || '文件');
+    colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\\'a\\');a.href=\\''+msg.file+'\\';a.download=\\''+escHtml(msg.filename||'file')+'\\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn + '</div>';
   }
   var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l});
   var bubbleIdx = 0;
@@ -3475,6 +3486,32 @@ function sendImage(file) {
 
 document.getElementById('photoInput').addEventListener('change', function() {
   if (this.files[0]) sendImage(this.files[0]);
+  this.value = '';
+});
+
+function sendFile(file) {
+  if (file.size > 10 * 1024 * 1024) { alert('文件太大，最大10MB'); return; }
+  var reader = new FileReader();
+  reader.onload = function() {
+    var base64 = reader.result;
+    var fname = file.name;
+    var userMsg = {role:'user', content:'[文件] ' + fname, file: base64, filename: fname, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
+    msgContainer.appendChild(renderTime(userMsg.time));
+    msgContainer.appendChild(renderMessage(userMsg, -1));
+    scrollBottom();
+    fetch('/chat/send', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({message:'[文件] ' + fname, file: base64, filename: fname})
+    }).then(function(r){return r.json()}).then(function(data) {
+      if (!data.ok) alert('文件发送失败');
+      pollKnown++;
+    }).catch(function(){ alert('文件发送失败，请重试'); });
+  };
+  reader.readAsDataURL(file);
+}
+document.getElementById('fileInput').addEventListener('change', function() {
+  if (this.files[0]) sendFile(this.files[0]);
   this.value = '';
 });
 
