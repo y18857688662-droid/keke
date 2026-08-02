@@ -1844,7 +1844,7 @@ function addMsg(role,text,time,noSave){
       });
     }
   }else{
-    var lines=text.split(/\\n+/).map(function(l){return l.trim()}).filter(Boolean);
+    var lines=text.split(/\\/\\/|\\n+/).map(function(l){return l.trim()}).filter(Boolean);
     lines.forEach(function(line,i){
       const row=document.createElement('div');
       row.className='row human tail';
@@ -1866,7 +1866,7 @@ function insertNewline(){
 }
 async function send(){
   if(sending)return;
-  const msg=input.value.replace(/\\/\\//g,'\\n').trim();
+  const msg=input.value.trim();
   if(!msg)return;
   input.value='';input.style.height='auto';
   const now=new Date(Date.now()+8*3600000);
