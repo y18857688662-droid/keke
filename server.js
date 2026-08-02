@@ -3601,7 +3601,7 @@ function sendFile(file) {
     var chunk = file.slice(start, end);
     fetch('/chat/upload-chunk', {
       method:'POST',
-      headers:{'X-Upload-Id': uploadId, 'X-Chunk-Index': currentChunk.toString()},
+      headers:{'X-Upload-Id': uploadId, 'X-Chunk-Index': currentChunk.toString(), 'Content-Type': 'application/octet-stream'},
       body: chunk
     }).then(function(r){return r.json()}).then(function(data) {
       if (data.ok) { currentChunk++; uploadNext(); }
