@@ -341,8 +341,60 @@ app.post('/chat/upload', express.raw({ type: '*/*', limit: '100mb' }), (req, res
   }
 });
 
+const CHUNKS_DIR = path.join(UPLOADS_DIR, 'chunks');
+if (!fs.existsSync(CHUNKS_DIR)) fs.mkdirSync(CHUNKS_DIR, { recursive: true });
+
+app.post('/chat/upload-chunk', express.raw({ type: '*/*', limit: '800kb' }), (req, res) => {
+  try {
+    const uploadId = req.headers['x-upload-id'];
+    const chunkIndex = req.headers['x-chunk-index'];
+    if (!uploadId || chunkIndex === undefined) return res.status(400).json({ ok: false, error: 'missing headers' });
+    const chunkDir = path.join(CHUNKS_DIR, uploadId);
+    if (!fs.existsSync(chunkDir)) fs.mkdirSync(chunkDir, { recursive: true });
+    fs.writeFileSync(path.join(chunkDir, chunkIndex), req.body);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[upload-chunk]', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 app.use(express.json({ limit: '70mb' }));
 app.use(express.urlencoded({ extended: true, limit: '70mb' }));
+
+app.post('/chat/upload-finalize', (req, res) => {
+  try {
+    const { uploadId, filename, totalChunks } = req.body;
+    if (!uploadId || !filename || !totalChunks) return res.status(400).json({ ok: false, error: 'missing fields' });
+    const chunkDir = path.join(CHUNKS_DIR, uploadId);
+    const ext = path.extname(filename) || '';
+    const id = crypto.randomBytes(8).toString('hex');
+    const safeName = id + ext;
+    const filePath = path.join(UPLOADS_DIR, safeName);
+    const buffers = [];
+    for (let i = 0; i < totalChunks; i++) {
+      const cp = path.join(chunkDir, i.toString());
+      if (!fs.existsSync(cp)) return res.status(400).json({ ok: false, error: 'missing chunk ' + i });
+      buffers.push(fs.readFileSync(cp));
+    }
+    fs.writeFileSync(filePath, Buffer.concat(buffers));
+    fs.rmSync(chunkDir, { recursive: true, force: true });
+    const url = '/uploads/' + safeName;
+    const now = new Date(Date.now() + 8 * 3600000);
+    const time = now.toISOString().slice(0, 16).replace('T', ' ');
+    const chat = readChat();
+    chat.push({ role: 'user', content: '[文件] ' + filename, fileUrl: url, filename, time, pending: true });
+    let archived = [];
+    if (chat.length > 200) archived = chat.splice(0, chat.length - 200);
+    writeChat(chat, archived);
+    notifyWaitClients();
+    if (typeof touchUserActivity === 'function') touchUserActivity();
+    res.json({ ok: true, url, time });
+  } catch (e) {
+    console.error('[upload-finalize]', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 app.post('/app', (req, res) => {
   const appName = req.body.app || req.query.app;
@@ -3528,17 +3580,35 @@ function sendFile(file) {
   msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
-  fetch('/chat/upload', {
-    method:'POST',
-    headers:{'X-Filename': encodeURIComponent(fname)},
-    body: file
-  }).then(function(r){
-    if (!r.ok) { alert('上传失败: HTTP ' + r.status); return {ok:false}; }
-    return r.json();
-  }).then(function(data) {
-    if (data && !data.ok) alert('文件发送失败: ' + (data.error || '未知错误'));
-    pollKnown++;
-  }).catch(function(e){ alert('文件发送失败: ' + e.message); });
+  var chunkSize = 512 * 1024;
+  var totalChunks = Math.ceil(file.size / chunkSize);
+  var uploadId = Math.random().toString(36).substr(2, 16);
+  var currentChunk = 0;
+  function uploadNext() {
+    if (currentChunk >= totalChunks) {
+      fetch('/chat/upload-finalize', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({uploadId: uploadId, filename: fname, totalChunks: totalChunks})
+      }).then(function(r){return r.json()}).then(function(data) {
+        if (!data.ok) alert('文件发送失败: ' + (data.error || '未知错误'));
+        pollKnown++;
+      }).catch(function(e){ alert('文件发送失败: ' + e.message); });
+      return;
+    }
+    var start = currentChunk * chunkSize;
+    var end = Math.min(start + chunkSize, file.size);
+    var chunk = file.slice(start, end);
+    fetch('/chat/upload-chunk', {
+      method:'POST',
+      headers:{'X-Upload-Id': uploadId, 'X-Chunk-Index': currentChunk.toString()},
+      body: chunk
+    }).then(function(r){return r.json()}).then(function(data) {
+      if (data.ok) { currentChunk++; uploadNext(); }
+      else { alert('上传失败: ' + (data.error || '未知错误')); }
+    }).catch(function(e){ alert('上传失败: ' + e.message); });
+  }
+  uploadNext();
 }
 document.getElementById('fileInput').addEventListener('change', function() {
   if (this.files[0]) sendFile(this.files[0]);
