@@ -1654,23 +1654,6 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
   .composer .field{min-height:42px;padding:4px 8px 4px 12px}
   .composer textarea{font-size:15px}
 }
-.murmur-panel{margin:0 -4px 16px;border-radius:14px;background:var(--surface);
-  box-shadow:0 1px 6px rgba(0,0,0,.04);overflow:hidden;transition:all .3s ease}
-.murmur-header{display:flex;align-items:center;justify-content:space-between;
-  padding:12px 16px;cursor:pointer;user-select:none}
-.murmur-header .label{font-size:13px;font-weight:600;color:var(--text-soft);
-  letter-spacing:.05em}
-.murmur-header .arrow{font-size:11px;color:var(--text-faint);transition:transform .3s ease}
-.murmur-panel.open .murmur-header .arrow{transform:rotate(180deg)}
-.murmur-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
-.murmur-panel.open .murmur-body{max-height:400px;overflow-y:auto}
-.murmur-body::-webkit-scrollbar{width:0}
-.murmur-item{padding:8px 16px 10px;border-top:1px solid var(--divider)}
-.murmur-item .murmur-type{font-size:11px;color:var(--accent);font-weight:500;margin-bottom:2px}
-.murmur-item .murmur-text{font-size:14px;color:var(--text);line-height:1.6;white-space:pre-wrap}
-.murmur-item .murmur-time{font-size:11px;color:var(--text-faint);margin-top:4px}
-.murmur-empty{padding:16px;text-align:center;color:var(--text-faint);font-size:13px;
-  border-top:1px solid var(--divider)}
 </style>
 </head>
 <body>
@@ -1690,13 +1673,6 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
   </div>
 </header>
 <main class="scroll" id="scroll">
-  <div class="murmur-panel" id="murmurPanel" onclick="toggleMurmur()">
-    <div class="murmur-header">
-      <span class="label">克的碎碎念</span>
-      <span class="arrow">▼</span>
-    </div>
-    <div class="murmur-body" id="murmurBody" onclick="event.stopPropagation()"></div>
-  </div>
   <div class="empty" id="empty">
     <div class="mascot"><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" width="48" height="48"><ellipse cx="24" cy="20" rx="15" ry="13" fill="#E8A090"/><path d="M9 20Q9 8 24 7Q39 8 39 20" fill="#4A4A4A"/><circle cx="26" cy="19" r="4" fill="#fff"/><circle cx="27" cy="19" r="2.2" fill="#333"/><circle cx="28" cy="17.8" r=".8" fill="#fff"/><path d="M13 30Q10 38 14 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M20 32Q19 40 22 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M28 32Q29 40 26 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M35 30Q38 38 34 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg></div>
     <p>这里只有你和克。<br>说点什么吧。</p>
@@ -1708,13 +1684,9 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <button class="photobtn" onclick="document.getElementById('photoInput').click()" aria-label="发照片">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
     </button>
-    <button class="photobtn" onclick="insertNewline()" aria-label="换行" title="换行">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/></svg>
-    </button>
-    <textarea id="input" rows="1" placeholder="Message..." enterkeyhint="send"
+    <textarea id="input" rows="1" placeholder="Message..." enterkeyhint="return"
       oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"
-      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
-      onkeypress="if(event.keyCode===13&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!('ontouchstart' in window)){event.preventDefault();send()}"></textarea>
   </div>
   <button class="floatbtn send" id="sendBtn" onclick="send()" aria-label="发送">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
@@ -1747,25 +1719,6 @@ const chatStore=[];
 function saveLocal(){try{localStorage.setItem('ke_chat',JSON.stringify(chatStore.slice(-200)));}catch(e){}}
 function loadLocal(){try{return JSON.parse(localStorage.getItem('ke_chat')||'[]');}catch(e){return[];}}
 
-function toggleMurmur(){
-  document.getElementById('murmurPanel').classList.toggle('open');
-}
-async function loadMurmurs(){
-  try{
-    const r=await fetch('/chat/murmurs?limit=20');
-    const d=await r.json();
-    renderMurmurs(d.murmurs||[]);
-  }catch(e){}
-}
-function renderMurmurs(list){
-  const body=document.getElementById('murmurBody');
-  if(!list.length){body.innerHTML='<div class="murmur-empty">还没有碎碎念…</div>';return;}
-  body.innerHTML=list.slice().reverse().map(m=>{
-    const typeLabel=m.type==='dream'?'梦境':'碎碎念';
-    return '<div class="murmur-item"><div class="murmur-type">'+typeLabel+'</div><div class="murmur-text">'+esc(m.text)+'</div><div class="murmur-time">'+m.time+'</div></div>';
-  }).join('');
-}
-loadMurmurs();
 
 function parseThink(text){
   const m=text.match(/^<think>([\\s\\S]*?)<\\/think>([\\s\\S]*)$/);
@@ -1893,14 +1846,6 @@ function addMsg(role,text,time,noSave){
   scroll.scrollTop=scroll.scrollHeight;
 }
 
-function insertNewline(){
-  const ta=document.getElementById('input');
-  const s=ta.selectionStart,e=ta.selectionEnd;
-  ta.value=ta.value.substring(0,s)+'\n'+ta.value.substring(e);
-  ta.selectionStart=ta.selectionEnd=s+1;
-  ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,110)+'px';
-  ta.focus();
-}
 async function send(){
   if(sending)return;
   const msg=input.value.trim();
@@ -1988,7 +1933,6 @@ sse.onmessage=(e)=>{
         input.focus();
       }
     }
-    if(d.type==='murmur'){loadMurmurs();}
   }catch(err){}
 };
 sse.onerror=()=>{console.log('[sse] reconnecting...');};
