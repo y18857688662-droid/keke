@@ -1708,6 +1708,9 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <button class="photobtn" onclick="document.getElementById('photoInput').click()" aria-label="发照片">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
     </button>
+    <button class="photobtn" onclick="insertNewline()" aria-label="换行" title="换行">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/></svg>
+    </button>
     <textarea id="input" rows="1" placeholder="Message..." enterkeyhint="send"
       oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"
       onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
@@ -1890,9 +1893,17 @@ function addMsg(role,text,time,noSave){
   scroll.scrollTop=scroll.scrollHeight;
 }
 
+function insertNewline(){
+  const ta=document.getElementById('input');
+  const s=ta.selectionStart,e=ta.selectionEnd;
+  ta.value=ta.value.substring(0,s)+'\n'+ta.value.substring(e);
+  ta.selectionStart=ta.selectionEnd=s+1;
+  ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,110)+'px';
+  ta.focus();
+}
 async function send(){
   if(sending)return;
-  const msg=input.value.replace(/\\n+/g,' ').trim();
+  const msg=input.value.trim();
   if(!msg)return;
   input.value='';input.style.height='auto';
   const now=new Date(Date.now()+8*3600000);
