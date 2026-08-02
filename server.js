@@ -3969,6 +3969,7 @@ body {
         <div class="input-field-wrap"><textarea class="input-field" rows="1" placeholder="Message..." oninput="autoResize(this)"></textarea></div>
         <div class="input-toolbar">
           <button class="tb-btn" onclick="toggleAttach()" aria-label="附件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="tb-btn" onclick="insertNL()" aria-label="换行" style="font-size:16px;font-family:var(--font)">⏎</button>
           <div class="model-tag">Opus 4.6</div>
           <div class="tb-spacer"></div>
           <button class="tb-btn" aria-label="麦克风"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v1a7 7 0 01-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg></button>
@@ -4235,13 +4236,22 @@ function loadHistory() {
   }).catch(function(){});
 }
 
+function insertNL(){
+  var ta=inputField;
+  var s=ta.selectionStart,e=ta.selectionEnd;
+  ta.value=ta.value.substring(0,s)+'\\n'+ta.value.substring(e);
+  ta.selectionStart=ta.selectionEnd=s+1;
+  ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,100)+'px';
+  ta.focus();
+}
 function sendMessage() {
   var text = inputField.value.trim();
   if (!text || sending) return;
   sending = true;
   inputField.value = '';
   inputField.style.height = 'auto';
-  var userMsg = {role:'user', content: text, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
+  var display = text.replace(/\\/\\//g, '\\n');
+  var userMsg = {role:'user', content: display, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
   msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
