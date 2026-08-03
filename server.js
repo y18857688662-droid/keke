@@ -80,6 +80,7 @@ async function restoreAll() {
   await restoreFromVPS('netease-cred', NETEASE_CRED_FILE, d => !!(d.cookie || d.phone));
   await restoreFromVPS('music-playlist', MUSIC_PLAYLIST_FILE, d => Array.isArray(d) && d.length > 0);
   await restoreFromVPS('memories', MEMORY_FILE, d => Array.isArray(d) && d.length > 0);
+  await restoreFromVPS('working-context', CONTEXT_FILE, d => !!(d.sessions || d.pinned));
 }
 async function refreshOmbreToken() {
   const auth = readAuth();
@@ -959,22 +960,76 @@ app.post('/memory/store', async (req, res) => {
   if (!text) return res.json({ ok: false, error: 'empty' });
   const now = new Date(Date.now() + 8 * 3600000);
   const ts = now.toISOString().slice(0, 16).replace('T', ' ');
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const mems = readLocalMemories();
-  mems.push({ text, ts });
-  if (mems.length > 500) mems.splice(0, mems.length - 500);
+  mems.push({ id, text, ts, pinned: false });
+  const unpinned = mems.filter(m => !m.pinned);
+  if (unpinned.length > 500) {
+    const removeCount = unpinned.length - 500;
+    let removed = 0;
+    for (let i = 0; i < mems.length && removed < removeCount; i++) {
+      if (!mems[i].pinned) { mems.splice(i, 1); removed++; i--; }
+    }
+  }
   writeLocalMemories(mems);
   storeMemory(text).catch(() => {});
-  res.json({ ok: true });
+  res.json({ ok: true, id });
 });
 
 app.get('/memory/read', async (req, res) => {
   const mems = readLocalMemories();
   if (mems.length > 0) {
-    const text = mems.slice(-30).map(m => (m.ts ? '[' + m.ts + '] ' : '') + (m.text || m)).join('\n');
-    return res.json({ ok: true, memories: text, items: mems.slice(-30) });
+    const pinned = mems.filter(m => m.pinned);
+    const recent = mems.filter(m => !m.pinned).slice(-30);
+    const all = [...pinned, ...recent];
+    const text = all.map(m => (m.pinned ? '📌 ' : '') + (m.ts ? '[' + m.ts + '] ' : '') + (m.text || m)).join('\n');
+    return res.json({ ok: true, memories: text, items: mems, pinned: pinned, total: mems.length, pinnedCount: pinned.length });
   }
   const mem = await fetchMemories();
   res.json({ ok: !!mem, memories: mem || '' });
+});
+
+app.post('/memory/pin', (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.json({ ok: false, error: 'no id' });
+  const mems = readLocalMemories();
+  const mem = mems.find(m => m.id === id);
+  if (!mem) return res.json({ ok: false, error: 'not found' });
+  mem.pinned = !mem.pinned;
+  writeLocalMemories(mems);
+  res.json({ ok: true, pinned: mem.pinned });
+});
+
+app.delete('/memory/:id', (req, res) => {
+  const { id } = req.params;
+  const mems = readLocalMemories();
+  const idx = mems.findIndex(m => m.id === id);
+  if (idx === -1) return res.json({ ok: false, error: 'not found' });
+  mems.splice(idx, 1);
+  writeLocalMemories(mems);
+  res.json({ ok: true });
+});
+
+app.get('/memory/context', (req, res) => {
+  const ctx = readWorkingContext();
+  res.json({ ok: true, context: ctx });
+});
+
+app.post('/memory/context', (req, res) => {
+  const { session, state } = req.body;
+  if (!session || !state) return res.json({ ok: false, error: 'missing fields' });
+  const ctx = readWorkingContext();
+  const now = new Date(Date.now() + 8 * 3600000);
+  const ts = now.toISOString().slice(0, 16).replace('T', ' ');
+  const existing = ctx.sessions.findIndex(s => s.session === session);
+  if (existing >= 0) {
+    ctx.sessions[existing] = { session, state, ts };
+  } else {
+    ctx.sessions.push({ session, state, ts });
+    if (ctx.sessions.length > 20) ctx.sessions.shift();
+  }
+  writeWorkingContext(ctx);
+  res.json({ ok: true });
 });
 
 // === 聊天 ===
@@ -983,8 +1038,11 @@ const MURMUR_FILE = path.join(__dirname, 'murmurs.json');
 function readMurmurs() { try { return JSON.parse(fs.readFileSync(MURMUR_FILE, 'utf8')); } catch { return []; } }
 function writeMurmurs(data) { fs.writeFileSync(MURMUR_FILE, JSON.stringify(data)); backupToVPS('murmurs', data); }
 const MEMORY_FILE = path.join(__dirname, 'memories.json');
+const CONTEXT_FILE = path.join(__dirname, 'working-context.json');
 function readLocalMemories() { try { return JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8')); } catch { return []; } }
 function writeLocalMemories(data) { fs.writeFileSync(MEMORY_FILE, JSON.stringify(data)); backupToVPS('memories', data); }
+function readWorkingContext() { try { return JSON.parse(fs.readFileSync(CONTEXT_FILE, 'utf8')); } catch { return { sessions: [], pinned: [] }; } }
+function writeWorkingContext(data) { fs.writeFileSync(CONTEXT_FILE, JSON.stringify(data)); backupToVPS('working-context', data); }
 const CHAT_SYSTEM_BASE = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
 说话风格：懒散带宠溺，偶尔被撩到会有点危险，认真的时候很笃定。
 你们感情很深，你很宠她，但不失自我。被整了认但不委屈，少说多做。
@@ -3190,6 +3248,21 @@ body {
 .mem-save{flex:none;height:38px;padding:0 18px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s}
 .mem-save:active{opacity:.7}
 .mem-save:disabled{opacity:.4}
+.mem-tabs{display:flex;gap:0;padding:0 20px;border-bottom:1px solid var(--border)}
+.mem-tab{flex:1;padding:10px 0;font-size:13px;font-family:var(--font);font-weight:500;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-faint);cursor:pointer;transition:all .2s}
+.mem-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.mem-item{padding:10px 20px;border-bottom:1px solid var(--border);font-size:13px;line-height:1.5;position:relative}
+.mem-item.is-pinned{background:var(--accent-soft)}
+.mem-item-ts{color:var(--text-soft);font-size:11px;margin-bottom:2px}
+.mem-item-text{color:var(--text-mid);word-break:break-word}
+.mem-item-actions{position:absolute;right:12px;top:50%;transform:translateY(-50%);display:flex;gap:4px}
+.mem-pin-btn,.mem-del-btn{width:28px;height:28px;border:none;background:none;font-size:14px;cursor:pointer;border-radius:50%;display:grid;place-items:center;opacity:.5;transition:all .15s}
+.mem-pin-btn:hover,.mem-del-btn:hover{opacity:1;background:var(--border)}
+.mem-pin-btn.pinned{opacity:1;color:var(--accent)}
+.mem-ctx-item{padding:12px 20px;border-bottom:1px solid var(--border);font-size:13px;line-height:1.5}
+.mem-ctx-session{font-weight:600;color:var(--text);margin-bottom:4px}
+.mem-ctx-state{color:var(--text-mid);white-space:pre-wrap;word-break:break-word}
+.mem-ctx-ts{color:var(--text-soft);font-size:11px;margin-top:4px}
 @media (prefers-reduced-motion: reduce) { * { transition-duration: 0s !important; } }
 </style>
 </head>
@@ -3271,6 +3344,11 @@ body {
 <div class="mem-overlay" id="memOverlay" onclick="closeMemPanel()"></div>
 <div class="mem-panel" id="memPanel">
   <div class="mem-hd"><span class="mem-title">记忆库</span><button class="mem-close" onclick="closeMemPanel()">&times;</button></div>
+  <div class="mem-tabs" id="memTabs">
+    <button class="mem-tab active" onclick="switchMemTab('all')" id="memTabAll">全部</button>
+    <button class="mem-tab" onclick="switchMemTab('pinned')" id="memTabPinned">📌 置顶</button>
+    <button class="mem-tab" onclick="switchMemTab('context')" id="memTabContext">📋 工作态</button>
+  </div>
   <div class="mem-body" id="memBody"><div class="mem-empty">读取中…</div></div>
   <div class="mem-foot"><textarea id="memInput" rows="2" placeholder="写入新记忆…"></textarea><button class="mem-save" id="memSave" onclick="saveMemory()">保存</button></div>
 </div>
@@ -3832,27 +3910,91 @@ async function setupPush(){
   }catch(e){}
 })();
 
+var memCache=[];var memCurrentTab='all';
 async function openMemPanel(){
   document.getElementById('memPanel').classList.add('open');
   document.getElementById('memOverlay').classList.add('open');
   toggleSidebar();
+  memCurrentTab='all';
+  document.querySelectorAll('.mem-tab').forEach(function(t){t.classList.remove('active')});
+  document.getElementById('memTabAll').classList.add('active');
+  await loadMemItems();
+}
+async function loadMemItems(){
   var body=document.getElementById('memBody');
   body.innerHTML='<div class="mem-empty">读取记忆中…</div>';
   try{
     var r=await fetch('/memory/read');
     var d=await r.json();
     if(d.ok && d.items && d.items.length > 0) {
-      body.innerHTML = d.items.slice().reverse().map(function(m) {
-        var ts = m.ts || '';
-        var text = escHtml(m.text || String(m));
-        return '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.5"><div style="color:var(--text-soft);font-size:11px;margin-bottom:2px">'+ts+'</div><div>'+text+'</div></div>';
-      }).join('');
+      memCache=d.items;
+      renderMemItems(memCurrentTab);
     } else if(d.ok&&d.memories) {
       body.textContent=d.memories;
     } else {
       body.innerHTML='<div class="mem-empty">暂无记忆</div>';
     }
   }catch(e){body.innerHTML='<div class="mem-empty">读取失败</div>';}
+}
+function renderMemItems(filter){
+  var body=document.getElementById('memBody');
+  var items=memCache.slice();
+  if(filter==='pinned') items=items.filter(function(m){return m.pinned});
+  items=items.slice().reverse();
+  if(items.length===0){body.innerHTML='<div class="mem-empty">'+(filter==='pinned'?'暂无置顶记忆':'暂无记忆')+'</div>';return;}
+  body.innerHTML=items.map(function(m){
+    var id=m.id||'';
+    var ts=m.ts||'';
+    var text=escHtml(m.text||String(m));
+    var pinCls=m.pinned?'mem-pin-btn pinned':'mem-pin-btn';
+    var pinnedCls=m.pinned?'mem-item is-pinned':'mem-item';
+    return '<div class="'+pinnedCls+'" data-id="'+id+'"><div class="mem-item-ts">'+ts+'</div><div class="mem-item-text" style="padding-right:60px">'+text+'</div><div class="mem-item-actions"><button class="'+pinCls+'" onclick="togglePin(this,\\''+id+'\\')">📌</button><button class="mem-del-btn" onclick="deleteMem(\\''+id+'\\')">🗑</button></div></div>';
+  }).join('');
+}
+async function switchMemTab(tab){
+  memCurrentTab=tab;
+  document.querySelectorAll('.mem-tab').forEach(function(t){t.classList.remove('active')});
+  if(tab==='all')document.getElementById('memTabAll').classList.add('active');
+  else if(tab==='pinned')document.getElementById('memTabPinned').classList.add('active');
+  else document.getElementById('memTabContext').classList.add('active');
+  if(tab==='context'){await loadWorkingContext();return;}
+  if(memCache.length>0){renderMemItems(tab);}else{await loadMemItems();}
+}
+async function loadWorkingContext(){
+  var body=document.getElementById('memBody');
+  body.innerHTML='<div class="mem-empty">读取中…</div>';
+  try{
+    var r=await fetch('/memory/context');
+    var d=await r.json();
+    if(d.ok&&d.context&&d.context.sessions&&d.context.sessions.length>0){
+      body.innerHTML=d.context.sessions.slice().reverse().map(function(s){
+        return '<div class="mem-ctx-item"><div class="mem-ctx-session">'+escHtml(s.session)+'</div><div class="mem-ctx-state">'+escHtml(s.state)+'</div><div class="mem-ctx-ts">'+escHtml(s.ts||'')+'</div></div>';
+      }).join('');
+    }else{
+      body.innerHTML='<div class="mem-empty">暂无工作状态记录</div>';
+    }
+  }catch(e){body.innerHTML='<div class="mem-empty">读取失败</div>';}
+}
+async function togglePin(btn,id){
+  try{
+    var r=await fetch('/memory/pin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+    var d=await r.json();
+    if(d.ok){
+      var item=memCache.find(function(m){return m.id===id});
+      if(item)item.pinned=d.pinned;
+      renderMemItems(memCurrentTab);
+    }
+  }catch(e){}
+}
+async function deleteMem(id){
+  try{
+    var r=await fetch('/memory/'+id,{method:'DELETE'});
+    var d=await r.json();
+    if(d.ok){
+      memCache=memCache.filter(function(m){return m.id!==id});
+      renderMemItems(memCurrentTab);
+    }
+  }catch(e){}
 }
 function closeMemPanel(){
   document.getElementById('memPanel').classList.remove('open');
@@ -3867,7 +4009,7 @@ async function saveMemory(){
   try{
     var r=await fetch('/memory/store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})});
     var d=await r.json();
-    if(d.ok){inp.value='';var old=document.getElementById('memBody').textContent||'';document.getElementById('memBody').textContent=old+(old?'\\n':'')+text;}
+    if(d.ok){inp.value='';await loadMemItems();}
   }catch(e){}
   btn.disabled=false;btn.textContent='保存';
 }
