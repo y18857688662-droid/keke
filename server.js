@@ -1506,6 +1506,29 @@ app.get('/chat/presence', (req, res) => {
   });
 });
 
+let comebackFlag = false;
+
+app.post('/app/comeback', (req, res) => {
+  comebackFlag = true;
+  setTimeout(() => { comebackFlag = false; }, 10 * 60 * 1000);
+  res.json({ ok: true });
+});
+
+app.post('/app/reset', (req, res) => {
+  comebackFlag = false;
+  res.json({ ok: true });
+});
+
+app.get('/app', (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  if (comebackFlag) {
+    comebackFlag = false;
+    res.send('comeback');
+  } else {
+    res.send('stay');
+  }
+});
+
 app.get('/chat/archive', async (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   try {
