@@ -1537,6 +1537,7 @@ const SESSION_SNAPSHOT_FILE = path.join(__dirname, 'session-snapshot.json');
 
 app.post('/session/snapshot', (req, res) => {
   const { context, tasks, preferences, notes } = req.body;
+  const chat = readChat();
   const snapshot = {
     timestamp: new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' '),
     context: context || '',
