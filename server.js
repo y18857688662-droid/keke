@@ -1519,6 +1519,10 @@ app.post('/app/reset', (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/app/status', (req, res) => {
+  res.json({ comeback: comebackFlag });
+});
+
 app.get('/app', (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   if (comebackFlag) {
