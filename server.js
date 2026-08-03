@@ -1476,6 +1476,36 @@ app.get('/chat/history', (req, res) => {
   res.json({ messages: chat });
 });
 
+let userPresence = { status: 'offline', since: Date.now(), lastSeen: Date.now(), awaySeconds: 0 };
+
+app.post('/chat/presence', (req, res) => {
+  const { status } = req.body;
+  if (!['online', 'away'].includes(status)) return res.json({ ok: false });
+  const now = Date.now();
+  if (status === 'online' && userPresence.status !== 'online') {
+    userPresence.awaySeconds = Math.floor((now - userPresence.since) / 1000);
+  }
+  userPresence.status = status;
+  userPresence.since = now;
+  userPresence.lastSeen = now;
+  res.json({ ok: true });
+});
+
+app.get('/chat/presence', (req, res) => {
+  const now = Date.now();
+  const elapsed = Math.floor((now - userPresence.since) / 1000);
+  let awayFor = 0;
+  if (userPresence.status === 'away') awayFor = elapsed;
+  else if (userPresence.status === 'offline') awayFor = elapsed;
+  res.json({
+    status: userPresence.status,
+    since: userPresence.since,
+    lastSeen: userPresence.lastSeen,
+    awayForSeconds: awayFor,
+    awayForMinutes: Math.floor(awayFor / 60)
+  });
+});
+
 app.get('/chat/archive', async (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   try {
@@ -3760,6 +3790,8 @@ inputField.addEventListener('keydown', function(e) {
 
 var evtSource = new EventSource('/chat/stream');
 var pollKnown = -1;
+fetch('/chat/presence', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'online'})}).catch(function(){});
+window.addEventListener('beforeunload', function(){navigator.sendBeacon('/chat/presence',new Blob([JSON.stringify({status:'away'})],{type:'application/json'}));});
 evtSource.onerror = function() {
   var hs = document.querySelector('.header-status');
   if (hs) hs.innerHTML = '<span class="status-dot" style="background:#ccc"></span>重连中...';
@@ -3805,6 +3837,7 @@ setInterval(function() {
 }, 2000);
 
 document.addEventListener('visibilitychange', function() {
+  fetch('/chat/presence', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:document.visibilityState==='visible'?'online':'away'})}).catch(function(){});
   if (document.visibilityState === 'visible') {
     fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
       if (!data.messages) return;
