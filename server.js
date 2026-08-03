@@ -1533,6 +1533,28 @@ app.get('/app', (req, res) => {
   }
 });
 
+const SESSION_SNAPSHOT_FILE = path.join(__dirname, 'session-snapshot.json');
+
+app.post('/session/snapshot', (req, res) => {
+  const { context, tasks, preferences, notes } = req.body;
+  const snapshot = {
+    timestamp: new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' '),
+    context: context || '',
+    tasks: tasks || [],
+    preferences: preferences || {},
+    notes: notes || '',
+    recentMessages: chatMessages.slice(-20).map(m => ({ role: m.role, content: m.content, time: m.time }))
+  };
+  fs.writeFileSync(SESSION_SNAPSHOT_FILE, JSON.stringify(snapshot, null, 2));
+  res.json({ ok: true, snapshot });
+});
+
+app.get('/session/snapshot', (req, res) => {
+  if (!fs.existsSync(SESSION_SNAPSHOT_FILE)) return res.json({ ok: false, error: 'no snapshot' });
+  const snapshot = JSON.parse(fs.readFileSync(SESSION_SNAPSHOT_FILE, 'utf8'));
+  res.json({ ok: true, snapshot });
+});
+
 app.get('/chat/archive', async (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   try {
