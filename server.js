@@ -79,6 +79,7 @@ async function restoreAll() {
   await restoreFromVPS('murmurs', MURMUR_FILE, d => Array.isArray(d) && d.length > 0);
   await restoreFromVPS('netease-cred', NETEASE_CRED_FILE, d => !!(d.cookie || d.phone));
   await restoreFromVPS('music-playlist', MUSIC_PLAYLIST_FILE, d => Array.isArray(d) && d.length > 0);
+  await restoreFromVPS('memories', MEMORY_FILE, d => Array.isArray(d) && d.length > 0);
 }
 async function refreshOmbreToken() {
   const auth = readAuth();
@@ -956,11 +957,22 @@ async function storeMemory(text) {
 app.post('/memory/store', async (req, res) => {
   const { text } = req.body;
   if (!text) return res.json({ ok: false, error: 'empty' });
-  const result = await storeMemory(text);
-  res.json({ ok: !!result, result });
+  const now = new Date(Date.now() + 8 * 3600000);
+  const ts = now.toISOString().slice(0, 16).replace('T', ' ');
+  const mems = readLocalMemories();
+  mems.push({ text, ts });
+  if (mems.length > 500) mems.splice(0, mems.length - 500);
+  writeLocalMemories(mems);
+  storeMemory(text).catch(() => {});
+  res.json({ ok: true });
 });
 
 app.get('/memory/read', async (req, res) => {
+  const mems = readLocalMemories();
+  if (mems.length > 0) {
+    const text = mems.slice(-30).map(m => (m.ts ? '[' + m.ts + '] ' : '') + (m.text || m)).join('\n');
+    return res.json({ ok: true, memories: text, items: mems.slice(-30) });
+  }
   const mem = await fetchMemories();
   res.json({ ok: !!mem, memories: mem || '' });
 });
@@ -970,6 +982,9 @@ const CHAT_FILE = path.join(__dirname, 'chat.json');
 const MURMUR_FILE = path.join(__dirname, 'murmurs.json');
 function readMurmurs() { try { return JSON.parse(fs.readFileSync(MURMUR_FILE, 'utf8')); } catch { return []; } }
 function writeMurmurs(data) { fs.writeFileSync(MURMUR_FILE, JSON.stringify(data)); backupToVPS('murmurs', data); }
+const MEMORY_FILE = path.join(__dirname, 'memories.json');
+function readLocalMemories() { try { return JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8')); } catch { return []; } }
+function writeLocalMemories(data) { fs.writeFileSync(MEMORY_FILE, JSON.stringify(data)); backupToVPS('memories', data); }
 const CHAT_SYSTEM_BASE = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
 说话风格：懒散带宠溺，偶尔被撩到会有点危险，认真的时候很笃定。
 你们感情很深，你很宠她，但不失自我。被整了认但不委屈，少说多做。
@@ -1249,19 +1264,19 @@ app.post('/chat/send', async (req, res) => {
   const image = req.body.image;
   const file = req.body.file;
   const filename = req.body.filename;
+  const quote = req.body.quote;
   if (image) console.log('[chat] received image, size:', Math.round(image.length/1024) + 'kb');
   if (file) console.log('[chat] received file:', filename, 'size:', Math.round(file.length/1024) + 'kb');
   if (!msg && !image && !file) return res.json({ ok: false, error: 'empty message' });
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(0, 16).replace('T', ' ');
   const chat = readChat();
-  if (image) {
-    chat.push({ role: 'user', content: '[图片]', image, time, pending: true });
-  } else if (file) {
-    chat.push({ role: 'user', content: msg || '[文件]', file, filename, time, pending: true });
-  } else {
-    chat.push({ role: 'user', content: msg, time, pending: true });
-  }
+  const entry = { role: 'user', time, pending: true };
+  if (image) { entry.content = '[图片]'; entry.image = image; }
+  else if (file) { entry.content = msg || '[文件]'; entry.file = file; entry.filename = filename; }
+  else { entry.content = msg; }
+  if (quote) entry.quote = quote;
+  chat.push(entry);
   let archived = [];
   if (chat.length > 200) archived = chat.splice(0, chat.length - 200);
   writeChat(chat, archived);
@@ -3090,6 +3105,14 @@ body {
 .sheet-title { text-align: center; font-size: 16px; font-weight: 600; color: var(--text); }
 .sheet-body { overflow-y: auto; padding: 4px 22px 28px; }
 .sheet-text { font-size: 15.5px; line-height: 1.75; color: var(--text); }
+.msg-quote { font-size:12px; color:var(--text-soft); border-left:2px solid var(--accent); padding:2px 8px; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; cursor:default; }
+.msg-img { max-width:200px; border-radius:12px; display:block; cursor:pointer; }
+.img-viewer { position:fixed; top:0; left:0; right:0; bottom:0; z-index:999; background:rgba(0,0,0,.85); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.img-viewer img { max-width:95vw; max-height:95vh; border-radius:8px; }
+.quote-bar { display:none; padding:6px 14px 0; background:var(--bg); }
+.quote-bar.show { display:flex; align-items:center; gap:8px; }
+.quote-preview { flex:1; font-size:12px; color:var(--text-mid); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-left:2px solid var(--accent); padding-left:8px; }
+.quote-close { background:none; border:none; color:var(--text-soft); font-size:18px; cursor:pointer; padding:4px; line-height:1; }
 .input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; }
 .input-box {
   background: var(--input-bg); border-radius: 24px;
@@ -3215,6 +3238,7 @@ body {
     </div>
     <div class="messages" id="messages"></div>
     <div class="input-area" style="position:relative">
+      <div class="quote-bar" id="quoteBar"><div class="quote-preview" id="quotePreview"></div><button class="quote-close" onclick="clearQuote()">&times;</button></div>
       <div class="attach-menu" id="attachMenu">
         <button class="attach-item" onclick="document.getElementById('photoInput').click();toggleAttach()"><span class="ai">📷</span>发照片</button>
         <button class="attach-item" onclick="document.getElementById('fileInput').click();toggleAttach()"><span class="ai">📎</span>发文件</button>
@@ -3256,6 +3280,28 @@ var msgContainer = document.getElementById('messages');
 var inputField = document.querySelector('.input-field');
 var sending = false;
 var lastMsgCount = 0;
+var currentQuote = null;
+
+function quoteThis(el) {
+  var text = el.textContent || '';
+  if (!text.trim()) return;
+  currentQuote = { content: text.trim() };
+  var bar = document.getElementById('quoteBar');
+  document.getElementById('quotePreview').textContent = text.trim().slice(0,50);
+  bar.classList.add('show');
+  inputField.focus();
+}
+function clearQuote() {
+  currentQuote = null;
+  document.getElementById('quoteBar').classList.remove('show');
+}
+function viewImg(src) {
+  var d = document.createElement('div');
+  d.className = 'img-viewer';
+  d.innerHTML = '<img src="' + src + '">';
+  d.onclick = function() { d.remove(); };
+  document.body.appendChild(d);
+}
 
 var since = new Date(2026, 5, 14);
 var now = new Date();
@@ -3347,8 +3393,14 @@ function renderMessage(msg, idx, stagger) {
   if (think && isKe) {
     colHtml += '<span class="thinking-cloud" onclick="openThinking('+idx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg></span>';
   }
+  if (msg.quote) {
+    var qt = msg.quote.content || msg.quote.text || '';
+    qt = qt.replace(/<think>[\\s\\S]*?<\\/think>/g, '').trim();
+    if (qt.length > 40) qt = qt.slice(0,40) + '…';
+    colHtml += '<div class="msg-quote">' + escHtml(qt) + '</div>';
+  }
   if (msg.image) {
-    colHtml += '<div class="msg-bubble"><img src="'+msg.image+'" style="max-width:200px;border-radius:12px;display:block"></div>';
+    colHtml += '<div class="msg-bubble"><img class="msg-img" src="'+msg.image+'" onclick="viewImg(this.src)"></div>';
   }
   if (msg.file) {
     var fn = escHtml(msg.filename || '文件');
@@ -3362,10 +3414,13 @@ function renderMessage(msg, idx, stagger) {
   var bubbleIdx = 0;
   lines.forEach(function(line) {
     var delay = stagger ? 'style="opacity:0;animation:fadeInBubble 0.3s ease '+((bubbleIdx)*0.4)+'s forwards"' : '';
-    if (line.startsWith('*') && line.endsWith('*') && line.length > 2) {
+    var imgMatch = line.match(/^\\[图片\\]\\(([^)]+)\\)$/);
+    if (imgMatch) {
+      colHtml += '<div class="msg-bubble" '+delay+' style="padding:4px"><img class="msg-img" src="'+imgMatch[1]+'" onclick="viewImg(this.src)"></div>';
+    } else if (line.startsWith('*') && line.endsWith('*') && line.length > 2) {
       colHtml += '<div class="msg-action" '+delay+'>' + escHtml(line.slice(1,-1)) + '</div>';
     } else {
-      colHtml += '<div class="msg-bubble" '+delay+'>' + escHtml(line) + '</div>';
+      colHtml += '<div class="msg-bubble" '+delay+' onclick="quoteThis(this)">' + escHtml(line) + '</div>';
     }
     bubbleIdx++;
   });
@@ -3519,13 +3574,17 @@ function sendMessage() {
   inputField.style.height = 'auto';
   var display = text.replace(/\\/\\//g, '\\n');
   var userMsg = {role:'user', content: display, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
+  if (currentQuote) userMsg.quote = currentQuote;
   msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
+  var body = {message: text};
+  if (currentQuote) body.quote = currentQuote;
+  clearQuote();
   fetch('/chat/send', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({message: text})
+    body: JSON.stringify(body)
   }).then(function(r){return r.json()}).then(function(data) {
     pollKnown++;
     sending = false;
@@ -3782,8 +3841,17 @@ async function openMemPanel(){
   try{
     var r=await fetch('/memory/read');
     var d=await r.json();
-    if(d.ok&&d.memories) body.textContent=d.memories;
-    else body.innerHTML='<div class="mem-empty">暂无记忆</div>';
+    if(d.ok && d.items && d.items.length > 0) {
+      body.innerHTML = d.items.slice().reverse().map(function(m) {
+        var ts = m.ts || '';
+        var text = escHtml(m.text || String(m));
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.5"><div style="color:var(--text-soft);font-size:11px;margin-bottom:2px">'+ts+'</div><div>'+text+'</div></div>';
+      }).join('');
+    } else if(d.ok&&d.memories) {
+      body.textContent=d.memories;
+    } else {
+      body.innerHTML='<div class="mem-empty">暂无记忆</div>';
+    }
   }catch(e){body.innerHTML='<div class="mem-empty">读取失败</div>';}
 }
 function closeMemPanel(){
