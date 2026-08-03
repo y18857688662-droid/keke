@@ -3375,7 +3375,7 @@ body {
         <button class="attach-item" onclick="toggleAttach();syncMemory()"><span class="ai">🧠</span>同步记忆库</button>
         <button class="attach-item" onclick="toggleAttach();window.open('/call','_blank')"><span class="ai">📞</span>语音通话</button>
         <button class="attach-item" onclick="toggleAttach();window.open('/screen','_blank')"><span class="ai">🖥</span>屏幕共享</button>
-        <input type="file" id="photoInput" accept="image/*" style="display:none">
+        <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
         <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md,.json,.csv,.xlsx,.xls,.ppt,.pptx,.zip,.rar" style="display:none">
       </div>
       <div class="input-box">
@@ -3763,8 +3763,9 @@ function sendImage(file) {
 }
 
 document.getElementById('photoInput').addEventListener('change', function() {
-  if (this.files[0]) sendImage(this.files[0]);
+  var files = Array.from(this.files);
   this.value = '';
+  files.forEach(function(f) { sendImage(f); });
 });
 
 function sendFile(file) {
