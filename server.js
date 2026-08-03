@@ -1330,7 +1330,7 @@ app.post('/chat/send', async (req, res) => {
   const time = now.toISOString().slice(0, 16).replace('T', ' ');
   const chat = readChat();
   const entry = { role: 'user', time, pending: true };
-  if (image) { entry.content = '[图片]'; entry.image = image; }
+  if (image) { entry.content = (msg && msg !== '[图片]') ? msg : '[图片]'; entry.image = image; }
   else if (file) { entry.content = msg || '[文件]'; entry.file = file; entry.filename = filename; }
   else { entry.content = msg; }
   if (quote) entry.quote = quote;
@@ -3568,7 +3568,7 @@ function renderMessage(msg, idx, stagger) {
     var fn2 = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\\'a\\');a.href=\\''+msg.fileUrl+'\\';a.download=\\''+escHtml(msg.filename||'file')+'\\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn2 + '</div>';
   }
-  var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l});
+  var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l && !(msg.image && l === '[图片]')});
   var bubbleIdx = 0;
   lines.forEach(function(line) {
     var delay = stagger ? 'style="opacity:0;animation:fadeInBubble 0.3s ease '+((bubbleIdx)*0.4)+'s forwards"' : '';
@@ -3768,16 +3768,17 @@ function compressImage(file, maxDim, quality) {
     img.src = URL.createObjectURL(file);
   });
 }
-function sendImage(file) {
+function sendImage(file, caption) {
   compressImage(file, 1600, 0.85).then(function(base64) {
-    var userMsg = {role:'user', content:'[图片]', image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
+    var displayContent = caption || '[图片]';
+    var userMsg = {role:'user', content: displayContent, image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
     msgContainer.appendChild(renderTime(userMsg.time));
     msgContainer.appendChild(renderMessage(userMsg, -1));
     scrollBottom();
     fetch('/chat/send', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({message:'[图片]', image: base64})
+      body: JSON.stringify({message: displayContent, image: base64})
     }).then(function(r){return r.json()}).then(function(data) {
       if (!data.ok) alert('图片发送失败');
       pollKnown++;
@@ -3788,7 +3789,10 @@ function sendImage(file) {
 document.getElementById('photoInput').addEventListener('change', function() {
   var files = Array.from(this.files);
   this.value = '';
-  files.forEach(function(f) { sendImage(f); });
+  var inp = document.getElementById('msgInput');
+  var caption = inp ? inp.value.trim() : '';
+  if (caption) inp.value = '';
+  files.forEach(function(f, i) { sendImage(f, i === 0 ? caption : ''); });
 });
 
 function sendFile(file) {
