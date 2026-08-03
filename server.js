@@ -1543,7 +1543,7 @@ app.post('/session/snapshot', (req, res) => {
     tasks: tasks || [],
     preferences: preferences || {},
     notes: notes || '',
-    recentMessages: chatMessages.slice(-20).map(m => ({ role: m.role, content: m.content, time: m.time }))
+    recentMessages: chat.slice(-20).map(m => ({ role: m.role, content: m.content, time: m.time }))
   };
   fs.writeFileSync(SESSION_SNAPSHOT_FILE, JSON.stringify(snapshot, null, 2));
   res.json({ ok: true, snapshot });
