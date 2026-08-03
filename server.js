@@ -4544,6 +4544,47 @@ setInterval(async () => {
   console.log(`[miss-timer] sent: ${msg.slice(0, 60)}`);
 }, 5 * 60 * 1000);
 
+// === Ombre Brain MCP 代理 ===
+const httpProxy = require('http');
+const urlProxy = require('url');
+app.use('/ob', (req, res, next) => {
+  req._obRawChunks = [];
+  const origPush = req.push;
+  req.on('data', c => req._obRawChunks.push(c));
+  next();
+});
+app.all('/ob/*', (req, res) => {
+  const target = urlProxy.parse(OMBRE_URL);
+  const subPath = req.originalUrl.replace(/^\/ob/, '') || '/';
+  const bodyBuf = req.body ? Buffer.from(JSON.stringify(req.body)) : (req._obRawChunks.length ? Buffer.concat(req._obRawChunks) : null);
+  const fwdHeaders = {};
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (!['host', 'connection', 'content-length'].includes(k)) fwdHeaders[k] = v;
+  }
+  fwdHeaders.host = target.host;
+  if (bodyBuf) fwdHeaders['content-length'] = bodyBuf.length;
+  const options = {
+    hostname: target.hostname,
+    port: target.port || 80,
+    path: subPath,
+    method: req.method,
+    headers: fwdHeaders,
+  };
+  const proxyReq = httpProxy.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res, { end: true });
+  });
+  proxyReq.on('error', (e) => {
+    console.error('OB proxy error:', e.message);
+    if (!res.headersSent) res.status(502).json({ error: 'Ombre Brain unreachable' });
+  });
+  if (bodyBuf) {
+    proxyReq.end(bodyBuf);
+  } else {
+    proxyReq.end();
+  }
+});
+
 app.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   await restoreAll();
