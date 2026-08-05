@@ -74,6 +74,7 @@ async function restoreAll() {
   await restoreFromVPS('diary', DIARY_FILE, d => Array.isArray(d) && d.length > 0);
   await restoreFromVPS('thoughts', THOUGHTS_FILE, d => Array.isArray(d) && d.length > 0);
   await restoreFromVPS('period', PERIOD_FILE, d => !!(d.cycle_length || d.records));
+  await restoreFromVPS('period_ends', PERIOD_ENDS_FILE, d => typeof d === 'object' && !Array.isArray(d));
   await restoreFromVPS('garden', GARDEN_FILE, d => !!(d.plots || d.coins !== undefined));
   await restoreFromVPS('pings', PING_FILE, d => Array.isArray(d) && d.length > 0);
   await restoreFromVPS('murmurs', MURMUR_FILE, d => Array.isArray(d) && d.length > 0);
@@ -1787,6 +1788,7 @@ app.post('/voice/reply', async (req, res) => {
 
 // ==================== 经期系统 ====================
 const PERIOD_FILE = path.join(__dirname, 'period_data.json');
+const PERIOD_ENDS_FILE = path.join(__dirname, 'period_ends.json');
 const PERIOD_SEED = ['2026-07-01'];
 const PERIOD_LEN = 5;
 
@@ -1806,6 +1808,16 @@ function writePeriods(arr) {
   try { fs.writeFileSync(PERIOD_FILE, JSON.stringify(sorted)); } catch (e) {}
   backupToVPS('period', sorted);
 }
+function readPeriodEnds() {
+  try {
+    const d = JSON.parse(fs.readFileSync(PERIOD_ENDS_FILE, 'utf8'));
+    return (typeof d === 'object' && !Array.isArray(d)) ? d : {};
+  } catch (e) { return {}; }
+}
+function writePeriodEnds(ends) {
+  try { fs.writeFileSync(PERIOD_ENDS_FILE, JSON.stringify(ends)); } catch (e) {}
+  backupToVPS('period_ends', ends);
+}
 
 app.get('/period/data', async (req, res) => {
   let periods = readPeriods();
@@ -1820,7 +1832,8 @@ app.get('/period/data', async (req, res) => {
       if (dates.length) { periods = [...new Set([...periods, ...dates])].sort(); writePeriods(periods); }
     } catch (e) {}
   }
-  res.json({ periods, periodLen: PERIOD_LEN, today: bjToday() });
+  const ends = readPeriodEnds();
+  res.json({ periods, periodLen: PERIOD_LEN, today: bjToday(), ends });
 });
 
 app.post('/period/start', (req, res) => {
@@ -1849,6 +1862,25 @@ app.post('/period/remove', (req, res) => {
   const periods = readPeriods().filter(s => s !== date);
   writePeriods(periods);
   res.json({ ok: true, periods });
+});
+
+app.post('/period/end', (req, res) => {
+  const date = ((req.body && req.body.date) || bjToday()).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'bad date' });
+  const periods = readPeriods();
+  const starts = periods.filter(s => s <= date).sort();
+  if (!starts.length) return res.status(400).json({ error: 'no start found' });
+  const startDate = starts[starts.length - 1];
+  const days = pd2n(date) - pd2n(startDate) + 1;
+  if (days > 15 || days < 1) return res.status(400).json({ error: 'end date too far from start' });
+  const ends = readPeriodEnds();
+  ends[startDate] = date;
+  writePeriodEnds(ends);
+  fetch('http://127.0.0.1:' + PORT + '/memory/store', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: '[PERIOD_LOG] 月经结束 ' + date + ' (开始于 ' + startDate + ', 共' + days + '天)' })
+  }).catch(() => {});
+  res.json({ ok: true, ends });
 });
 
 app.get('/period', (req, res) => {
@@ -1901,7 +1933,7 @@ body{background:#f6f8f4;color:#2f4638;font-family:-apple-system,sans-serif;min-h
     <div class="card"><div class="v" id="next">–</div><div class="k">下次预计</div></div>
     <div class="card"><div class="v" id="avg">–</div><div class="k">平均周期</div></div>
   </div>
-  <button class="btn" onclick="markStart()">经期来了</button>
+  <div style="display:flex;gap:10px"><button class="btn" style="flex:1" onclick="markStart()">经期来了</button><button class="btn" id="endBtn" style="flex:1;background:#fbe9ec;color:#c04b62;display:none" onclick="markEnd()">经期结束了</button></div>
   <div class="legend"><span><i class="c1"></i>经期</span><span><i class="c2"></i>卵泡期</span><span><i class="c3"></i>排卵期</span><span><i class="c4"></i>黄体期</span></div>
   <div class="cal">
     <div class="cal-head"><button onclick="move(-1)">‹</button><b id="mtitle"></b><button onclick="move(1)">›</button></div>
@@ -1910,18 +1942,19 @@ body{background:#f6f8f4;color:#2f4638;font-family:-apple-system,sans-serif;min-h
   <div class="note" id="note"></div>
 </div>
 <script>
-var P=[],PLEN=5,TODAY='',view;
+var P=[],PLEN=5,TODAY='',ENDS={},view;
 function d2n(s){return Math.round(new Date(s+'T00:00:00Z').getTime()/86400000)}
 function n2d(n){return new Date(n*86400000).toISOString().slice(0,10)}
 function avgCycle(){if(P.length<2)return 32;var s=0;for(var i=1;i<P.length;i++)s+=d2n(P[i])-d2n(P[i-1]);var a=Math.round(s/(P.length-1));return Math.max(21,Math.min(45,a))}
-function phaseOf(day,L){var ov=L-14;if(day<=PLEN)return 1;if(Math.abs(day-ov)<=2)return 3;if(day<ov-2)return 2;if(day<=L)return 4;return 0}
-function dotFor(ds){if(ds>TODAY)return 0;var L=avgCycle();var n=d2n(ds);var best=-1;for(var i=0;i<P.length;i++){var sn=d2n(P[i]);if(sn<=n&&sn>best)best=sn}if(best<0)return 0;return phaseOf(n-best+1,L)}
+function phaseOf(day,L,pl){if(!pl)pl=PLEN;var ov=L-14;if(day<=pl)return 1;if(Math.abs(day-ov)<=2)return 3;if(day<ov-2)return 2;if(day<=L)return 4;return 0}
+function dotFor(ds){if(ds>TODAY)return 0;var L=avgCycle();var n=d2n(ds);var best=-1,bestDs='';for(var i=0;i<P.length;i++){var sn=d2n(P[i]);if(sn<=n&&sn>best){best=sn;bestDs=P[i]}}if(best<0)return 0;var pl=ENDS[bestDs]?d2n(ENDS[bestDs])-best+1:PLEN;return phaseOf(n-best+1,L,pl)}
 function render(){
   var L=avgCycle(),last=P[P.length-1],cd=d2n(TODAY)-d2n(last)+1,nx=n2d(d2n(last)+L);
+  var pl=ENDS[last]?d2n(ENDS[last])-d2n(last)+1:PLEN;
   document.getElementById('last').textContent=last.slice(5).replace('-','-');
   document.getElementById('next').textContent=nx.slice(5);
   document.getElementById('avg').textContent=L+'天';
-  var hero=document.getElementById('hero'),ph=phaseOf(cd,L);
+  var hero=document.getElementById('hero'),ph=phaseOf(cd,L,pl);
   var names={1:'经期',2:'卵泡期',3:'排卵期',4:'黄体期',0:'已超期'};
   document.getElementById('phase').textContent=names[ph];
   document.getElementById('cday').textContent='第'+cd+'天';
@@ -1929,6 +1962,8 @@ function render(){
   var left=d2n(nx)-d2n(TODAY);
   document.getElementById('sub').textContent=ph===0?('已超过预计'+(-left)+'天'):('距下次预计还有'+left+'天');
   document.getElementById('note').textContent=P.length<2?'目前只有一次记录，周期先按32天估算，多记几次会越来越准':'根据'+P.length+'次记录计算';
+  var eb=document.getElementById('endBtn');
+  if(ph===1&&!ENDS[last])eb.style.display='';else eb.style.display='none';
   drawCal();
 }
 function drawCal(){
@@ -1955,13 +1990,17 @@ function markStart(){
   if(!confirm('记录今天为经期第一天？'))return;
   post('/period/start');
 }
+function markEnd(){
+  if(!confirm('记录今天经期结束？'))return;
+  fetch('/period/end',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json()}).then(function(j){if(j.ends)ENDS=j.ends;render()})
+}
 function dayTap(ds){
   if(P.indexOf(ds)>=0){if(confirm('撤销 '+ds+' 这条经期记录？'))post('/period/remove',{date:ds});return}
   if(ds>TODAY)return;
   if(confirm('补记 '+ds+' 为经期第一天？'))post('/period/start',{date:ds});
 }
 fetch('/period/data').then(function(r){return r.json()}).then(function(j){
-  P=j.periods;PLEN=j.periodLen;TODAY=j.today;
+  P=j.periods;PLEN=j.periodLen;TODAY=j.today;ENDS=j.ends||{};
   view={y:+TODAY.slice(0,4),m:+TODAY.slice(5,7)-1};
   render();
 });
