@@ -1991,13 +1991,14 @@ function markStart(){
   post('/period/start');
 }
 function markEnd(){
-  var last=P[P.length-1],cd=d2n(TODAY)-d2n(last)+1;
-  var d=prompt('经期哪天结束的？输入日期（如 08-05）或天数（如 5 表示第5天）',TODAY.slice(5));
-  if(!d)return;
-  var endDate;
-  if(/^\d+$/.test(d.trim())){endDate=n2d(d2n(last)+parseInt(d.trim())-1)}
-  else{var m=d.trim().match(/(\d{1,2})-(\d{1,2})/);if(m)endDate=TODAY.slice(0,5)+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0');else return alert('格式不对')}
-  fetch('/period/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:endDate})}).then(function(r){return r.json()}).then(function(j){if(j.ends){ENDS=j.ends;render()}else alert(j.error||'失败')})
+  var last=P[P.length-1];
+  var d=prompt('哪天结束的？（比如 5 或 08-05 或 8/5）',TODAY.slice(8));
+  if(!d)return;d=d.trim();
+  var endDate,nums=d.match(/\d+/g);
+  if(!nums)return alert('没看懂');
+  if(nums.length===1){var n=parseInt(nums[0]);if(n<=15)endDate=n2d(d2n(last)+n-1);else endDate=TODAY.slice(0,8)+String(n).padStart(2,'0')}
+  else endDate=TODAY.slice(0,5)+nums[0].padStart(2,'0')+'-'+nums[1].padStart(2,'0');
+  fetch('/period/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:endDate})}).then(function(r){return r.json()}).then(function(j){if(j.ends){ENDS=j.ends;render()}else alert(j.error||'记录失败')})
 }
 function dayTap(ds){
   if(P.indexOf(ds)>=0){if(confirm('撤销 '+ds+' 这条经期记录？'))post('/period/remove',{date:ds});return}
