@@ -1999,6 +1999,11 @@ function markEnd(){
 function dayTap(ds){
   if(P.indexOf(ds)>=0){if(confirm('撤销 '+ds+' 这条经期记录？'))post('/period/remove',{date:ds});return}
   if(ds>TODAY)return;
+  var last=P[P.length-1];
+  if(last&&ds>last&&!ENDS[last]&&d2n(ds)-d2n(last)<15){
+    if(confirm('记录 '+ds.slice(5)+' 为经期结束？'))fetch('/period/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:ds})}).then(function(r){return r.json()}).then(function(j){if(j.ends){ENDS=j.ends;render()}});
+    return;
+  }
   if(confirm('补记 '+ds+' 为经期第一天？'))post('/period/start',{date:ds});
 }
 fetch('/period/data').then(function(r){return r.json()}).then(function(j){
