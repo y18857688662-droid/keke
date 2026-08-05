@@ -1992,11 +1992,11 @@ function markStart(){
 }
 function markEnd(){
   var last=P[P.length-1];
-  var d=prompt('哪天结束的？（比如 5 或 08-05 或 8/5）',TODAY.slice(8));
+  var d=prompt('哪天结束的？',TODAY.slice(5));
   if(!d)return;d=d.trim();
   var endDate,nums=d.match(/\d+/g);
   if(!nums)return alert('没看懂');
-  if(nums.length===1){var n=parseInt(nums[0]);if(n<=15)endDate=n2d(d2n(last)+n-1);else endDate=TODAY.slice(0,8)+String(n).padStart(2,'0')}
+  if(nums.length===1)endDate=TODAY.slice(0,5)+TODAY.slice(5,7)+'-'+String(parseInt(nums[0])).padStart(2,'0');
   else endDate=TODAY.slice(0,5)+nums[0].padStart(2,'0')+'-'+nums[1].padStart(2,'0');
   fetch('/period/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:endDate})}).then(function(r){return r.json()}).then(function(j){if(j.ends){ENDS=j.ends;render()}else alert(j.error||'记录失败')})
 }
