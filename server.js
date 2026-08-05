@@ -1963,7 +1963,7 @@ function render(){
   document.getElementById('sub').textContent=ph===0?('已超过预计'+(-left)+'天'):('距下次预计还有'+left+'天');
   document.getElementById('note').textContent=P.length<2?'目前只有一次记录，周期先按32天估算，多记几次会越来越准':'根据'+P.length+'次记录计算';
   var eb=document.getElementById('endBtn');
-  if(!ENDS[last])eb.style.display='';else eb.style.display='none';
+  if(cd<=15)eb.style.display='';else eb.style.display='none';
   drawCal();
 }
 function drawCal(){
@@ -2000,7 +2000,7 @@ function dayTap(ds){
   if(P.indexOf(ds)>=0){if(confirm('撤销 '+ds+' 这条经期记录？'))post('/period/remove',{date:ds});return}
   if(ds>TODAY)return;
   var last=P[P.length-1];
-  if(last&&ds>last&&!ENDS[last]&&d2n(ds)-d2n(last)<15){
+  if(last&&ds>last&&d2n(ds)-d2n(last)<15){
     if(confirm('记录 '+ds.slice(5)+' 为经期结束？'))fetch('/period/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:ds})}).then(function(r){return r.json()}).then(function(j){if(j.ends){ENDS=j.ends;render()}});
     return;
   }
