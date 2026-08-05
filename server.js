@@ -2654,6 +2654,35 @@ app.post('/api/remote', (req, res) => {
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
+// === Pillow IR Control ===
+const tuyaIR = require('./tuya-ir');
+
+app.post('/api/pillow/config', (req, res) => {
+  const { token, accessId, accessSecret, deviceId, remoteId } = req.body || {};
+  if (token !== 'igh1KcpnAfKtPiI_fSmIEIIcBH3ZkKAR') return res.status(403).json({ error: 'forbidden' });
+  tuyaIR.saveConfig({ accessId, accessSecret, deviceId, remoteId });
+  res.json({ ok: true });
+});
+
+app.post('/api/pillow/pat-start', async (req, res) => {
+  try { const r = await tuyaIR.patStart(); res.json({ ok: true, result: r }); }
+  catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.post('/api/pillow/pat-stop', async (req, res) => {
+  try { const r = await tuyaIR.patStop(); res.json({ ok: true, result: r }); }
+  catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.post('/api/pillow/cmd', async (req, res) => {
+  try {
+    const { key } = req.body || {};
+    if (!key || !tuyaIR.KEYS[key]) return res.status(400).json({ error: 'valid keys: ' + Object.keys(tuyaIR.KEYS).join(', ') });
+    const r = await tuyaIR.sendKey(key);
+    res.json({ ok: true, result: r });
+  } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
 app.get('/music/player', (req, res) => {
   res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' });
   res.send(`<!DOCTYPE html>
