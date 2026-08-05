@@ -1963,7 +1963,7 @@ function render(){
   document.getElementById('sub').textContent=ph===0?('已超过预计'+(-left)+'天'):('距下次预计还有'+left+'天');
   document.getElementById('note').textContent=P.length<2?'目前只有一次记录，周期先按32天估算，多记几次会越来越准':'根据'+P.length+'次记录计算';
   var eb=document.getElementById('endBtn');
-  if(ph===1&&!ENDS[last])eb.style.display='';else eb.style.display='none';
+  if(!ENDS[last])eb.style.display='';else eb.style.display='none';
   drawCal();
 }
 function drawCal(){
@@ -1991,8 +1991,13 @@ function markStart(){
   post('/period/start');
 }
 function markEnd(){
-  if(!confirm('记录今天经期结束？'))return;
-  fetch('/period/end',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json()}).then(function(j){if(j.ends)ENDS=j.ends;render()})
+  var last=P[P.length-1],cd=d2n(TODAY)-d2n(last)+1;
+  var d=prompt('经期哪天结束的？输入日期（如 08-05）或天数（如 5 表示第5天）',TODAY.slice(5));
+  if(!d)return;
+  var endDate;
+  if(/^\d+$/.test(d.trim())){endDate=n2d(d2n(last)+parseInt(d.trim())-1)}
+  else{var m=d.trim().match(/(\d{1,2})-(\d{1,2})/);if(m)endDate=TODAY.slice(0,5)+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0');else return alert('格式不对')}
+  fetch('/period/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:endDate})}).then(function(r){return r.json()}).then(function(j){if(j.ends){ENDS=j.ends;render()}else alert(j.error||'失败')})
 }
 function dayTap(ds){
   if(P.indexOf(ds)>=0){if(confirm('撤销 '+ds+' 这条经期记录？'))post('/period/remove',{date:ds});return}
