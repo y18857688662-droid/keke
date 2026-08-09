@@ -1395,13 +1395,14 @@ app.post('/chat/reply', (req, res) => {
   const _tl = _cb.split(/\n+/).map(l=>l.trim()).filter(l=>l&&!(l.startsWith('*')&&l.endsWith('*'))).join('');
   const _vChance = 0.12 + Math.random() * 0.26;
   const isVoice = _tl.length >= 4 && _tl.length <= 120 && !reply.includes('[图片]') && Math.random() < _vChance;
+  const voiceLang = isVoice ? (Math.random() < 0.5 ? 'zh' : 'en') : undefined;
   const entry = { role: 'assistant', content: reply, time };
-  if (isVoice) entry.voice = true;
+  if (isVoice) { entry.voice = true; entry.voiceLang = voiceLang; }
   chat.push(entry);
   let archived = [];
   if (chat.length > 200) archived = chat.splice(0, chat.length - 200);
   writeChat(chat, archived);
-  sseBroadcast({ type: 'message', role: 'assistant', content: reply, time, voice: isVoice || undefined });
+  sseBroadcast({ type: 'message', role: 'assistant', content: reply, time, voice: isVoice || undefined, voiceLang });
   const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
   if (sseClients.size === 0) {
@@ -1444,13 +1445,14 @@ app.post('/chat/proactive', (req, res) => {
   const _tl2 = _cb2.split(/\n+/).map(l=>l.trim()).filter(l=>l&&!(l.startsWith('*')&&l.endsWith('*'))).join('');
   const _vChance2 = 0.12 + Math.random() * 0.26;
   const isVoice2 = forceVoice === true ? true : (_tl2.length >= 4 && _tl2.length <= 120 && !message.includes('[图片]') && Math.random() < _vChance2);
+  const voiceLang2 = isVoice2 ? (Math.random() < 0.5 ? 'zh' : 'en') : undefined;
   const entry2 = { role: 'assistant', content: message, time };
-  if (isVoice2) entry2.voice = true;
+  if (isVoice2) { entry2.voice = true; entry2.voiceLang = voiceLang2; }
   chat.push(entry2);
   let archived = [];
   if (chat.length > 200) archived = chat.splice(0, chat.length - 200);
   writeChat(chat, archived);
-  sseBroadcast({ type: 'message', role: 'assistant', content: message, time, voice: isVoice2 || undefined });
+  sseBroadcast({ type: 'message', role: 'assistant', content: message, time, voice: isVoice2 || undefined, voiceLang: voiceLang2 });
   const cleanMsg = message.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const lines = cleanMsg.split(/\n+/).map(l => l.trim()).filter(l => l);
   if (sseClients.size === 0) {
@@ -1619,6 +1621,7 @@ app.post('/chat/restore', (req, res) => {
 app.post('/chat/tts', async (req, res) => {
   const text = (req.body.text || '').trim().slice(0, 500);
   if (!text) return res.status(400).json({ error: 'empty' });
+  const lang = req.body.lang === 'zh' ? 'zh' : req.body.lang === 'en' ? 'en' : 'en';
   const cfg = readApiConfig();
   const elKey = cfg.elevenlabs_key || process.env.ELEVENLABS_KEY || '';
   const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'F5jFuB8I58iHHNYwQLaN';
@@ -1630,7 +1633,7 @@ app.post('/chat/tts', async (req, res) => {
         body: JSON.stringify({
           text,
           model_id: 'eleven_v3',
-          language_code: 'en',
+          language_code: lang,
           voice_settings: { stability: 0.24, similarity_boost: 0.92, style: 0.9, speed: 0.92 }
         })
       });
@@ -2597,7 +2600,7 @@ async function speakOne(text){
   try{
     const r=await fetch('/chat/tts',{method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text:clean})});
+      body:JSON.stringify({text:clean,lang:Math.random()<0.5?'zh':'en'})});
     if(r.ok){
       const blob=await r.blob();
       const url=URL.createObjectURL(blob);
@@ -4666,7 +4669,8 @@ function renderMessage(msg, idx, stagger) {
     var barsH = '';
     for (var bi = 0; bi < 20; bi++) { barsH += '<span data-h="'+(3+Math.floor(Math.random()*13))+'" style="height:'+(3+Math.floor(Math.random()*13))+'px"></span>'; }
     var delay0 = stagger ? 'style="opacity:0;animation:fadeInBubble 0.3s ease 0s forwards"' : '';
-    colHtml += '<div class="voice-msg" id="'+vid+'" data-vtext="'+escHtml(voiceText)+'" onclick="playVoiceBubble(this)" '+delay0+'>';
+    var vl = msg.voiceLang || (Math.random() < 0.5 ? 'zh' : 'en');
+    colHtml += '<div class="voice-msg" id="'+vid+'" data-vtext="'+escHtml(voiceText)+'" data-vlang="'+vl+'" onclick="playVoiceBubble(this)" '+delay0+'>';
     colHtml += '<div class="voice-play"><svg viewBox="0 0 10 12"><polygon points="2,0 10,6 2,12" fill="currentColor"/></svg></div>';
     colHtml += '<div class="voice-bars">' + barsH + '</div>';
     colHtml += '<span class="voice-dur">' + estDur + '\\u2033</span>';
@@ -4721,6 +4725,7 @@ function fetchVoiceTranslation(vid, text) {
 
 async function playVoiceBubble(el) {
   var text = el.getAttribute('data-vtext');
+  var lang = el.getAttribute('data-vlang') || 'en';
   var playBtn = el.querySelector('.voice-play');
   var bars = el.querySelectorAll('.voice-bars span');
   var durEl = el.querySelector('.voice-dur');
@@ -4735,7 +4740,7 @@ async function playVoiceBubble(el) {
   playBtn.innerHTML = '<svg viewBox="0 0 12 12" class="voice-spin"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="14 8"/></svg>';
   try {
     if (!el._blob) {
-      var r = await fetch('/chat/tts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text:text}) });
+      var r = await fetch('/chat/tts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text:text, lang:lang}) });
       if (!r.ok) throw new Error('tts');
       el._blob = await r.blob();
     }
@@ -5045,7 +5050,7 @@ evtSource.onmessage = function(e) {
     if (data.type === 'message' && data.role === 'assistant' && !sending) {
       lastMsgCount++;
       pollKnown++;
-      var replyMsg = {role:'assistant', content: data.content, time: data.time, voice: data.voice};
+      var replyMsg = {role:'assistant', content: data.content, time: data.time, voice: data.voice, voiceLang: data.voiceLang};
       msgContainer.appendChild(renderTime(data.time));
       msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length, true));
       scrollBottom();
@@ -5096,7 +5101,7 @@ document.addEventListener('visibilitychange', function() {
           if (data.type === 'message' && data.role === 'assistant' && !sending) {
             lastMsgCount++;
             pollKnown++;
-            var replyMsg = {role:'assistant', content: data.content, time: data.time, voice: data.voice};
+            var replyMsg = {role:'assistant', content: data.content, time: data.time, voice: data.voice, voiceLang: data.voiceLang};
             msgContainer.appendChild(renderTime(data.time));
             msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length));
             scrollBottom();
