@@ -1635,7 +1635,7 @@ app.post('/chat/tts', async (req, res) => {
           text: paddedText,
           model_id: 'eleven_v3',
           language_code: lang,
-          voice_settings: { stability: 0.48, similarity_boost: 0.90, style: 0.75, speed: 0.90 }
+          voice_settings: { stability: 0.68, similarity_boost: 0.95, style: 0.55, speed: 0.90 }
         })
       });
       if (resp.ok) {
