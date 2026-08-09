@@ -1650,6 +1650,34 @@ app.post('/chat/tts', async (req, res) => {
   res.status(500).json({ error: 'tts failed' });
 });
 
+const _transCache = new Map();
+app.post('/chat/translate', async (req, res) => {
+  const text = (req.body.text || '').trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: 'empty' });
+  if (_transCache.has(text)) return res.json({ ok: true, en: _transCache.get(text) });
+  const cfg = readApiConfig();
+  const key = cfg.api_key || process.env.DEEPSEEK_API_KEY || '';
+  if (!key) return res.status(500).json({ error: 'no api key' });
+  try {
+    const r = await fetch(cfg.api_url || 'https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: cfg.model || 'deepseek-chat',
+        messages: [
+          { role: 'system', content: 'Translate the Chinese text to natural casual English. Output ONLY the translation. Keep it short and natural, like texting.' },
+          { role: 'user', content: text }
+        ],
+        max_tokens: 200, temperature: 0.3
+      })
+    });
+    const d = await r.json();
+    const en = (d.choices?.[0]?.message?.content || '').trim();
+    if (en) { _transCache.set(text, en); if (_transCache.size > 500) _transCache.delete(_transCache.keys().next().value); }
+    res.json({ ok: true, en });
+  } catch (e) { res.status(500).json({ error: 'translate failed' }); }
+});
+
 app.get('/chat', (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.send(`<!DOCTYPE html>
@@ -2536,8 +2564,10 @@ async function drainSpeakQueue(){
   while(speakQueue.length&&callOpen){
     const text=speakQueue.shift();
     const clean=text.replace(/\*[^*]+\*/g,'').trim();
-    callTranscript.innerHTML=esc(clean||text);
+    callTranscript.innerHTML='<div class="call-cn">'+esc(clean||text)+'</div><div class="call-en" style="opacity:0.5;font-size:12px;margin-top:4px">翻译中...</div>';
     setCallState('speaking');
+    fetch('/chat/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:clean||text})})
+      .then(r=>r.json()).then(d=>{if(d.en){var el=callTranscript.querySelector('.call-en');if(el){el.textContent=d.en;el.style.opacity='0.7';}}}).catch(()=>{});
     await speakOne(text);
   }
   speakBusy=false;
@@ -4265,9 +4295,9 @@ body {
 .voice-msg.playing .voice-play { background: var(--accent); }
 .voice-spin { animation: voiceSpin 0.8s linear infinite; }
 @keyframes voiceSpin { to { transform: rotate(360deg); } }
+.voice-bilingual { padding: 4px 0 0; }
 .voice-cn { font-size: 12.5px; color: var(--text-soft); padding: 2px 0; line-height: 1.5; }
-.voice-show-text { font-size: 11px; color: var(--text-faint); cursor: pointer; padding: 2px 0; }
-.voice-show-text:hover { color: var(--text-soft); }
+.voice-en { font-size: 11.5px; color: var(--text-faint); padding: 1px 0; line-height: 1.4; font-style: italic; min-height: 14px; }
 .sheet-overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,.25);
   z-index: 200; opacity: 0; pointer-events: none; transition: opacity .3s;
@@ -4629,8 +4659,10 @@ function renderMessage(msg, idx, stagger) {
     colHtml += '<div class="voice-bars">' + barsH + '</div>';
     colHtml += '<span class="voice-dur">' + estDur + '\\u2033</span>';
     colHtml += '</div>';
-    colHtml += '<div class="voice-cn" id="'+vid+'_cn" style="display:none">' + escHtml(voiceText) + '</div>';
-    colHtml += '<span class="voice-show-text" onclick="toggleVoiceText(\\''+vid+'\\')">\u8F6C\u6587\u5B57</span>';
+    colHtml += '<div class="voice-bilingual" id="'+vid+'_bi">';
+    colHtml += '<div class="voice-cn">' + escHtml(voiceText) + '</div>';
+    colHtml += '<div class="voice-en" id="'+vid+'_en"></div>';
+    colHtml += '</div>';
     lines.forEach(function(line) {
       if (line.startsWith('*') && line.endsWith('*') && line.length > 2) {
         colHtml += '<div class="msg-action">' + escHtml(line.slice(1,-1)) + '</div>';
@@ -4655,29 +4687,37 @@ function renderMessage(msg, idx, stagger) {
   if (stagger && lines.length > 1) {
     setTimeout(function(){ scrollBottom(); }, lines.length * 400 + 100);
   }
+  if (msg.voice && isKe) {
+    var _vid = vid;
+    var _vt = lines.filter(function(l){ return !(l.startsWith('*') && l.endsWith('*') && l.length > 2); }).join(' ');
+    setTimeout(function(){
+      fetchVoiceTranslation(_vid, _vt);
+    }, 100);
+  }
   return group;
 }
 
-function toggleVoiceText(vid) {
-  var el = document.getElementById(vid + '_cn');
-  if (!el) return;
-  var show = el.style.display === 'none';
-  el.style.display = show ? '' : 'none';
-  el._pinned = show;
+function fetchVoiceTranslation(vid, text) {
+  var enEl = document.getElementById(vid + '_en');
+  if (!enEl || enEl.textContent) return;
+  enEl.textContent = '...';
+  fetch('/chat/translate', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text: text})})
+    .then(function(r){return r.json()})
+    .then(function(d){ if(d.en && enEl) enEl.textContent = d.en; else if(enEl) enEl.textContent = ''; })
+    .catch(function(){ if(enEl) enEl.textContent = ''; });
 }
+
 async function playVoiceBubble(el) {
   var text = el.getAttribute('data-vtext');
   var playBtn = el.querySelector('.voice-play');
   var bars = el.querySelectorAll('.voice-bars span');
   var durEl = el.querySelector('.voice-dur');
-  var cnEl = document.getElementById(el.id + '_cn');
   if (el._audio && !el._audio.paused) {
     el._audio.pause(); el._audio.currentTime = 0;
     el.classList.remove('playing');
     playBtn.innerHTML = '<svg viewBox="0 0 10 12"><polygon points="2,0 10,6 2,12" fill="currentColor"/></svg>';
     bars.forEach(function(b){ b.style.height = b.getAttribute('data-h') + 'px'; b.style.background = ''; });
     if (el._raf) cancelAnimationFrame(el._raf);
-    if (cnEl && !cnEl._pinned) cnEl.style.display = 'none';
     return;
   }
   playBtn.innerHTML = '<svg viewBox="0 0 12 12" class="voice-spin"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="14 8"/></svg>';
@@ -4698,10 +4738,8 @@ async function playVoiceBubble(el) {
       playBtn.innerHTML = '<svg viewBox="0 0 10 12"><polygon points="2,0 10,6 2,12" fill="currentColor"/></svg>';
       bars.forEach(function(b){ b.style.height = b.getAttribute('data-h') + 'px'; b.style.background = ''; });
       if (el._raf) cancelAnimationFrame(el._raf);
-      if (cnEl && !cnEl._pinned) cnEl.style.display = 'none';
       URL.revokeObjectURL(url);
     };
-    if (cnEl) cnEl.style.display = '';
     await audio.play();
     el.classList.add('playing');
     playBtn.innerHTML = '<svg viewBox="0 0 10 12"><rect x="1" y="1" width="3" height="10" rx="1" fill="currentColor"/><rect x="6" y="1" width="3" height="10" rx="1" fill="currentColor"/></svg>';
