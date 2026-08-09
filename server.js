@@ -902,6 +902,18 @@ app.get('/auth/status', (req, res) => {
   res.json({ connected: !!auth.access_token, api: !!(cfg.api_key || cfg.anthropic_key) });
 });
 
+const DEPLOY_TOKEN = 'igh1KcpnAfKtPiI_fSmIEIIcBH3ZkKAR';
+app.post('/deploy', (req, res) => {
+  const token = req.body.token || req.query.token;
+  if (token !== DEPLOY_TOKEN) return res.status(403).json({ ok: false, error: 'forbidden' });
+  res.json({ ok: true, msg: 'deploying...' });
+  const { exec } = require('child_process');
+  exec('cd /root/keke && git fetch origin claude/identity-question-em7y21 && git checkout claude/identity-question-em7y21 && git pull origin claude/identity-question-em7y21; bash fix-nginx.sh; systemctl restart keke', { timeout: 30000 }, (err, stdout, stderr) => {
+    console.log('[deploy]', stdout, stderr);
+    if (err) console.error('[deploy error]', err.message);
+  });
+});
+
 app.post('/setup/api', (req, res) => {
   const { key, provider } = req.body;
   if (!key) return res.json({ ok: false, error: 'missing key' });
