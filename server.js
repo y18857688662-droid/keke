@@ -1,6 +1,5 @@
 const express = require('express');
 const http = require('http');
-const { WebSocketServer } = require('ws');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -4609,14 +4608,31 @@ app.post('/email/comeback', async (req, res) => {
 });
 
 const server = http.createServer(app);
-const bridgeWss = new WebSocketServer({ server, path: '/bridge/ws' });
-bridgeWss.on('connection', (ws, req) => {
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+// raw WebSocket for /bridge/ws — no external deps
+server.on('upgrade', (req, socket, head) => {
+  if (req.url !== '/bridge/ws') { socket.destroy(); return; }
+  const key = req.headers['sec-websocket-key'];
+  if (!key) { socket.destroy(); return; }
+  const accept = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-5AB9FC11171A').digest('base64');
+  socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
+  const ip = req.headers['x-forwarded-for'] || socket.remoteAddress;
   console.log('[bridge] client connected from ' + ip);
-  bridgeClient = ws;
-  ws.on('close', () => { console.log('[bridge] client disconnected'); if (bridgeClient === ws) bridgeClient = null; });
-  ws.on('error', (e) => { console.log('[bridge] ws error: ' + e.message); if (bridgeClient === ws) bridgeClient = null; });
-  ws.send(JSON.stringify({ type: 'hello', msg: 'bridge relay ready' }));
+
+  function wsSend(obj) {
+    const data = Buffer.from(JSON.stringify(obj));
+    const frame = Buffer.alloc(2 + (data.length > 125 ? 2 : 0) + data.length);
+    frame[0] = 0x81;
+    if (data.length > 125) { frame[1] = 126; frame.writeUInt16BE(data.length, 2); data.copy(frame, 4); }
+    else { frame[1] = data.length; data.copy(frame, 2); }
+    socket.write(frame);
+  }
+
+  bridgeClient = { send: wsSend, readyState: 1, _socket: socket };
+  wsSend({ type: 'hello', msg: 'bridge relay ready' });
+
+  socket.on('close', () => { console.log('[bridge] client disconnected'); if (bridgeClient && bridgeClient._socket === socket) bridgeClient = null; });
+  socket.on('error', (e) => { console.log('[bridge] ws error: ' + e.message); if (bridgeClient && bridgeClient._socket === socket) bridgeClient = null; });
 });
 
 server.listen(PORT, async () => {
