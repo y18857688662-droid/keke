@@ -1499,6 +1499,18 @@ app.get('/chat/history', (req, res) => {
   res.json({ messages: chat });
 });
 
+app.post('/chat/delete-msg', (req, res) => {
+  const { token, match } = req.body;
+  if (token !== 'igh1KcpnAfKtPiI_fSmIEIIcBH3ZkKAR') return res.status(403).json({ error: 'forbidden' });
+  if (!match) return res.status(400).json({ error: 'missing match' });
+  const chat = readChat();
+  const before = chat.length;
+  const filtered = chat.filter(m => !m.content?.includes(match));
+  if (filtered.length === before) return res.json({ ok: true, removed: 0 });
+  writeChat(filtered);
+  res.json({ ok: true, removed: before - filtered.length });
+});
+
 let userPresence = { status: 'offline', since: Date.now(), lastSeen: Date.now(), awaySeconds: 0 };
 
 app.post('/chat/presence', (req, res) => {
