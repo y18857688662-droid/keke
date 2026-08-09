@@ -1,4 +1,6 @@
 const express = require('express');
+const http = require('http');
+const { WebSocketServer } = require('ws');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -3747,40 +3749,38 @@ app.get('/scan.py', (req, res) => {
   res.type('text/plain; charset=utf-8').send(require('fs').readFileSync(__dirname + '/scan.py', 'utf8'));
 });
 
-// === 蓝牙桥中继 ===
-const BRIDGE_PHONE_URL = process.env.BRIDGE_PHONE_URL || 'http://45.76.172.191:9587';
-let bridgeTarget = BRIDGE_PHONE_URL;
+// === 蓝牙桥中继 (内嵌 WebSocket) ===
+let bridgeClient = null;
+let bridgeLastCmd = null;
 
-app.post('/bridge/command', async (req, res) => {
-  const { type, intensity } = req.body || {};
+app.post('/bridge/command', (req, res) => {
+  const { type, intensity, mode, level } = req.body || {};
   if (!type) return res.status(400).json({ error: 'missing type' });
-  if (type === 'intensity' && (intensity === undefined || intensity < 0 || intensity > 180)) {
-    return res.status(400).json({ error: 'intensity must be 0-180' });
+  let cmd;
+  if (type === 'stop') cmd = { type: 'stop' };
+  else if (type === 'intensity') {
+    const v = Number(intensity);
+    if (!Number.isFinite(v) || v < 0 || v > 180) return res.status(400).json({ error: 'intensity must be 0-180' });
+    cmd = { type: 'intensity', intensity: v };
+  } else if (type === 'pattern') {
+    cmd = { type: 'pattern', mode: Number(mode) || 1, level: Number(level) || 1 };
+  } else {
+    return res.status(400).json({ error: 'unknown type' });
   }
-  const payload = type === 'stop' ? { type: 'stop' } : { type, intensity: Number(intensity) };
-  try {
-    const r = await fetch(bridgeTarget + '/command', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(5000)
-    });
-    const data = await r.text();
-    res.json({ ok: true, target: bridgeTarget, response: data });
-  } catch (e) {
-    res.status(502).json({ error: 'bridge unreachable', target: bridgeTarget, detail: e.message });
+  bridgeLastCmd = cmd;
+  if (bridgeClient && bridgeClient.readyState === 1) {
+    bridgeClient.send(JSON.stringify(cmd));
+    res.json({ ok: true, delivered: true });
+  } else {
+    res.status(503).json({ ok: false, error: 'no client connected' });
   }
 });
 
 app.get('/bridge/status', (req, res) => {
-  res.json({ target: bridgeTarget });
-});
-
-app.post('/bridge/target', (req, res) => {
-  const { url } = req.body || {};
-  if (!url) return res.status(400).json({ error: 'missing url' });
-  bridgeTarget = url;
-  res.json({ ok: true, target: bridgeTarget });
+  res.json({
+    client: bridgeClient && bridgeClient.readyState === 1 ? 'connected' : 'disconnected',
+    lastCmd: bridgeLastCmd
+  });
 });
 app.get('/runbook', (req, res) => {
   try {
@@ -4608,7 +4608,18 @@ app.post('/email/comeback', async (req, res) => {
   }
 });
 
-app.listen(PORT, async () => {
+const server = http.createServer(app);
+const bridgeWss = new WebSocketServer({ server, path: '/bridge/ws' });
+bridgeWss.on('connection', (ws, req) => {
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  console.log('[bridge] client connected from ' + ip);
+  bridgeClient = ws;
+  ws.on('close', () => { console.log('[bridge] client disconnected'); if (bridgeClient === ws) bridgeClient = null; });
+  ws.on('error', (e) => { console.log('[bridge] ws error: ' + e.message); if (bridgeClient === ws) bridgeClient = null; });
+  ws.send(JSON.stringify({ type: 'hello', msg: 'bridge relay ready' }));
+});
+
+server.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   buildMissYouPlan();
   let auth = readAuth();
