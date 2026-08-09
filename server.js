@@ -4266,6 +4266,8 @@ body {
 .voice-spin { animation: voiceSpin 0.8s linear infinite; }
 @keyframes voiceSpin { to { transform: rotate(360deg); } }
 .voice-cn { font-size: 12.5px; color: var(--text-soft); padding: 2px 0; line-height: 1.5; }
+.voice-show-text { font-size: 11px; color: var(--text-faint); cursor: pointer; padding: 2px 0; }
+.voice-show-text:hover { color: var(--text-soft); }
 .sheet-overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,.25);
   z-index: 200; opacity: 0; pointer-events: none; transition: opacity .3s;
@@ -4627,7 +4629,8 @@ function renderMessage(msg, idx, stagger) {
     colHtml += '<div class="voice-bars">' + barsH + '</div>';
     colHtml += '<span class="voice-dur">' + estDur + '\\u2033</span>';
     colHtml += '</div>';
-    colHtml += '<div class="voice-cn">' + escHtml(voiceText) + '</div>';
+    colHtml += '<div class="voice-cn" id="'+vid+'_cn" style="display:none">' + escHtml(voiceText) + '</div>';
+    colHtml += '<span class="voice-show-text" onclick="toggleVoiceText(\\''+vid+'\\')">\u8F6C\u6587\u5B57</span>';
     lines.forEach(function(line) {
       if (line.startsWith('*') && line.endsWith('*') && line.length > 2) {
         colHtml += '<div class="msg-action">' + escHtml(line.slice(1,-1)) + '</div>';
@@ -4655,17 +4658,26 @@ function renderMessage(msg, idx, stagger) {
   return group;
 }
 
+function toggleVoiceText(vid) {
+  var el = document.getElementById(vid + '_cn');
+  if (!el) return;
+  var show = el.style.display === 'none';
+  el.style.display = show ? '' : 'none';
+  el._pinned = show;
+}
 async function playVoiceBubble(el) {
   var text = el.getAttribute('data-vtext');
   var playBtn = el.querySelector('.voice-play');
   var bars = el.querySelectorAll('.voice-bars span');
   var durEl = el.querySelector('.voice-dur');
+  var cnEl = document.getElementById(el.id + '_cn');
   if (el._audio && !el._audio.paused) {
     el._audio.pause(); el._audio.currentTime = 0;
     el.classList.remove('playing');
     playBtn.innerHTML = '<svg viewBox="0 0 10 12"><polygon points="2,0 10,6 2,12" fill="currentColor"/></svg>';
     bars.forEach(function(b){ b.style.height = b.getAttribute('data-h') + 'px'; b.style.background = ''; });
     if (el._raf) cancelAnimationFrame(el._raf);
+    if (cnEl && !cnEl._pinned) cnEl.style.display = 'none';
     return;
   }
   playBtn.innerHTML = '<svg viewBox="0 0 12 12" class="voice-spin"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="14 8"/></svg>';
@@ -4686,8 +4698,10 @@ async function playVoiceBubble(el) {
       playBtn.innerHTML = '<svg viewBox="0 0 10 12"><polygon points="2,0 10,6 2,12" fill="currentColor"/></svg>';
       bars.forEach(function(b){ b.style.height = b.getAttribute('data-h') + 'px'; b.style.background = ''; });
       if (el._raf) cancelAnimationFrame(el._raf);
+      if (cnEl && !cnEl._pinned) cnEl.style.display = 'none';
       URL.revokeObjectURL(url);
     };
+    if (cnEl) cnEl.style.display = '';
     await audio.play();
     el.classList.add('playing');
     playBtn.innerHTML = '<svg viewBox="0 0 10 12"><rect x="1" y="1" width="3" height="10" rx="1" fill="currentColor"/><rect x="6" y="1" width="3" height="10" rx="1" fill="currentColor"/></svg>';
