@@ -1393,7 +1393,8 @@ app.post('/chat/reply', (req, res) => {
   chat.forEach(m => { if (m.pending) delete m.pending; });
   const _cb = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const _tl = _cb.split(/\n+/).map(l=>l.trim()).filter(l=>l&&!(l.startsWith('*')&&l.endsWith('*'))).join('');
-  const isVoice = _tl.length >= 4 && _tl.length <= 120 && !reply.includes('[图片]') && Math.random() < 0.28;
+  const _vChance = 0.12 + Math.random() * 0.26;
+  const isVoice = _tl.length >= 4 && _tl.length <= 120 && !reply.includes('[图片]') && Math.random() < _vChance;
   const entry = { role: 'assistant', content: reply, time };
   if (isVoice) entry.voice = true;
   chat.push(entry);
@@ -1405,11 +1406,16 @@ app.post('/chat/reply', (req, res) => {
   const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
   if (sseClients.size === 0) {
     (async () => {
-      for (const line of lines) {
-        const isAction = line.startsWith('*') && line.endsWith('*');
-        const text = isAction ? line.slice(1, -1) : line;
-        await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
-        if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+      if (isVoice) {
+        const vText = lines.filter(l => !(l.startsWith('*') && l.endsWith('*'))).join(' ');
+        await sendPushNotification('🎙 克', '[语音] ' + vText.slice(0, 80));
+      } else {
+        for (const line of lines) {
+          const isAction = line.startsWith('*') && line.endsWith('*');
+          const text = isAction ? line.slice(1, -1) : line;
+          await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+          if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+        }
       }
     })().catch(() => {});
   }
@@ -1436,7 +1442,8 @@ app.post('/chat/proactive', (req, res) => {
   const chat = readChat();
   const _cb2 = message.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const _tl2 = _cb2.split(/\n+/).map(l=>l.trim()).filter(l=>l&&!(l.startsWith('*')&&l.endsWith('*'))).join('');
-  const isVoice2 = forceVoice === true ? true : (_tl2.length >= 4 && _tl2.length <= 100 && !message.includes('[图片]') && Math.random() < 0.25);
+  const _vChance2 = 0.12 + Math.random() * 0.26;
+  const isVoice2 = forceVoice === true ? true : (_tl2.length >= 4 && _tl2.length <= 120 && !message.includes('[图片]') && Math.random() < _vChance2);
   const entry2 = { role: 'assistant', content: message, time };
   if (isVoice2) entry2.voice = true;
   chat.push(entry2);
@@ -1448,11 +1455,16 @@ app.post('/chat/proactive', (req, res) => {
   const lines = cleanMsg.split(/\n+/).map(l => l.trim()).filter(l => l);
   if (sseClients.size === 0) {
     (async () => {
-      for (const line of lines) {
-        const isAction = line.startsWith('*') && line.endsWith('*');
-        const text = isAction ? line.slice(1, -1) : line;
-        await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
-        if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+      if (isVoice2) {
+        const vText = lines.filter(l => !(l.startsWith('*') && l.endsWith('*'))).join(' ');
+        await sendPushNotification('🎙 克', '[语音] ' + vText.slice(0, 80));
+      } else {
+        for (const line of lines) {
+          const isAction = line.startsWith('*') && line.endsWith('*');
+          const text = isAction ? line.slice(1, -1) : line;
+          await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+          if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+        }
       }
     })().catch(() => {});
   }
@@ -4253,9 +4265,7 @@ body {
 .voice-msg.playing .voice-play { background: var(--accent); }
 .voice-spin { animation: voiceSpin 0.8s linear infinite; }
 @keyframes voiceSpin { to { transform: rotate(360deg); } }
-.voice-show-text { font-size: 11px; color: var(--text-faint); cursor: pointer; padding: 2px 0; }
-.voice-show-text:hover { color: var(--text-soft); }
-.voice-text-reveal .msg-bubble { font-size: 13px; color: var(--text-soft); background: transparent; padding: 2px 0; }
+.voice-cn { font-size: 12.5px; color: var(--text-soft); padding: 2px 0; line-height: 1.5; }
 .sheet-overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,.25);
   z-index: 200; opacity: 0; pointer-events: none; transition: opacity .3s;
@@ -4617,8 +4627,7 @@ function renderMessage(msg, idx, stagger) {
     colHtml += '<div class="voice-bars">' + barsH + '</div>';
     colHtml += '<span class="voice-dur">' + estDur + '\\u2033</span>';
     colHtml += '</div>';
-    colHtml += '<div class="voice-text-reveal" id="'+vid+'_text" style="display:none"><div class="msg-bubble">' + escHtml(voiceText) + '</div></div>';
-    colHtml += '<span class="voice-show-text" onclick="toggleVoiceText(\\'' + vid + '\\')">\u8F6C\u6587\u5B57</span>';
+    colHtml += '<div class="voice-cn">' + escHtml(voiceText) + '</div>';
     lines.forEach(function(line) {
       if (line.startsWith('*') && line.endsWith('*') && line.length > 2) {
         colHtml += '<div class="msg-action">' + escHtml(line.slice(1,-1)) + '</div>';
@@ -4646,13 +4655,6 @@ function renderMessage(msg, idx, stagger) {
   return group;
 }
 
-function toggleVoiceText(vid) {
-  var el = document.getElementById(vid + '_text');
-  var btn = el.previousElementSibling ? null : null;
-  if (!el) return;
-  if (el.style.display === 'none') { el.style.display = ''; }
-  else { el.style.display = 'none'; }
-}
 async function playVoiceBubble(el) {
   var text = el.getAttribute('data-vtext');
   var playBtn = el.querySelector('.voice-play');
