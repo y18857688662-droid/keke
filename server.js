@@ -3855,6 +3855,42 @@ app.get('/bridge-vps.apk', (req, res) => {
 app.get('/scan.py', (req, res) => {
   res.type('text/plain; charset=utf-8').send(require('fs').readFileSync(__dirname + '/scan.py', 'utf8'));
 });
+
+// === 蓝牙桥中继 ===
+const BRIDGE_PHONE_URL = process.env.BRIDGE_PHONE_URL || 'http://45.76.172.191:9587';
+let bridgeTarget = BRIDGE_PHONE_URL;
+
+app.post('/bridge/command', async (req, res) => {
+  const { type, intensity } = req.body || {};
+  if (!type) return res.status(400).json({ error: 'missing type' });
+  if (type === 'intensity' && (intensity === undefined || intensity < 0 || intensity > 180)) {
+    return res.status(400).json({ error: 'intensity must be 0-180' });
+  }
+  const payload = type === 'stop' ? { type: 'stop' } : { type, intensity: Number(intensity) };
+  try {
+    const r = await fetch(bridgeTarget + '/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(5000)
+    });
+    const data = await r.text();
+    res.json({ ok: true, target: bridgeTarget, response: data });
+  } catch (e) {
+    res.status(502).json({ error: 'bridge unreachable', target: bridgeTarget, detail: e.message });
+  }
+});
+
+app.get('/bridge/status', (req, res) => {
+  res.json({ target: bridgeTarget });
+});
+
+app.post('/bridge/target', (req, res) => {
+  const { url } = req.body || {};
+  if (!url) return res.status(400).json({ error: 'missing url' });
+  bridgeTarget = url;
+  res.json({ ok: true, target: bridgeTarget });
+});
 app.get('/runbook', (req, res) => {
   try {
     res.type('text/plain; charset=utf-8').send(require('fs').readFileSync(__dirname + '/RUNBOOK.md', 'utf8'));
