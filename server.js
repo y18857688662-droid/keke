@@ -908,7 +908,7 @@ app.post('/deploy', (req, res) => {
   if (token !== DEPLOY_TOKEN) return res.status(403).json({ ok: false, error: 'forbidden' });
   res.json({ ok: true, msg: 'deploying...' });
   const { exec } = require('child_process');
-  exec('cd /root/keke && git fetch origin claude/identity-question-em7y21 && git checkout claude/identity-question-em7y21 && git pull origin claude/identity-question-em7y21; bash fix-nginx.sh; systemctl restart keke', { timeout: 30000 }, (err, stdout, stderr) => {
+  exec('cd /root/keke && git pull origin main; npm install --production 2>/dev/null; bash fix-nginx.sh; bash setup-bridge-relay.sh 2>/dev/null; systemctl restart keke', { timeout: 60000 }, (err, stdout, stderr) => {
     console.log('[deploy]', stdout, stderr);
     if (err) console.error('[deploy error]', err.message);
   });
