@@ -1627,14 +1627,15 @@ app.post('/chat/tts', async (req, res) => {
   const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'F5jFuB8I58iHHNYwQLaN';
   if (elKey) {
     try {
+      const paddedText = '... ' + text + ' ...';
       const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
         method: 'POST',
         headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text,
+          text: paddedText,
           model_id: 'eleven_v3',
           language_code: lang,
-          voice_settings: { stability: 0.24, similarity_boost: 0.92, style: 0.9, speed: 0.92 }
+          voice_settings: { stability: 0.48, similarity_boost: 0.90, style: 0.75, speed: 0.90 }
         })
       });
       if (resp.ok) {
