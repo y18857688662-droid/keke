@@ -1393,7 +1393,7 @@ app.post('/chat/reply', (req, res) => {
   chat.forEach(m => { if (m.pending) delete m.pending; });
   const _cb = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const _tl = _cb.split(/\n+/).map(l=>l.trim()).filter(l=>l&&!(l.startsWith('*')&&l.endsWith('*'))).join('');
-  const isVoice = _tl.length >= 4 && _tl.length <= 100 && !reply.includes('[图片]') && Math.random() < 0.22;
+  const isVoice = _tl.length >= 4 && _tl.length <= 120 && !reply.includes('[图片]') && Math.random() < 0.28;
   const entry = { role: 'assistant', content: reply, time };
   if (isVoice) entry.voice = true;
   chat.push(entry);
@@ -1429,14 +1429,14 @@ app.post('/chat/typing', (req, res) => {
 });
 
 app.post('/chat/proactive', (req, res) => {
-  const { message } = req.body;
+  const { message, voice: forceVoice } = req.body;
   if (!message) return res.json({ ok: false });
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(0, 16).replace('T', ' ');
   const chat = readChat();
   const _cb2 = message.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const _tl2 = _cb2.split(/\n+/).map(l=>l.trim()).filter(l=>l&&!(l.startsWith('*')&&l.endsWith('*'))).join('');
-  const isVoice2 = _tl2.length >= 4 && _tl2.length <= 100 && !message.includes('[图片]') && Math.random() < 0.22;
+  const isVoice2 = forceVoice === true ? true : (_tl2.length >= 4 && _tl2.length <= 100 && !message.includes('[图片]') && Math.random() < 0.25);
   const entry2 = { role: 'assistant', content: message, time };
   if (isVoice2) entry2.voice = true;
   chat.push(entry2);
@@ -4234,9 +4234,12 @@ body {
 @keyframes fadeInBubble { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
 .voice-msg {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 13px; border-radius: var(--radius);
+  padding: 10px 14px; border-radius: var(--radius);
   background: var(--bubble-ke); cursor: pointer; width: fit-content;
+  min-width: 140px; user-select: none; -webkit-user-select: none;
+  transition: background 0.2s;
 }
+.voice-msg:active { background: var(--border); }
 .msg-group.yao .voice-msg { align-self: flex-end; }
 .voice-play {
   width: 20px; height: 20px; border-radius: 50%;
