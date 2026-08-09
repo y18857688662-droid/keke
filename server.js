@@ -1600,14 +1600,13 @@ app.post('/chat/tts', async (req, res) => {
   const elVoice = cfg.elevenlabs_voice || process.env.ELEVENLABS_VOICE || 'F5jFuB8I58iHHNYwQLaN';
   if (elKey) {
     try {
-      const isEnglish = /^[a-zA-Z\s\d.,!?'";\-:()\[\]]+$/.test(text.replace(/\[.*?\]/g, '').trim());
       const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
         method: 'POST',
         headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
           model_id: 'eleven_v3',
-          language_code: isEnglish ? 'en' : 'zh',
+          language_code: 'en',
           voice_settings: { stability: 0.24, similarity_boost: 0.92, style: 0.9, speed: 0.92 }
         })
       });
