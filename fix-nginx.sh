@@ -1,8 +1,10 @@
 #!/bin/bash
 # Best-effort nginx fixes — always exits 0 so deploy continues
 (
-  # body size
-  if ! grep -q client_max_body_size /etc/nginx/nginx.conf 2>/dev/null; then
+  # body size — remove duplicate if conf.d already has it
+  if grep -rq client_max_body_size /etc/nginx/conf.d/ 2>/dev/null; then
+    sed -i '/client_max_body_size/d' /etc/nginx/nginx.conf 2>/dev/null
+  elif ! grep -q client_max_body_size /etc/nginx/nginx.conf 2>/dev/null; then
     LINE=$(grep -n 'http' /etc/nginx/nginx.conf 2>/dev/null | grep '{' | head -1 | cut -d: -f1)
     if [ -n "$LINE" ]; then
       sed -i "${LINE}a\\    client_max_body_size 100m;" /etc/nginx/nginx.conf
