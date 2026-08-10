@@ -267,7 +267,7 @@ app.get('/ping', async (req, res) => {
   const pings = readPings();
   pings.push(time);
   writePings(pings);
-  res.json({ ok: true, time, v: '20260810b' });
+  res.json({ ok: true, time, v: '20260810c' });
   let msg = '';
   const orKey = process.env.OPENROUTER_API_KEY || '';
   if (orKey) {
@@ -2696,6 +2696,10 @@ body {
 @keyframes voiceWave { from { transform: scaleY(0.5); } to { transform: scaleY(1.3); } }
 .voice-text-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 24px; }
 .voice-text-box { background: var(--surface); color: var(--text); border-radius: 16px; padding: 20px 24px; max-width: 320px; font-size: 15px; line-height: 1.6; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
+.voice-wrap { display: flex; flex-direction: column; align-items: flex-start; max-width: 260px; }
+.voice-wrap-human { align-items: flex-end; margin-left: auto; }
+.voice-to-text { font-size: 12px; color: var(--text-secondary, #888); margin-top: 4px; padding: 2px 0; cursor: pointer; }
+.voice-text-content { font-size: 14px; line-height: 1.5; color: var(--text); margin-top: 6px; padding: 8px 12px; background: var(--surface, #f5f5f5); border-radius: 10px; word-break: break-word; }
 .sheet-overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,.25);
   z-index: 200; opacity: 0; pointer-events: none; transition: opacity .3s;
@@ -3033,6 +3037,14 @@ function voiceTouchStart(el, b64) {
 function voiceTouchEnd() {
   if (_voiceLongTimer) { clearTimeout(_voiceLongTimer); _voiceLongTimer = null; }
 }
+function toggleVoiceText(el, b64) {
+  var box = el.nextElementSibling;
+  if (box.style.display !== 'none') { box.style.display = 'none'; el.textContent = '转文字'; return; }
+  var text = decodeURIComponent(atob(b64));
+  box.textContent = text;
+  box.style.display = 'block';
+  el.textContent = '收起';
+}
 
 function renderMessage(msg, idx, stagger) {
   var isKe = msg.role === 'assistant';
@@ -3084,10 +3096,14 @@ function renderMessage(msg, idx, stagger) {
     var vBars = '';
     for (var vb = 0; vb < 18; vb++) { var vh = 4 + Math.floor(Math.random() * 14); vBars += '<span style="height:'+vh+'px"></span>'; }
     var vB64 = btoa(encodeURIComponent(vText));
-    colHtml += '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" onclick="playVoice(this,\\''+vB64+'\\')\" ontouchstart="voiceTouchStart(this,\\''+vB64+'\\')\" ontouchend="voiceTouchEnd()" ontouchcancel="voiceTouchEnd()">'
+    colHtml += '<div class="voice-wrap' + (isKe ? '' : ' voice-wrap-human') + '">'
+      + '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" onclick="playVoice(this,\\''+vB64+'\\')\">'
       + '<div class="voice-play"><svg viewBox="0 0 10 12" fill="currentColor"><polygon points="1,0 10,6 1,12"/></svg></div>'
       + '<div class="voice-bars">' + vBars + '</div>'
       + '<span class="voice-dur">' + vDur + '&Prime;</span>'
+      + '</div>'
+      + '<div class="voice-to-text" onclick="toggleVoiceText(this,\\''+vB64+'\\')">\u8F6C\u6587\u5B57</div>'
+      + '<div class="voice-text-content" style="display:none"></div>'
       + '</div>';
   } else {
   var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l && !(msg.image && l === '[图片]')});
