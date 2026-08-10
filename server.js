@@ -2689,6 +2689,11 @@ body {
 .voice-bars span { width: 2px; border-radius: 1px; background: var(--voice-bar); }
 .voice-dur { font-size: 11px; color: var(--text-soft); margin-left: 2px; font-variant-numeric: tabular-nums; }
 .voice-human { background: var(--bubble-yao); margin-left: auto; }
+.voice-msg.playing .voice-play { background: var(--accent); }
+.voice-msg.playing .voice-bars span { animation: voiceWave 0.6s ease-in-out infinite alternate; }
+.voice-msg.playing .voice-bars span:nth-child(odd) { animation-delay: 0.15s; }
+.voice-msg.playing .voice-bars span:nth-child(3n) { animation-delay: 0.3s; }
+@keyframes voiceWave { from { transform: scaleY(0.5); } to { transform: scaleY(1.3); } }
 .sheet-overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,.25);
   z-index: 200; opacity: 0; pointer-events: none; transition: opacity .3s;
@@ -2991,6 +2996,23 @@ document.addEventListener('click', function(e) {
 });
 
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+var _voicePlaying = null;
+function playVoice(el, b64) {
+  var text = decodeURIComponent(atob(b64));
+  if (_voicePlaying) { _voicePlaying.pause(); _voicePlaying = null; el.classList.remove('playing'); return; }
+  el.classList.add('playing');
+  fetch('/chat/tts', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({text: text}) })
+    .then(function(r) { if (!r.ok) throw new Error('tts failed'); return r.blob(); })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = new Audio(url);
+      _voicePlaying = a;
+      a.onended = function() { el.classList.remove('playing'); _voicePlaying = null; URL.revokeObjectURL(url); };
+      a.onerror = function() { el.classList.remove('playing'); _voicePlaying = null; };
+      a.play().catch(function() { el.classList.remove('playing'); _voicePlaying = null; });
+    })
+    .catch(function() { el.classList.remove('playing'); });
+}
 
 function renderMessage(msg, idx, stagger) {
   var isKe = msg.role === 'assistant';
@@ -3041,7 +3063,7 @@ function renderMessage(msg, idx, stagger) {
     var vDur = Math.max(2, Math.min(Math.ceil(vText.length / 4), 60));
     var vBars = '';
     for (var vb = 0; vb < 18; vb++) { var vh = 4 + Math.floor(Math.random() * 14); vBars += '<span style="height:'+vh+'px"></span>'; }
-    colHtml += '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" title="' + escHtml(vText) + '">'
+    colHtml += '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" title="' + escHtml(vText) + '" onclick="playVoice(this,\\''+btoa(encodeURIComponent(vText))+'\\')\">'
       + '<div class="voice-play"><svg viewBox="0 0 10 12" fill="currentColor"><polygon points="1,0 10,6 1,12"/></svg></div>'
       + '<div class="voice-bars">' + vBars + '</div>'
       + '<span class="voice-dur">' + vDur + '&Prime;</span>'
