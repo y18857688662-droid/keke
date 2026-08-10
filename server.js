@@ -3035,6 +3035,18 @@ function renderMessage(msg, idx, stagger) {
     var fn2 = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\\'a\\');a.href=\\''+msg.fileUrl+'\\';a.download=\\''+escHtml(msg.filename||'file')+'\\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn2 + '</div>';
   }
+  var voiceRe = content.match(/^\\[voice\\]\\s*/i);
+  if (voiceRe) {
+    var vText = content.slice(voiceRe[0].length).trim();
+    var vDur = Math.max(2, Math.min(Math.ceil(vText.length / 4), 60));
+    var vBars = '';
+    for (var vb = 0; vb < 18; vb++) { var vh = 4 + Math.floor(Math.random() * 14); vBars += '<span style="height:'+vh+'px"></span>'; }
+    colHtml += '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" title="' + escHtml(vText) + '">'
+      + '<div class="voice-play"><svg viewBox="0 0 10 12" fill="currentColor"><polygon points="1,0 10,6 1,12"/></svg></div>'
+      + '<div class="voice-bars">' + vBars + '</div>'
+      + '<span class="voice-dur">' + vDur + '&Prime;</span>'
+      + '</div>';
+  } else {
   var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l && !(msg.image && l === '[图片]')});
   var bubbleIdx = 0;
   lines.forEach(function(line) {
@@ -3049,6 +3061,7 @@ function renderMessage(msg, idx, stagger) {
     }
     bubbleIdx++;
   });
+  }
   colHtml += '</div>';
   group.innerHTML = avaHtml + colHtml;
   if (stagger && lines.length > 1) {
