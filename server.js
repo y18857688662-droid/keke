@@ -3787,9 +3787,9 @@ app.get('/bridge/status', (req, res) => {
 app.get('/bridge/poll', (req, res) => {
   const since = Number(req.query.since) || 0;
   if (bridgeLastCmd && bridgeLastCmdTs > since) {
-    res.json({ cmd: bridgeLastCmd, ts: bridgeLastCmdTs });
+    res.json({ ...bridgeLastCmd, ts: bridgeLastCmdTs });
   } else {
-    res.json({ cmd: null, ts: bridgeLastCmdTs });
+    res.json({ ts: bridgeLastCmdTs });
   }
 });
 app.get('/runbook', (req, res) => {
