@@ -1343,6 +1343,16 @@ app.get('/chat/history', (req, res) => {
   res.json({ messages: chat.slice(-50) });
 });
 
+app.get('/chat/archive', (req, res) => {
+  const chat = readChat();
+  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+  const before = req.query.before !== undefined ? parseInt(req.query.before) : chat.length - 50;
+  const end = Math.max(0, before);
+  const start = Math.max(0, end - limit);
+  const msgs = chat.slice(start, end);
+  res.json({ messages: msgs, remaining: start });
+});
+
 function addAudioTags(text) {
   return text;
 }
