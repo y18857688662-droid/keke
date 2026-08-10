@@ -321,6 +321,11 @@ app.post('/pat/stop', async (req, res) => {
   try { const r = await tuya.patStop(); res.json({ ok: true, result: r }); }
   catch (e) { res.json({ ok: false, error: e.message }); }
 });
+app.post('/pat/tap', async (req, res) => {
+  const key = req.query.key || 'pat';
+  try { const r = await tuya.sendKey(key); res.json({ ok: true, result: r }); }
+  catch (e) { res.json({ ok: false, error: e.message }); }
+});
 
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
