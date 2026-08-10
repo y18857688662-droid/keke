@@ -859,6 +859,16 @@ app.get('/memory/tools', async (req, res) => {
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
+app.get('/memory/diag', async (req, res) => {
+  try {
+    const r = await fetch(`${OMBRE_URL}/health`, { signal: AbortSignal.timeout(5000) });
+    const text = await r.text();
+    res.json({ ok: true, ombre_url: OMBRE_URL, health: text.slice(0, 500) });
+  } catch (e) {
+    res.json({ ok: false, ombre_url: OMBRE_URL, error: e.message });
+  }
+});
+
 // === 聊天 ===
 const CHAT_FILE = path.join(__dirname, 'chat.json');
 const CHAT_SYSTEM_BASE = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
