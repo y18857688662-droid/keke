@@ -36,7 +36,7 @@ const AUTH_FILE = path.join(__dirname, 'ombre_auth.json');
 
 const OMBRE_URL = 'http://127.0.0.1:18001';
 const OMBRE_CLIENT_ID = 'D0QB90mzcLjuIVpV6JxEqA';
-const OMBRE_REDIRECT = 'https://keke-production.up.railway.app/auth/callback';
+const OMBRE_REDIRECT = 'https://yyaokeke.top/auth/callback';
 
 function readAuth() {
   try { return JSON.parse(fs.readFileSync(AUTH_FILE, 'utf8')); }
@@ -2563,7 +2563,7 @@ app.get('/auth/url', (req, res) => {
 
 app.get('/vps-auth.sh', (req, res) => {
   res.type('text/plain').send(`#!/bin/bash
-KEKE="https://keke-production.up.railway.app"
+KEKE="https://yyaokeke.top"
 
 # Clear old data
 curl -s -X POST "$KEKE/auth/code" -H 'Content-Type: application/json' -d '{"code":""}' > /dev/null 2>&1
@@ -2589,7 +2589,7 @@ import pty, os, sys, time, select, subprocess, json, re
 
 def get_code():
     try:
-        r = subprocess.run(['curl', '-s', 'https://keke-production.up.railway.app/auth/code'],
+        r = subprocess.run(['curl', '-s', 'https://yyaokeke.top/auth/code'],
                           capture_output=True, text=True, timeout=5)
         d = json.loads(r.stdout)
         return d.get('code', '')
@@ -2599,7 +2599,7 @@ def get_code():
 def post_url(url):
     try:
         subprocess.run(['curl', '-s', '-X', 'POST',
-                       'https://keke-production.up.railway.app/auth/url',
+                       'https://yyaokeke.top/auth/url',
                        '-H', 'Content-Type: application/json',
                        '-d', json.dumps({'url': url})],
                       capture_output=True, timeout=5)
@@ -2650,7 +2650,7 @@ try:
                         url = m.group(1)
                         post_url(url)
                         url_sent = True
-                        os.write(sys.stdout.fileno(), b'\\r\\n>>> URL sent to relay! Open https://keke-production.up.railway.app/auth on phone\\r\\n')
+                        os.write(sys.stdout.fileno(), b'\\r\\n>>> URL sent to relay! Open https://yyaokeke.top/auth on phone\\r\\n')
 
                 if not code_sent and b'Paste code' in buf:
                     os.write(sys.stdout.fileno(), b'\\r\\n>>> Waiting for code from relay...\\r\\n')
@@ -2951,7 +2951,7 @@ app.post('/tg/webhook', async (req, res) => {
 });
 
 async function setupTgWebhook() {
-  const url = 'https://keke-production.up.railway.app/tg/webhook';
+  const url = 'https://yyaokeke.top/tg/webhook';
   try {
     const r = await fetch(`${TG_API}/setWebhook`, {
       method: 'POST',
