@@ -12,7 +12,6 @@
   # WebSocket upgrade for /bridge/ws
   SITE=$(ls /etc/nginx/sites-enabled/ 2>/dev/null | head -1)
   if [ -n "$SITE" ] && ! grep -q 'bridge/ws' "/etc/nginx/sites-enabled/$SITE" 2>/dev/null; then
-    # insert before the last closing brace of the server block
     sed -i '/location \/ {/i\
     location /bridge/ws {\
         proxy_pass http://127.0.0.1:8080;\
@@ -27,9 +26,19 @@
 
   nginx -t 2>/dev/null && nginx -s reload 2>/dev/null
 
-  # ensure ombre-brain is running
+  # ensure ombre-brain is installed and running
+  if [ ! -d /root/ombre-brain ]; then
+    cd /root && git clone https://github.com/y18857688662-droid/Ombre-Brain.git ombre-brain 2>/dev/null || true
+    if [ -d /root/ombre-brain ]; then
+      cd /root/ombre-brain
+      python3 -m venv venv 2>/dev/null || true
+      /root/ombre-brain/venv/bin/pip install -r requirements.txt 2>/dev/null || true
+      cp config.example.yaml config.yaml 2>/dev/null || true
+      sed -i 's/transport: "stdio"/transport: "streamable-http"/' config.yaml 2>/dev/null || true
+      sed -i 's/mcp_require_auth: true/mcp_require_auth: false/' config.yaml 2>/dev/null || true
+    fi
+  fi
   if ! systemctl is-enabled ombre-brain &>/dev/null; then
-    # service not installed — create it if code exists
     if [ -d /root/ombre-brain/src ]; then
       cat > /etc/systemd/system/ombre-brain.service << 'SVC'
 [Unit]
@@ -53,7 +62,6 @@ SVC
       systemctl enable ombre-brain
     fi
   fi
-  # pull latest code and restart
   (cd /root/ombre-brain && git pull origin main 2>/dev/null) || true
   systemctl restart ombre-brain 2>/dev/null || true
 ) || true
