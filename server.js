@@ -1960,6 +1960,23 @@ function addMsg(role,text,time,noSave){
     scroll.scrollTop=scroll.scrollHeight;
     return;
   }
+  var voiceMatch=text.match(/^\[voice\]\s*/i);
+  if(voiceMatch){
+    var voiceText=text.slice(voiceMatch[0].length).trim();
+    var dur=Math.max(2,Math.min(Math.ceil(voiceText.length/4),60));
+    var bars='';for(var bi=0;bi<18;bi++){var h=4+Math.floor(Math.random()*14);bars+='<span style="height:'+h+'px"></span>';}
+    const row=document.createElement('div');
+    row.className=role==='assistant'?'row ai tail':'row human tail';
+    row.innerHTML='<div class="voice-msg'+(role==='user'?' voice-human':'')+'" title="'+esc(voiceText)+'">'
+      +'<div class="voice-play"><svg viewBox="0 0 10 12" fill="currentColor"><polygon points="1,0 10,6 1,12"/></svg></div>'
+      +'<div class="voice-bars">'+bars+'</div>'
+      +'<span class="voice-dur">'+dur+'&Prime;</span>'
+      +'<span class="meta">'+(time||'')+'</span>'
+      +'</div>';
+    scroll.appendChild(row);
+    scroll.scrollTop=scroll.scrollHeight;
+    return;
+  }
   if(role==='assistant'){
     const p=parseThink(text);
     if(p.think){
@@ -2661,6 +2678,7 @@ body {
 .voice-bars { display: flex; align-items: center; gap: 1.5px; height: 18px; }
 .voice-bars span { width: 2px; border-radius: 1px; background: var(--voice-bar); }
 .voice-dur { font-size: 11px; color: var(--text-soft); margin-left: 2px; font-variant-numeric: tabular-nums; }
+.voice-human { background: var(--bubble-yao); margin-left: auto; }
 .sheet-overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,.25);
   z-index: 200; opacity: 0; pointer-events: none; transition: opacity .3s;
