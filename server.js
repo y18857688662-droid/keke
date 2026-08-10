@@ -869,6 +869,43 @@ app.get('/memory/diag', async (req, res) => {
   }
 });
 
+// Ombre Brain reverse proxy at /ob/
+app.all('/ob/*', async (req, res) => {
+  const obPath = req.params[0] || '';
+  const url = `${OMBRE_URL}/${obPath}`;
+  try {
+    const headers = { ...req.headers, host: '127.0.0.1:18001' };
+    delete headers['content-length'];
+    const body = ['GET', 'HEAD'].includes(req.method) ? undefined : req;
+    const r = await fetch(url, {
+      method: req.method,
+      headers,
+      body,
+      duplex: body ? 'half' : undefined,
+      signal: AbortSignal.timeout(300000)
+    });
+    res.status(r.status);
+    for (const [k, v] of r.headers) {
+      if (!['transfer-encoding', 'content-encoding', 'connection'].includes(k.toLowerCase())) {
+        res.setHeader(k, v);
+      }
+    }
+    if (r.body) {
+      const reader = r.body.getReader();
+      const pump = async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) { res.end(); return; }
+          res.write(value);
+        }
+      };
+      pump().catch(() => res.end());
+    } else {
+      res.end();
+    }
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
 // === 聊天 ===
 const CHAT_FILE = path.join(__dirname, 'chat.json');
 const CHAT_SYSTEM_BASE = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
