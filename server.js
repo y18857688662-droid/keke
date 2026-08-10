@@ -1020,17 +1020,7 @@ app.post('/setup/pro', (req, res) => {
   res.json({ ok: true, pro_mode: cfg.pro_mode });
 });
 
-app.post('/setup/bridge', (req, res) => {
-  const cfg = readApiConfig();
-  cfg.bridge_mode = !cfg.bridge_mode;
-  writeApiConfig(cfg);
-  res.json({ ok: true, bridge_mode: cfg.bridge_mode });
-});
 
-app.get('/setup/bridge', (req, res) => {
-  const cfg = readApiConfig();
-  res.json({ bridge_mode: !!cfg.bridge_mode });
-});
 
 app.get('/setup', (req, res) => {
   const cfg = readApiConfig();
@@ -1195,11 +1185,6 @@ app.post('/chat/send', async (req, res) => {
   }
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
-  const cfg = readApiConfig();
-  if (cfg.bridge_mode) {
-    sseBroadcast({ type: 'user_msg', content: msg, time });
-    return res.json({ ok: true, time, async: true });
-  }
   const directKey = process.env.ANTHROPIC_API_KEY || '';
   const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
   if (!chatApiKey) {
