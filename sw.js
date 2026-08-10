@@ -2,12 +2,16 @@ self.addEventListener('push', (e) => {
   let data = { title: '克', body: '发来了一条消息' };
   try { data = e.data.json(); } catch {}
   e.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/icon.svg',
-      badge: '/icon.svg',
-      tag: 'ke-msg-' + Date.now(),
-      renotify: true
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const visible = list.some(c => c.visibilityState === 'visible');
+      if (visible) return;
+      return self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: '/icon.svg',
+        badge: '/icon.svg',
+        tag: 'ke-msg-' + Date.now(),
+        renotify: true
+      });
     })
   );
 });
