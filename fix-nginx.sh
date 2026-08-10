@@ -26,4 +26,7 @@
   fi
 
   nginx -t 2>/dev/null && nginx -s reload 2>/dev/null
+
+  # ensure ombre-brain is running
+  systemctl restart ombre-brain 2>/dev/null || true
 ) || true

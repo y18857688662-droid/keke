@@ -34,7 +34,7 @@ const APPS_FILE = path.join(__dirname, 'apps.json');
 const APP_NOTIFY_FILE = path.join(__dirname, 'app_notify.json');
 const AUTH_FILE = path.join(__dirname, 'ombre_auth.json');
 
-const OMBRE_URL = 'https://ombre-brain-production-9daa.up.railway.app';
+const OMBRE_URL = 'http://127.0.0.1:8060';
 const OMBRE_CLIENT_ID = 'D0QB90mzcLjuIVpV6JxEqA';
 const OMBRE_REDIRECT = 'https://keke-production.up.railway.app/auth/callback';
 
