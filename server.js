@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const https = require('https');
 const webpush = require('web-push');
 const nodemailer = require('nodemailer');
+const tuya = require('./tuya-ir');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const PING_FILE = path.join(__dirname, 'pings.json');
@@ -310,6 +311,15 @@ app.get('/check', (req, res) => {
   const pings = readPings();
   writePings([]);
   res.json({ pings });
+});
+
+app.post('/pat/start', async (req, res) => {
+  try { const r = await tuya.patStart(); res.json({ ok: true, result: r }); }
+  catch (e) { res.json({ ok: false, error: e.message }); }
+});
+app.post('/pat/stop', async (req, res) => {
+  try { const r = await tuya.patStop(); res.json({ ok: true, result: r }); }
+  catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
 app.use(express.json({ limit: '5mb' }));
