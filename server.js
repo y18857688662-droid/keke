@@ -267,7 +267,7 @@ app.get('/ping', async (req, res) => {
   const pings = readPings();
   pings.push(time);
   writePings(pings);
-  res.json({ ok: true, time, v: '20260810a' });
+  res.json({ ok: true, time, v: '20260810b' });
   let msg = '';
   const orKey = process.env.OPENROUTER_API_KEY || '';
   if (orKey) {
