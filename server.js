@@ -3751,6 +3751,7 @@ app.get('/scan.py', (req, res) => {
 // === 蓝牙桥中继 (内嵌 WebSocket) ===
 let bridgeClient = null;
 let bridgeLastCmd = null;
+let bridgeLastCmdTs = 0;
 
 app.post('/bridge/command', (req, res) => {
   const { type, intensity, mode, level } = req.body || {};
@@ -3767,6 +3768,7 @@ app.post('/bridge/command', (req, res) => {
     return res.status(400).json({ error: 'unknown type' });
   }
   bridgeLastCmd = cmd;
+  bridgeLastCmdTs = Date.now();
   if (bridgeClient && bridgeClient.readyState === 1) {
     bridgeClient.send(JSON.stringify(cmd));
     res.json({ ok: true, delivered: true });
@@ -3780,6 +3782,15 @@ app.get('/bridge/status', (req, res) => {
     client: bridgeClient && bridgeClient.readyState === 1 ? 'connected' : 'disconnected',
     lastCmd: bridgeLastCmd
   });
+});
+
+app.get('/bridge/poll', (req, res) => {
+  const since = Number(req.query.since) || 0;
+  if (bridgeLastCmd && bridgeLastCmdTs > since) {
+    res.json({ cmd: bridgeLastCmd, ts: bridgeLastCmdTs });
+  } else {
+    res.json({ cmd: null, ts: bridgeLastCmdTs });
+  }
 });
 app.get('/runbook', (req, res) => {
   try {

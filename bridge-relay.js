@@ -51,6 +51,16 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && (req.url === '/bridge/poll' || req.url.startsWith('/bridge/poll?'))) {
+    const opts = { hostname: '127.0.0.1', port: 8080, path: req.url };
+    http.get(opts, (upstream) => {
+      let d = '';
+      upstream.on('data', c => d += c);
+      upstream.on('end', () => { res.end(d); });
+    }).on('error', (e) => { res.end(JSON.stringify({ error: e.message })); });
+    return;
+  }
+
   if (req.method === 'GET' && req.url === '/status') {
     const opts = { hostname: '127.0.0.1', port: 8080, path: '/bridge/status' };
     http.get(opts, (upstream) => {
