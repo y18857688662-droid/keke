@@ -3773,7 +3773,7 @@ app.post('/bridge/command', (req, res) => {
     bridgeClient.send(JSON.stringify(cmd));
     res.json({ ok: true, delivered: true });
   } else {
-    res.status(503).json({ ok: false, error: 'no client connected' });
+    res.json({ ok: true, delivered: false, queued: true });
   }
 });
 
