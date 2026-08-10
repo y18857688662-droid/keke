@@ -870,41 +870,64 @@ app.get('/memory/diag', async (req, res) => {
 });
 
 // Ombre Brain reverse proxy at /ob/
-app.all('/ob/*', async (req, res) => {
-  const obPath = req.params[0] || '';
-  const url = `${OMBRE_URL}/${obPath}`;
-  try {
-    const headers = { ...req.headers, host: '127.0.0.1:18001' };
-    delete headers['content-length'];
-    const body = ['GET', 'HEAD'].includes(req.method) ? undefined : req;
-    const r = await fetch(url, {
-      method: req.method,
-      headers,
-      body,
-      duplex: body ? 'half' : undefined,
-      signal: AbortSignal.timeout(300000)
-    });
-    res.status(r.status);
-    for (const [k, v] of r.headers) {
-      if (!['transfer-encoding', 'content-encoding', 'connection'].includes(k.toLowerCase())) {
-        res.setHeader(k, v);
+const { createProxyMiddleware } = (() => {
+  try { return require('http-proxy-middleware'); } catch { return {}; }
+})();
+if (createProxyMiddleware) {
+  app.use('/ob', createProxyMiddleware({
+    target: OMBRE_URL,
+    changeOrigin: true,
+    pathRewrite: { '^/ob': '' },
+    ws: true,
+    timeout: 300000,
+    proxyTimeout: 300000,
+    onProxyRes(proxyRes, req, res) {
+      if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders();
       }
     }
-    if (r.body) {
-      const reader = r.body.getReader();
-      const pump = async () => {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) { res.end(); return; }
-          res.write(value);
-        }
-      };
-      pump().catch(() => res.end());
-    } else {
-      res.end();
-    }
-  } catch (e) { res.status(502).json({ error: e.message }); }
-});
+  }));
+} else {
+  app.all('/ob/*', async (req, res) => {
+    const obPath = req.params[0] || '';
+    const url = `${OMBRE_URL}/${obPath}`;
+    try {
+      const fwdHeaders = { 'content-type': req.headers['content-type'] || 'application/json' };
+      if (req.headers['authorization']) fwdHeaders['authorization'] = req.headers['authorization'];
+      if (req.headers['mcp-session-id']) fwdHeaders['mcp-session-id'] = req.headers['mcp-session-id'];
+      const isBody = !['GET', 'HEAD'].includes(req.method);
+      const r = await fetch(url, {
+        method: req.method,
+        headers: fwdHeaders,
+        body: isBody ? JSON.stringify(req.body) : undefined,
+        signal: AbortSignal.timeout(300000)
+      });
+      res.status(r.status);
+      for (const [k, v] of r.headers) {
+        if (!['transfer-encoding', 'connection'].includes(k.toLowerCase())) res.setHeader(k, v);
+      }
+      const ct = r.headers.get('content-type') || '';
+      if (ct.includes('text/event-stream') && r.body) {
+        res.flushHeaders();
+        const reader = r.body.getReader();
+        const pump = async () => {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) { res.end(); return; }
+            res.write(value);
+            if (typeof res.flush === 'function') res.flush();
+          }
+        };
+        pump().catch(() => res.end());
+      } else {
+        const buf = Buffer.from(await r.arrayBuffer());
+        res.end(buf);
+      }
+    } catch (e) { res.status(502).json({ error: e.message }); }
+  });
+}
 
 // === 聊天 ===
 const CHAT_FILE = path.join(__dirname, 'chat.json');
