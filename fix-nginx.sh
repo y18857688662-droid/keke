@@ -9,8 +9,23 @@
     fi
   fi
 
-  # WebSocket upgrade for /bridge/ws
+  # Ombre Brain reverse proxy at /ob/
   SITE=$(ls /etc/nginx/sites-enabled/ 2>/dev/null | head -1)
+  if [ -n "$SITE" ] && ! grep -q '/ob/' "/etc/nginx/sites-enabled/$SITE" 2>/dev/null; then
+    sed -i '/location \/ {/i\
+    location /ob/ {\
+        proxy_pass http://127.0.0.1:18001/;\
+        proxy_http_version 1.1;\
+        proxy_set_header Upgrade $http_upgrade;\
+        proxy_set_header Connection "upgrade";\
+        proxy_set_header Host $host;\
+        proxy_set_header X-Real-IP $remote_addr;\
+        proxy_read_timeout 86400;\
+        proxy_buffering off;\
+    }' "/etc/nginx/sites-enabled/$SITE"
+  fi
+
+  # WebSocket upgrade for /bridge/ws
   if [ -n "$SITE" ] && ! grep -q 'bridge/ws' "/etc/nginx/sites-enabled/$SITE" 2>/dev/null; then
     sed -i '/location \/ {/i\
     location /bridge/ws {\
