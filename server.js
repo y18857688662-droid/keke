@@ -2694,6 +2694,8 @@ body {
 .voice-msg.playing .voice-bars span:nth-child(odd) { animation-delay: 0.15s; }
 .voice-msg.playing .voice-bars span:nth-child(3n) { animation-delay: 0.3s; }
 @keyframes voiceWave { from { transform: scaleY(0.5); } to { transform: scaleY(1.3); } }
+.voice-text-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.voice-text-box { background: var(--surface); color: var(--text); border-radius: 16px; padding: 20px 24px; max-width: 320px; font-size: 15px; line-height: 1.6; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
 .sheet-overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,.25);
   z-index: 200; opacity: 0; pointer-events: none; transition: opacity .3s;
@@ -2997,7 +2999,10 @@ document.addEventListener('click', function(e) {
 
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 var _voicePlaying = null;
+var _voiceLongTimer = null;
+var _voiceLongFired = false;
 function playVoice(el, b64) {
+  if (_voiceLongFired) { _voiceLongFired = false; return; }
   var text = decodeURIComponent(atob(b64));
   if (_voicePlaying) { _voicePlaying.pause(); _voicePlaying = null; el.classList.remove('playing'); return; }
   el.classList.add('playing');
@@ -3012,6 +3017,21 @@ function playVoice(el, b64) {
       a.play().catch(function() { el.classList.remove('playing'); _voicePlaying = null; });
     })
     .catch(function() { el.classList.remove('playing'); });
+}
+function voiceTouchStart(el, b64) {
+  _voiceLongFired = false;
+  _voiceLongTimer = setTimeout(function() {
+    _voiceLongFired = true;
+    var text = decodeURIComponent(atob(b64));
+    var overlay = document.createElement('div');
+    overlay.className = 'voice-text-overlay';
+    overlay.innerHTML = '<div class="voice-text-box">' + escHtml(text) + '</div>';
+    overlay.onclick = function() { overlay.remove(); };
+    document.body.appendChild(overlay);
+  }, 500);
+}
+function voiceTouchEnd() {
+  if (_voiceLongTimer) { clearTimeout(_voiceLongTimer); _voiceLongTimer = null; }
 }
 
 function renderMessage(msg, idx, stagger) {
@@ -3063,7 +3083,8 @@ function renderMessage(msg, idx, stagger) {
     var vDur = Math.max(2, Math.min(Math.ceil(vText.length / 4), 60));
     var vBars = '';
     for (var vb = 0; vb < 18; vb++) { var vh = 4 + Math.floor(Math.random() * 14); vBars += '<span style="height:'+vh+'px"></span>'; }
-    colHtml += '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" title="' + escHtml(vText) + '" onclick="playVoice(this,\\''+btoa(encodeURIComponent(vText))+'\\')\">'
+    var vB64 = btoa(encodeURIComponent(vText));
+    colHtml += '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" onclick="playVoice(this,\\''+vB64+'\\')\" ontouchstart="voiceTouchStart(this,\\''+vB64+'\\')\" ontouchend="voiceTouchEnd()" ontouchcancel="voiceTouchEnd()">'
       + '<div class="voice-play"><svg viewBox="0 0 10 12" fill="currentColor"><polygon points="1,0 10,6 1,12"/></svg></div>'
       + '<div class="voice-bars">' + vBars + '</div>'
       + '<span class="voice-dur">' + vDur + '&Prime;</span>'
