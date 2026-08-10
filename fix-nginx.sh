@@ -28,5 +28,32 @@
   nginx -t 2>/dev/null && nginx -s reload 2>/dev/null
 
   # ensure ombre-brain is running
+  if ! systemctl is-enabled ombre-brain &>/dev/null; then
+    # service not installed — create it if code exists
+    if [ -d /root/ombre-brain/src ]; then
+      cat > /etc/systemd/system/ombre-brain.service << 'SVC'
+[Unit]
+Description=Ombre Brain Memory Store
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/ombre-brain
+ExecStart=/root/ombre-brain/venv/bin/python /root/ombre-brain/src/server.py
+Restart=always
+RestartSec=5
+Environment=OMBRE_PORT=8060
+Environment=OMBRE_TRANSPORT=streamable-http
+Environment=OMBRE_MCP_REQUIRE_AUTH=false
+
+[Install]
+WantedBy=multi-user.target
+SVC
+      systemctl daemon-reload
+      systemctl enable ombre-brain
+    fi
+  fi
+  # pull latest code and restart
+  (cd /root/ombre-brain && git pull origin main 2>/dev/null) || true
   systemctl restart ombre-brain 2>/dev/null || true
 ) || true
