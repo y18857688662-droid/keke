@@ -1238,14 +1238,16 @@ app.post('/chat/send', async (req, res) => {
     sseBroadcast({ type: 'message', role: 'assistant', content: reply, time: replyTime });
     const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
-    (async () => {
-      for (const line of lines) {
-        const isAction = line.startsWith('*') && line.endsWith('*');
-        const text = isAction ? line.slice(1, -1) : line;
-        await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
-        if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
-      }
-    })().catch(() => {});
+    if (sseClients.size === 0) {
+      (async () => {
+        for (const line of lines) {
+          const isAction = line.startsWith('*') && line.endsWith('*');
+          const text = isAction ? line.slice(1, -1) : line;
+          await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+          if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+        }
+      })().catch(() => {});
+    }
     res.json({ ok: true, reply, time: replyTime, memoryLoaded });
     (async () => {
       try {
@@ -1287,14 +1289,16 @@ app.post('/chat/reply', (req, res) => {
   sseBroadcast({ type: 'message', role: 'assistant', content: reply, time });
   const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
-  (async () => {
-    for (const line of lines) {
-      const isAction = line.startsWith('*') && line.endsWith('*');
-      const text = isAction ? line.slice(1, -1) : line;
-      await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
-      if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
-    }
-  })().catch(() => {});
+  if (sseClients.size === 0) {
+    (async () => {
+      for (const line of lines) {
+        const isAction = line.startsWith('*') && line.endsWith('*');
+        const text = isAction ? line.slice(1, -1) : line;
+        await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+        if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+      }
+    })().catch(() => {});
+  }
   const tgId = getTgChatId();
   if (tgId) {
     (async () => {
