@@ -681,16 +681,12 @@ app.get('/auth/token', (req, res) => {
 let ombreSessionId = null;
 
 async function initOmbreSession() {
-  let auth = readAuth();
-  if (!auth.access_token) {
-    const ok = await refreshOmbreToken();
-    if (!ok) return false;
-    auth = readAuth();
-  }
+  const headers = { 'Content-Type': 'application/json' };
+  const auth = readAuth();
+  if (auth.access_token) headers['Authorization'] = 'Bearer ' + auth.access_token;
   try {
     const r = await fetch(`${OMBRE_URL}/mcp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + auth.access_token },
+      method: 'POST', headers,
       body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'keke', version: '1.0' } } })
     });
     const sid = r.headers.get('mcp-session-id');
@@ -708,18 +704,14 @@ async function initOmbreSession() {
 }
 
 async function callOmbreTool(toolName, args) {
-  let auth = readAuth();
-  if (!auth.access_token) {
-    const ok = await refreshOmbreToken();
-    if (!ok) return null;
-    auth = readAuth();
-  }
   if (!ombreSessionId) {
     const ok = await initOmbreSession();
     if (!ok) return null;
   }
   try {
-    const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + auth.access_token };
+    const headers = { 'Content-Type': 'application/json' };
+    const auth = readAuth();
+    if (auth.access_token) headers['Authorization'] = 'Bearer ' + auth.access_token;
     if (ombreSessionId) headers['Mcp-Session-Id'] = ombreSessionId;
     let r = await fetch(`${OMBRE_URL}/mcp`, {
       method: 'POST',
