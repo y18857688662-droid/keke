@@ -10,6 +10,8 @@ const tuya = require('./tuya-ir');
 const app = express();
 const PORT = process.env.PORT || 8080;
 const PING_FILE = path.join(__dirname, 'pings.json');
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 const PUSH_FILE = path.join(__dirname, 'push_subs.json');
 
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC || 'BNHqpsqvhslrhCzVz2GPcySqIJuKH7-hha6DJhaXRLUX3FIoJQ_dyQBF_qjJ0aZ1QDvhaSStqHU3uio2wsyysTU';
@@ -327,6 +329,7 @@ app.post('/pat/tap', async (req, res) => {
   catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
+app.use('/uploads', express.static(UPLOADS_DIR));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
@@ -1194,7 +1197,15 @@ app.post('/chat/send', async (req, res) => {
   const time = now.toISOString().slice(11, 16);
   const chat = readChat();
   if (image) {
-    chat.push({ role: 'user', content: '[图片]', image, time, pending: true });
+    const imgId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const ext = image.includes('image/png') ? '.png' : '.jpg';
+    const imgFile = imgId + ext;
+    try {
+      const b64 = image.includes(',') ? image.split(',')[1] : image;
+      fs.writeFileSync(path.join(UPLOADS_DIR, imgFile), Buffer.from(b64, 'base64'));
+    } catch(e) { console.log('[chat] image save error:', e.message); }
+    const imageUrl = '/uploads/' + imgFile;
+    chat.push({ role: 'user', content: '[图片]', image, imageUrl, time, pending: true });
   } else {
     chat.push({ role: 'user', content: msg, time, pending: true });
   }
