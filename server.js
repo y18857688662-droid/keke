@@ -1997,12 +1997,12 @@ function hideTyping(){
   checkMemory();
 }
 
-function isImg(t){return t&&t.startsWith('data:image/')}
+function isImg(t){return t&&(t.startsWith('data:image/')||t.startsWith('/uploads/'))}
 function imgHtml(src,time){return \`<div class="bubble" style="padding:6px"><img class="chat-img" src="\${src}" onclick="viewImg(this.src)"><span class="meta">\${time||''}</span></div>\`}
 function viewImg(src){const d=document.createElement('div');d.className='chat-img-full';d.innerHTML=\`<img src="\${src}">\`;d.onclick=()=>d.remove();document.body.appendChild(d)}
-function addMsg(role,text,time,noSave){
+function addMsg(role,text,time,noSave,imageUrl){
   empty.style.display='none';
-  if(!noSave){chatStore.push({role,content:text,time:time||''});saveLocal();}
+  if(!noSave){chatStore.push({role,content:text,time:time||'',imageUrl:imageUrl||''});saveLocal();}
   if(isImg(text)){
     const row=document.createElement('div');
     row.className=role==='assistant'?'row ai tail':'row human tail';
@@ -2056,6 +2056,12 @@ function addMsg(role,text,time,noSave){
         });
       }
     });
+    if(imageUrl){
+      const imgRow=document.createElement('div');
+      imgRow.className='row ai tail';
+      imgRow.innerHTML=\`<div class="bubble" style="padding:6px"><img class="chat-img" src="\${imageUrl}" onclick="viewImg(this.src)" style="max-width:100%;border-radius:8px;cursor:pointer"></div>\`;
+      scroll.appendChild(imgRow);
+    }
     allRows.forEach(function(r,i){
       const row=document.createElement('div');
       if(r.type==='action'){
@@ -2239,7 +2245,7 @@ sse.onmessage=(e)=>{
         callSpeak(d.content);
       }else{
         hideTyping();
-        addMsg('assistant',d.content,d.time);
+        addMsg('assistant',d.content,d.time,false,d.imageUrl);
         lastMsgCount++;
         sending=false;sendBtn.disabled=false;
         input.focus();
@@ -2277,10 +2283,10 @@ async function loadHistory(){
   }
   msgs=msgs.slice(-200);
   chatStore.length=0;
-  msgs.forEach(m=>{chatStore.push({role:m.role,content:m.image||m.content,time:m.time||''});});
+  msgs.forEach(m=>{chatStore.push({role:m.role,content:m.image||m.content,time:m.time||'',imageUrl:m.imageUrl||''});});
   saveLocal();
   if(msgs.length>0){
-    msgs.forEach(m=>addMsg(m.role,m.image||m.content,m.time,true));
+    msgs.forEach(m=>addMsg(m.role,m.image||m.content,m.time,true,m.imageUrl));
     lastMsgCount=msgs.length;
   }
 }
@@ -3122,6 +3128,9 @@ function renderMessage(msg, idx, stagger) {
   if (msg.image) {
     colHtml += '<div class="msg-bubble"><img class="msg-img" src="'+msg.image+'" onclick="viewImg(this.src)"></div>';
   }
+  if (msg.imageUrl) {
+    colHtml += '<div class="msg-bubble" style="padding:4px"><img class="msg-img" src="'+msg.imageUrl+'" onclick="viewImg(this.src)"></div>';
+  }
   if (msg.file) {
     var fn = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\\'a\\');a.href=\\''+msg.file+'\\';a.download=\\''+escHtml(msg.filename||'file')+'\\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn + '</div>';
@@ -3445,7 +3454,7 @@ evtSource.onmessage = function(e) {
     if (data.type === 'message' && data.role === 'assistant' && !sending) {
       lastMsgCount++;
       pollKnown++;
-      var replyMsg = {role:'assistant', content: data.content, time: data.time};
+      var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl};
       msgContainer.appendChild(renderTime(data.time));
       msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length, true));
       scrollBottom();
