@@ -1303,16 +1303,27 @@ app.get('/chat/pending', (req, res) => {
 });
 
 app.post('/chat/reply', (req, res) => {
-  const { reply, voice_line } = req.body;
+  const { reply, voice_line, image } = req.body;
   if (!reply) return res.json({ ok: false });
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
   const chat = readChat();
   chat.forEach(m => { if (m.pending) delete m.pending; });
-  chat.push({ role: 'assistant', content: reply, time });
+  const msg = { role: 'assistant', content: reply, time };
+  if (image) {
+    try {
+      const imgId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      const ext = image.includes('image/png') ? '.png' : '.jpg';
+      const imgFile = imgId + ext;
+      const b64 = image.includes(',') ? image.split(',')[1] : image;
+      fs.writeFileSync(path.join(UPLOADS_DIR, imgFile), Buffer.from(b64, 'base64'));
+      msg.imageUrl = '/uploads/' + imgFile;
+    } catch(e) { console.log('[chat] reply image save error:', e.message); }
+  }
+  chat.push(msg);
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
-  sseBroadcast({ type: 'message', role: 'assistant', content: reply, time });
+  sseBroadcast({ type: 'message', role: 'assistant', content: reply, time, imageUrl: msg.imageUrl });
   const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
   if (sseClients.size === 0) {
