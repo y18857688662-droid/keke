@@ -1394,6 +1394,62 @@ app.get('/chat/archive', (req, res) => {
   res.json({ messages: msgs, remaining: start });
 });
 
+app.get('/thoughts', (req, res) => {
+  const chat = readChat();
+  const thoughts = [];
+  for (let i = 0; i < chat.length; i++) {
+    const m = chat[i];
+    if (m.role !== 'assistant') continue;
+    const match = (m.content || '').match(/<think>([\s\S]*?)<\/think>/);
+    if (!match) continue;
+    const think = match[1].trim();
+    if (!think) continue;
+    const body = (m.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    const replyTo = i > 0 && chat[i-1].role === 'user' ? chat[i-1].content : '';
+    thoughts.push({ think, body: body.slice(0, 60), replyTo: replyTo.slice(0, 50), time: m.time || '' });
+  }
+  thoughts.reverse();
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const cards = thoughts.length === 0
+    ? '<div class="empty">还没有碎碎念</div>'
+    : thoughts.map(t => {
+        const replyHint = t.replyTo ? `<div class="t-reply">回复「${esc(t.replyTo)}${t.replyTo.length >= 50 ? '…' : ''}」</div>` : '';
+        return `<div class="t-card">
+          <div class="t-head"><span class="t-time">${esc(t.time)}</span></div>
+          ${replyHint}
+          <div class="t-text">${esc(t.think).replace(/\n/g, '<br>')}</div>
+          <div class="t-said">${esc(t.body)}${t.body.length >= 60 ? '…' : ''}</div>
+        </div>`;
+      }).join('');
+  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>克的碎碎念</title>
+<style>
+:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1816;--text-soft:#6B6560;--text-faint:#999;--accent:#D97A54;--divider:#E8E3DB;
+  --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
+  --shadow:0 2px 12px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#242220;--text:#E8E3DB;--text-soft:#9B9590;--text-faint:#6B6560;--accent:#E8A090;--divider:#333;--shadow:0 2px 12px rgba(0,0,0,.2)}}
+:root[data-theme="dark"]{--bg:#1A1816;--card:#242220;--text:#E8E3DB;--text-soft:#9B9590;--text-faint:#6B6560;--accent:#E8A090;--divider:#333;--shadow:0 2px 12px rgba(0,0,0,.2)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(safe-area-inset-bottom);font-family:var(--font);-webkit-font-smoothing:antialiased}
+.header{display:flex;align-items:center;padding:16px 0;gap:12px}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600}
+.t-card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.t-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.t-time{font-size:13px;color:var(--text-faint)}
+.t-reply{font-size:13px;color:var(--text-soft);margin-bottom:8px;padding:6px 10px;background:var(--bg);border-radius:8px;border-left:3px solid var(--accent)}
+.t-text{font-size:15px;line-height:1.7;color:var(--text);margin-bottom:8px}
+.t-said{font-size:13px;color:var(--text-faint);padding-top:8px;border-top:1px solid var(--divider);font-style:italic}
+.t-said:before{content:'说了：'}
+.empty{text-align:center;color:var(--text-faint);padding:60px 0;font-size:14px}
+.subtitle{color:var(--text-soft);font-size:13px;padding:0 0 12px;text-align:center}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>💭 克的碎碎念</h1></div>
+<div class="subtitle">每次回复前，克在想什么</div>
+${cards}
+</body></html>`);
+});
+
 function addAudioTags(text) {
   return text;
 }
