@@ -1190,13 +1190,24 @@ function sseBroadcast(event) {
 app.post('/chat/send', async (req, res) => {
   const msg = req.body.message;
   const image = req.body.image;
+  const audio = req.body.audio;
   if (image) console.log('[chat] received image, size:', Math.round(image.length/1024) + 'kb');
-  if (!msg && !image) return res.json({ ok: false, error: 'empty message' });
+  if (audio) console.log('[chat] received audio, size:', Math.round(audio.length/1024) + 'kb');
+  if (!msg && !image && !audio) return res.json({ ok: false, error: 'empty message' });
   trackUserMessage();
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
   const chat = readChat();
-  if (image) {
+  if (audio) {
+    const audioId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const audioFile = audioId + '.webm';
+    try {
+      const b64 = audio.includes(',') ? audio.split(',')[1] : audio;
+      fs.writeFileSync(path.join(UPLOADS_DIR, audioFile), Buffer.from(b64, 'base64'));
+    } catch(e) { console.log('[chat] audio save error:', e.message); }
+    const audioUrl = '/uploads/' + audioFile;
+    chat.push({ role: 'user', content: msg || '[语音]', audioUrl, time, pending: true });
+  } else if (image) {
     const imgId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     const ext = image.includes('image/png') ? '.png' : '.jpg';
     const imgFile = imgId + ext;
@@ -2809,6 +2820,20 @@ body {
 .voice-wrap-human { align-items: flex-end; margin-left: auto; }
 .voice-to-text { font-size: 12px; color: var(--text-secondary, #888); margin-top: 4px; padding: 2px 0; cursor: pointer; }
 .voice-text-content { font-size: 14px; line-height: 1.5; color: var(--text); margin-top: 6px; padding: 8px 12px; background: var(--surface, #f5f5f5); border-radius: 10px; word-break: break-word; }
+#micRecBtn.recording { color: #e44; animation: pulse-rec 1.2s infinite; }
+@keyframes pulse-rec { 0%,100%{opacity:1} 50%{opacity:.4} }
+.rec-overlay { position:absolute;left:0;right:0;bottom:0;height:56px;background:var(--surface);z-index:100;display:flex;align-items:center;padding:0 16px;gap:12px; }
+.rec-dot { width:10px;height:10px;border-radius:50%;background:#e44;animation:pulse-rec 1s infinite; }
+.rec-time { font-size:14px;color:var(--text-faint);font-variant-numeric:tabular-nums; }
+.rec-cancel { font-size:13px;color:var(--text-faint);cursor:pointer;margin-left:auto; }
+.rec-send { background:var(--accent,#D97A54);color:#fff;border:none;padding:6px 18px;border-radius:999px;font-size:14px;cursor:pointer;margin-left:8px; }
+.audio-bubble { display:flex;align-items:center;gap:10px;padding:10px 14px!important;min-width:160px;cursor:pointer; }
+.audio-icon { width:18px;height:18px;flex-shrink:0;color:var(--accent,#D97A54); }
+.audio-bubble.playing .audio-icon polygon { display:none; }
+.audio-bubble.playing .audio-icon::after { content:'❚❚';font-size:12px; }
+.audio-bar { flex:1;height:4px;background:var(--divider,#E8E3DB);border-radius:2px;overflow:hidden; }
+.audio-bar-fill { width:0%;height:100%;background:var(--accent,#D97A54);border-radius:2px;transition:width .1s linear; }
+.audio-dur { font-size:12px;color:var(--text-faint);min-width:28px;text-align:right; }
 .sheet-overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,.25);
   z-index: 200; opacity: 0; pointer-events: none; transition: opacity .3s;
@@ -2995,7 +3020,7 @@ body {
           <button class="tb-btn" onclick="insertNL()" aria-label="换行" style="font-size:16px;font-family:var(--font)">⏎</button>
           <div class="model-tag">Opus 4.6</div>
           <div class="tb-spacer"></div>
-          <button class="tb-btn" aria-label="麦克风"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v1a7 7 0 01-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg></button>
+          <button class="tb-btn" id="micRecBtn" onclick="toggleRecord()" aria-label="麦克风"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v1a7 7 0 01-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg></button>
           <button class="send-btn" aria-label="发送"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
         </div>
       </div>
@@ -3155,6 +3180,78 @@ function toggleVoiceText(el, b64) {
   el.textContent = '收起';
 }
 
+var _recorder = null, _recStream = null, _recChunks = [], _recStart = 0, _recTimer = null;
+function toggleRecord() {
+  if (_recorder && _recorder.state === 'recording') { _recorder.stop(); return; }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream) {
+    _recStream = stream;
+    _recorder = new MediaRecorder(stream, {mimeType:'audio/webm;codecs=opus'});
+    _recChunks = [];
+    _recorder.ondataavailable = function(e) { if (e.data.size > 0) _recChunks.push(e.data); };
+    _recorder.onstop = function() {
+      clearInterval(_recTimer);
+      stream.getTracks().forEach(function(t){t.stop()});
+      document.getElementById('micRecBtn').classList.remove('recording');
+      var el = document.querySelector('.rec-overlay');
+      if (el) el.remove();
+      if (_recChunks.length === 0) return;
+      var blob = new Blob(_recChunks, {type:'audio/webm'});
+      var reader = new FileReader();
+      reader.onload = function() { sendAudio(reader.result); };
+      reader.readAsDataURL(blob);
+    };
+    _recorder.start();
+    _recStart = Date.now();
+    document.getElementById('micRecBtn').classList.add('recording');
+    var inputBox = document.querySelector('.input-box');
+    var ov = document.createElement('div');
+    ov.className = 'rec-overlay';
+    ov.innerHTML = '<span class="rec-dot"></span><span class="rec-time" id="recTime">0:00</span><span class="rec-cancel" onclick="cancelRecord()">取消</span><button class="rec-send" onclick="stopRecord()">发送</button>';
+    inputBox.appendChild(ov);
+    _recTimer = setInterval(function() {
+      var s = Math.floor((Date.now() - _recStart) / 1000);
+      var el = document.getElementById('recTime');
+      if (el) el.textContent = Math.floor(s/60) + ':' + (s%60<10?'0':'') + s%60;
+    }, 500);
+  }).catch(function(e) {
+    alert('请允许麦克风权限');
+  });
+}
+function cancelRecord() {
+  _recChunks = [];
+  if (_recorder && _recorder.state === 'recording') _recorder.stop();
+}
+function stopRecord() {
+  if (_recorder && _recorder.state === 'recording') _recorder.stop();
+}
+function sendAudio(base64) {
+  var userMsg = {role:'user', content:'[语音]', audioUrl: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
+  msgContainer.appendChild(renderTime(userMsg.time));
+  msgContainer.appendChild(renderMessage(userMsg, -1));
+  scrollBottom();
+  fetch('/chat/send', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({message:'[语音]', audio: base64})
+  }).then(function(r){return r.json()}).then(function(d) {
+    pollKnown++;
+  }).catch(function(){});
+}
+var _audioPlaying = null;
+function playAudioMsg(el, src) {
+  if (_audioPlaying) { _audioPlaying.pause(); _audioPlaying = null; document.querySelectorAll('.audio-bubble.playing').forEach(function(b){b.classList.remove('playing')}); if (el.classList.contains('playing')) { el.classList.remove('playing'); return; } }
+  el.classList.add('playing');
+  var a = new Audio(src);
+  _audioPlaying = a;
+  var fill = el.querySelector('.audio-bar-fill');
+  var dur = el.querySelector('.audio-dur');
+  a.onloadedmetadata = function() { if (dur && isFinite(a.duration)) dur.textContent = Math.ceil(a.duration) + '"'; };
+  a.ontimeupdate = function() { if (fill && isFinite(a.duration)) fill.style.width = (a.currentTime/a.duration*100)+'%'; };
+  a.onended = function() { el.classList.remove('playing'); _audioPlaying = null; if (fill) fill.style.width='0%'; };
+  a.onerror = function() { el.classList.remove('playing'); _audioPlaying = null; };
+  a.play().catch(function() { el.classList.remove('playing'); _audioPlaying = null; });
+}
+
 function renderMessage(msg, idx, stagger) {
   var isKe = msg.role === 'assistant';
   var who = isKe ? 'ke' : 'yao';
@@ -3192,6 +3289,9 @@ function renderMessage(msg, idx, stagger) {
   }
   if (msg.imageUrl) {
     colHtml += '<div class="msg-bubble" style="padding:4px"><img class="msg-img" src="'+msg.imageUrl+'" onclick="viewImg(this.src)"></div>';
+  }
+  if (msg.audioUrl) {
+    colHtml += '<div class="msg-bubble audio-bubble" onclick="playAudioMsg(this,\\''+msg.audioUrl+'\\')"><svg class="audio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg><div class="audio-bar"><div class="audio-bar-fill"></div></div><span class="audio-dur"></span></div>';
   }
   if (msg.file) {
     var fn = escHtml(msg.filename || '文件');
@@ -3516,7 +3616,7 @@ evtSource.onmessage = function(e) {
     if (data.type === 'message' && data.role === 'assistant' && !sending) {
       lastMsgCount++;
       pollKnown++;
-      var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl};
+      var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl, audioUrl: data.audioUrl};
       msgContainer.appendChild(renderTime(data.time));
       msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length, true));
       scrollBottom();
