@@ -351,6 +351,7 @@ app.post('/pat/tap', async (req, res) => {
 });
 
 app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/static', express.static(path.join(__dirname, 'static')));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
@@ -2911,21 +2912,11 @@ body {
 .quote-preview { flex:1; font-size:12px; color:var(--text-mid); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-left:2px solid var(--accent); padding-left:8px; }
 .quote-close { background:none; border:none; color:var(--text-soft); font-size:18px; cursor:pointer; padding:4px; line-height:1; }
 .input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
-.desk-pet { position:absolute; top:-52px; right:16px; width:50px; height:50px; cursor:pointer; z-index:50; animation:petFloat 3s ease-in-out infinite; filter:drop-shadow(0 2px 8px rgba(217,122,84,.3)); }
-.pet-claude { width:100%; height:100%; overflow:visible; }
-.pet-logo { transform-origin:0 0; }
-@keyframes petFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
-.petal { transform-origin:3px 24px; }
-.p0 { animation:petalPulse 3s ease-in-out 0s infinite; }
-.p1 { animation:petalPulse 3s ease-in-out 0.4s infinite; }
-.p2 { animation:petalPulse 3s ease-in-out 0.8s infinite; }
-.p3 { animation:petalPulse 3s ease-in-out 1.2s infinite; }
-.p4 { animation:petalPulse 3s ease-in-out 1.6s infinite; }
-.p5 { animation:petalPulse 3s ease-in-out 2s infinite; }
-.p6 { animation:petalPulse 3s ease-in-out 2.4s infinite; }
-@keyframes petalPulse { 0%,100%{transform:scaleY(1) rotate(var(--r,0deg))} 50%{transform:scaleY(0.85) rotate(var(--r,0deg))} }
-.desk-pet.poked .pet-logo { animation:petSpin 0.6s ease-out 1; }
-@keyframes petSpin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+.desk-pet { position:absolute; top:-58px; right:12px; width:56px; height:56px; cursor:pointer; z-index:50; animation:petFloat 3s ease-in-out infinite; }
+.pet-clawd { width:100%; height:100%; image-rendering:pixelated; pointer-events:none; }
+@keyframes petFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+.desk-pet.poked { animation:petJump 0.4s ease 1; }
+@keyframes petJump { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-16px)} }
 .input-box {
   background: var(--input-bg); border-radius: 24px;
   border: 1px solid var(--border); overflow: hidden; transition: border-color .2s;
@@ -3076,20 +3067,7 @@ body {
         <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md,.json,.csv,.xlsx,.xls,.ppt,.pptx,.zip,.rar" style="display:none">
       </div>
       <div class="desk-pet" id="deskPet" onclick="petPoke()">
-        <svg class="pet-claude" viewBox="0 0 65 65">
-          <g class="pet-logo" transform="translate(32.5,32.5)">
-            <circle r="5.5" fill="#D97A54"/>
-            <g fill="#D97A54">
-              <rect class="petal p0" x="-3" y="-24" width="6" height="16" rx="3"/>
-              <rect class="petal p1" x="-3" y="-24" width="6" height="16" rx="3" transform="rotate(51.4)"/>
-              <rect class="petal p2" x="-3" y="-24" width="6" height="16" rx="3" transform="rotate(102.9)"/>
-              <rect class="petal p3" x="-3" y="-24" width="6" height="16" rx="3" transform="rotate(154.3)"/>
-              <rect class="petal p4" x="-3" y="-24" width="6" height="16" rx="3" transform="rotate(205.7)"/>
-              <rect class="petal p5" x="-3" y="-24" width="6" height="16" rx="3" transform="rotate(257.1)"/>
-              <rect class="petal p6" x="-3" y="-24" width="6" height="16" rx="3" transform="rotate(308.6)"/>
-            </g>
-          </g>
-        </svg>
+        <img class="pet-clawd" src="/static/clawd-idle.gif" alt="Clawd" draggable="false">
       </div>
       <div class="input-box">
         <div class="input-field-wrap"><textarea class="input-field" rows="1" placeholder="Message..." oninput="autoResize(this)"></textarea></div>
