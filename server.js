@@ -2910,7 +2910,27 @@ body {
 .quote-bar.show { display:flex; align-items:center; gap:8px; }
 .quote-preview { flex:1; font-size:12px; color:var(--text-mid); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-left:2px solid var(--accent); padding-left:8px; }
 .quote-close { background:none; border:none; color:var(--text-soft); font-size:18px; cursor:pointer; padding:4px; line-height:1; }
-.input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; }
+.input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
+.desk-pet { position:absolute; top:-38px; right:24px; width:36px; height:36px; cursor:pointer; z-index:50; animation:petFloat 3s ease-in-out infinite; }
+.pet-body { position:relative; width:100%; height:100%; }
+.pet-head { width:32px; height:28px; background:var(--accent,#D97A54); border-radius:50% 50% 45% 45%; position:absolute; bottom:0; left:2px; }
+.pet-ear { position:absolute; top:-2px; width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-bottom:10px solid var(--accent,#D97A54); }
+.pet-ear-l { left:2px; transform:rotate(-10deg); }
+.pet-ear-r { right:2px; transform:rotate(10deg); }
+.pet-eye { position:absolute; top:10px; width:5px; height:5px; background:#2a1a0a; border-radius:50%; }
+.pet-eye-l { left:7px; }
+.pet-eye-r { right:7px; }
+.pet-pupil { width:2px; height:2px; background:#fff; border-radius:50%; position:absolute; top:1px; left:1px; }
+.pet-nose { position:absolute; top:16px; left:50%; transform:translateX(-50%); width:3px; height:2px; background:#8B4513; border-radius:50%; }
+.pet-mouth { position:absolute; top:19px; left:50%; transform:translateX(-50%); width:8px; height:3px; border-bottom:1.5px solid #8B4513; border-radius:0 0 50% 50%; }
+.pet-blush { position:absolute; top:14px; width:5px; height:3px; background:rgba(255,150,150,.4); border-radius:50%; }
+.pet-blush-l { left:2px; }
+.pet-blush-r { right:2px; }
+.pet-tail { position:absolute; bottom:4px; right:-6px; width:12px; height:12px; border:2px solid var(--accent,#D97A54); border-color:transparent var(--accent,#D97A54) var(--accent,#D97A54) transparent; border-radius:0 0 50% 0; animation:petTail 1.5s ease-in-out infinite; transform-origin:left top; }
+@keyframes petFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+@keyframes petTail { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(15deg)} }
+.desk-pet.poked .pet-eye { height:2px; top:12px; border-radius:2px; }
+.desk-pet.poked .pet-mouth { border-bottom:none; width:6px; height:4px; background:#8B4513; border-radius:50%; top:18px; }
 .input-box {
   background: var(--input-bg); border-radius: 24px;
   border: 1px solid var(--border); overflow: hidden; transition: border-color .2s;
@@ -3059,6 +3079,21 @@ body {
         <button class="attach-item" onclick="toggleAttach();window.open('/screen','_blank')"><span class="ai">🖥</span>屏幕共享</button>
         <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
         <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md,.json,.csv,.xlsx,.xls,.ppt,.pptx,.zip,.rar" style="display:none">
+      </div>
+      <div class="desk-pet" id="deskPet" onclick="petPoke()">
+        <div class="pet-body">
+          <div class="pet-ear pet-ear-l"></div>
+          <div class="pet-ear pet-ear-r"></div>
+          <div class="pet-head">
+            <div class="pet-eye pet-eye-l"><div class="pet-pupil"></div></div>
+            <div class="pet-eye pet-eye-r"><div class="pet-pupil"></div></div>
+            <div class="pet-nose"></div>
+            <div class="pet-mouth"></div>
+            <div class="pet-blush pet-blush-l"></div>
+            <div class="pet-blush pet-blush-r"></div>
+          </div>
+          <div class="pet-tail"></div>
+        </div>
       </div>
       <div class="input-box">
         <div class="input-field-wrap"><textarea class="input-field" rows="1" placeholder="Message..." oninput="autoResize(this)"></textarea></div>
@@ -3292,6 +3327,11 @@ function cancelRecord() {
 }
 function stopRecord() {
   if (_recorder && _recorder.state === 'recording') _recorder.stop();
+}
+function petPoke() {
+  var pet = document.getElementById('deskPet');
+  pet.classList.add('poked');
+  setTimeout(function(){ pet.classList.remove('poked'); }, 1500);
 }
 function sendAudio(base64, transcript) {
   var contentText = transcript ? '[语音] ' + transcript : '[语音]';
