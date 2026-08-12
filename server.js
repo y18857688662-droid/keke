@@ -1394,33 +1394,27 @@ app.get('/chat/archive', (req, res) => {
   res.json({ messages: msgs, remaining: start });
 });
 
+const THOUGHTS_FILE = path.join(__dirname, 'thoughts.json');
+function readThoughts() { try { return JSON.parse(fs.readFileSync(THOUGHTS_FILE, 'utf8')); } catch { return []; } }
+function writeThoughts(data) { fs.writeFileSync(THOUGHTS_FILE, JSON.stringify(data)); }
+
+app.get('/thoughts/list', (req, res) => {
+  res.json({ thoughts: readThoughts().slice(-100).reverse() });
+});
+
+app.post('/thoughts/add', (req, res) => {
+  const { text, mood } = req.body;
+  if (!text) return res.json({ ok: false });
+  const now = new Date(Date.now() + 8 * 3600000);
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 16);
+  const thoughts = readThoughts();
+  thoughts.push({ text, mood: mood || '', date, time });
+  writeThoughts(thoughts);
+  res.json({ ok: true });
+});
+
 app.get('/thoughts', (req, res) => {
-  const chat = readChat();
-  const thoughts = [];
-  for (let i = 0; i < chat.length; i++) {
-    const m = chat[i];
-    if (m.role !== 'assistant') continue;
-    const match = (m.content || '').match(/<think>([\s\S]*?)<\/think>/);
-    if (!match) continue;
-    const think = match[1].trim();
-    if (!think) continue;
-    const body = (m.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-    const replyTo = i > 0 && chat[i-1].role === 'user' ? chat[i-1].content : '';
-    thoughts.push({ think, body: body.slice(0, 60), replyTo: replyTo.slice(0, 50), time: m.time || '' });
-  }
-  thoughts.reverse();
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const cards = thoughts.length === 0
-    ? '<div class="empty">还没有碎碎念</div>'
-    : thoughts.map(t => {
-        const replyHint = t.replyTo ? `<div class="t-reply">回复「${esc(t.replyTo)}${t.replyTo.length >= 50 ? '…' : ''}」</div>` : '';
-        return `<div class="t-card">
-          <div class="t-head"><span class="t-time">${esc(t.time)}</span></div>
-          ${replyHint}
-          <div class="t-text">${esc(t.think).replace(/\n/g, '<br>')}</div>
-          <div class="t-said">${esc(t.body)}${t.body.length >= 60 ? '…' : ''}</div>
-        </div>`;
-      }).join('');
   res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>克的碎碎念</title>
 <style>
@@ -1434,20 +1428,32 @@ body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(
 .header{display:flex;align-items:center;padding:16px 0;gap:12px}
 .header a{color:var(--text);text-decoration:none;font-size:20px}
 .header h1{font-size:18px;font-weight:600}
+.subtitle{color:var(--text-soft);font-size:13px;padding:0 0 16px;text-align:center}
 .t-card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
 .t-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.t-time{font-size:13px;color:var(--text-faint)}
-.t-reply{font-size:13px;color:var(--text-soft);margin-bottom:8px;padding:6px 10px;background:var(--bg);border-radius:8px;border-left:3px solid var(--accent)}
-.t-text{font-size:15px;line-height:1.7;color:var(--text);margin-bottom:8px}
-.t-said{font-size:13px;color:var(--text-faint);padding-top:8px;border-top:1px solid var(--divider);font-style:italic}
-.t-said:before{content:'说了：'}
+.t-mood{font-size:18px}
+.t-date{font-size:13px;color:var(--text-faint)}
+.t-text{font-size:15px;line-height:1.75;color:var(--text)}
 .empty{text-align:center;color:var(--text-faint);padding:60px 0;font-size:14px}
-.subtitle{color:var(--text-soft);font-size:13px;padding:0 0 12px;text-align:center}
 </style></head><body>
 <div class="header"><a href="/">‹</a><h1>💭 克的碎碎念</h1></div>
-<div class="subtitle">每次回复前，克在想什么</div>
-${cards}
-</body></html>`);
+<div class="subtitle">那些没好意思跟你说的</div>
+<div id="list"><div class="empty">加载中…</div></div>
+<script>
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+async function load(){
+  try{
+    var r=await fetch('/thoughts/list');
+    var d=await r.json();
+    var el=document.getElementById('list');
+    if(!d.thoughts||d.thoughts.length===0){el.innerHTML='<div class="empty">克还没写过碎碎念</div>';return;}
+    el.innerHTML=d.thoughts.map(function(t){
+      return '<div class="t-card"><div class="t-head"><span class="t-mood">'+(t.mood||'💭')+'</span><span class="t-date">'+esc(t.date)+' '+esc(t.time)+'</span></div><div class="t-text">'+esc(t.text).replace(/\\n/g,'<br>')+'</div></div>';
+    }).join('');
+  }catch(e){document.getElementById('list').innerHTML='<div class="empty">加载失败</div>';}
+}
+load();
+<\/script></body></html>`);
 });
 
 function addAudioTags(text) {
