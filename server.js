@@ -3195,24 +3195,44 @@ function toggleVoiceText(el, b64) {
 }
 
 var _recorder = null, _recStream = null, _recChunks = [], _recStart = 0, _recTimer = null, _recCancelled = false;
+var _recSpeech = null, _recTranscript = '';
 function toggleRecord() {
   if (_recorder && _recorder.state === 'recording') { stopRecord(); return; }
   _recCancelled = false;
+  _recTranscript = '';
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream) {
     _recStream = stream;
     _recorder = new MediaRecorder(stream, {mimeType:'audio/webm;codecs=opus'});
     _recChunks = [];
+    try {
+      var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SR) {
+        _recSpeech = new SR();
+        _recSpeech.lang = 'zh-CN';
+        _recSpeech.continuous = true;
+        _recSpeech.interimResults = false;
+        _recSpeech.onresult = function(ev) {
+          for (var i = ev.resultIndex; i < ev.results.length; i++) {
+            if (ev.results[i].isFinal) _recTranscript += ev.results[i][0].transcript;
+          }
+        };
+        _recSpeech.onerror = function() {};
+        _recSpeech.start();
+      }
+    } catch(e) {}
     _recorder.ondataavailable = function(e) { if (e.data.size > 0) _recChunks.push(e.data); };
     _recorder.onstop = function() {
       clearInterval(_recTimer);
       stream.getTracks().forEach(function(t){t.stop()});
+      try { if (_recSpeech) { _recSpeech.stop(); _recSpeech = null; } } catch(e) {}
       document.getElementById('micRecBtn').classList.remove('recording');
       var el = document.querySelector('.rec-overlay');
       if (el) el.remove();
-      if (_recCancelled || _recChunks.length === 0) { _recChunks = []; return; }
+      if (_recCancelled || _recChunks.length === 0) { _recChunks = []; _recTranscript = ''; return; }
       var blob = new Blob(_recChunks, {type:'audio/webm'});
+      var transcript = _recTranscript;
       var reader = new FileReader();
-      reader.onload = function() { sendAudio(reader.result); };
+      reader.onload = function() { sendAudio(reader.result, transcript); };
       reader.readAsDataURL(blob);
     };
     _recorder.start();
@@ -3234,20 +3254,22 @@ function toggleRecord() {
 }
 function cancelRecord() {
   _recCancelled = true;
+  try { if (_recSpeech) { _recSpeech.stop(); _recSpeech = null; } } catch(e) {}
   if (_recorder && _recorder.state === 'recording') _recorder.stop();
 }
 function stopRecord() {
   if (_recorder && _recorder.state === 'recording') _recorder.stop();
 }
-function sendAudio(base64) {
-  var userMsg = {role:'user', content:'[语音]', audioUrl: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
+function sendAudio(base64, transcript) {
+  var contentText = transcript ? '[语音] ' + transcript : '[语音]';
+  var userMsg = {role:'user', content: contentText, audioUrl: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
   msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
   fetch('/chat/send', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({message:'[语音]', audio: base64})
+    body: JSON.stringify({message: contentText, audio: base64})
   }).then(function(r){return r.json()}).then(function(d) {
     pollKnown++;
   }).catch(function(){});
@@ -3336,7 +3358,7 @@ function renderMessage(msg, idx, stagger) {
       + '</div>';
   } else {
   var hasMedia = msg.image || msg.imageUrl || msg.audioUrl || msg.file || msg.fileUrl;
-  var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l && !(hasMedia && /^\\[(图片|语音|文件)\\]/.test(l))});
+  var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l && !(hasMedia && /^\\[(图片|语音|文件)\\]/.test(l)) && !(msg.audioUrl && /^\\[语音\\]/.test(l))});
   var bubbleIdx = 0;
   lines.forEach(function(line) {
     var delay = stagger ? 'style="opacity:0;animation:fadeInBubble 0.3s ease '+((bubbleIdx)*0.4)+'s forwards"' : '';
