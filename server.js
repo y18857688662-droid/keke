@@ -2912,11 +2912,13 @@ body {
 .quote-preview { flex:1; font-size:12px; color:var(--text-mid); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-left:2px solid var(--accent); padding-left:8px; }
 .quote-close { background:none; border:none; color:var(--text-soft); font-size:18px; cursor:pointer; padding:4px; line-height:1; }
 .input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
-.desk-pet { position:absolute; top:-58px; right:12px; width:56px; height:56px; cursor:pointer; z-index:50; animation:petFloat 3s ease-in-out infinite; }
-.pet-clawd { width:100%; height:100%; image-rendering:pixelated; pointer-events:none; }
-@keyframes petFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
-.desk-pet.poked { animation:petJump 0.4s ease 1; }
-@keyframes petJump { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-16px)} }
+.desk-pet { position:absolute; top:-78px; left:12px; width:80px; height:80px; cursor:pointer; z-index:50; animation:petWalk 12s ease-in-out infinite; }
+.pet-clawd { width:100%; height:100%; image-rendering:pixelated; pointer-events:none; transition:transform .3s; }
+@keyframes petWalk { 0%{left:12px;transform:translateY(0) scaleX(1)} 5%{transform:translateY(-3px) scaleX(1)} 10%{transform:translateY(0) scaleX(1)} 15%{transform:translateY(-3px) scaleX(1)} 20%{transform:translateY(0) scaleX(1)} 25%{left:12px;transform:translateY(0) scaleX(1)} 50%{left:calc(100% - 92px);transform:translateY(0) scaleX(-1)} 55%{transform:translateY(-3px) scaleX(-1)} 60%{transform:translateY(0) scaleX(-1)} 65%{transform:translateY(-3px) scaleX(-1)} 70%{transform:translateY(0) scaleX(-1)} 75%{left:calc(100% - 92px);transform:translateY(0) scaleX(-1)} 100%{left:12px;transform:translateY(0) scaleX(1)} }
+.desk-pet.poked { animation:petJump 0.5s ease 1; }
+@keyframes petJump { 0%{transform:translateY(0) rotate(0)} 30%{transform:translateY(-20px) rotate(-10deg)} 50%{transform:translateY(-24px) rotate(5deg)} 70%{transform:translateY(-8px) rotate(-3deg)} 100%{transform:translateY(0) rotate(0)} }
+.desk-pet.sleepy .pet-clawd { filter:brightness(0.85); }
+.desk-pet.happy .pet-clawd { filter:saturate(1.3) brightness(1.1); }
 .input-box {
   background: var(--input-bg); border-radius: 24px;
   border: 1px solid var(--border); overflow: hidden; transition: border-color .2s;
@@ -3304,8 +3306,20 @@ function stopRecord() {
 }
 function petPoke() {
   var pet = document.getElementById('deskPet');
+  var walkAnim = pet.style.animation || '';
+  pet.style.animation = 'none';
+  pet.offsetHeight;
   pet.classList.add('poked');
-  setTimeout(function(){ pet.classList.remove('poked'); }, 1500);
+  setTimeout(function(){
+    pet.classList.remove('poked');
+    pet.style.animation = '';
+  }, 600);
+}
+function petMood(mood) {
+  var pet = document.getElementById('deskPet');
+  if (!pet) return;
+  pet.classList.remove('sleepy','happy');
+  if (mood) pet.classList.add(mood);
 }
 function sendAudio(base64, transcript) {
   var contentText = transcript ? '[语音] ' + transcript : '[语音]';
