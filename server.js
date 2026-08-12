@@ -108,6 +108,27 @@ function getApiUrl() { return readApiConfig().api_url || process.env.API_URL || 
 function getModel() { return readApiConfig().model || process.env.MODEL || 'deepseek-chat'; }
 function getAnthropicKey() { if (isProMode()) return ''; return readApiConfig().anthropic_key || process.env.ANTHROPIC_API_KEY || ''; }
 
+async function transcribeAudio(filePath, apiKey) {
+  const boundary = '----WhisperBoundary' + Date.now();
+  const fileData = fs.readFileSync(filePath);
+  const parts = [];
+  parts.push('--' + boundary + '\r\nContent-Disposition: form-data; name="file"; filename="audio.webm"\r\nContent-Type: audio/webm\r\n\r\n');
+  parts.push(fileData);
+  parts.push('\r\n--' + boundary + '\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1');
+  parts.push('\r\n--' + boundary + '\r\nContent-Disposition: form-data; name="language"\r\n\r\nzh');
+  parts.push('\r\n--' + boundary + '--\r\n');
+  const body = Buffer.concat(parts.map(p => typeof p === 'string' ? Buffer.from(p) : p));
+  return new Promise((resolve, reject) => {
+    const opts = { method: 'POST', hostname: 'api.openai.com', path: '/v1/audio/transcriptions', headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'multipart/form-data; boundary=' + boundary, 'Content-Length': body.length } };
+    const r = require('https').request(opts, res => {
+      let d = ''; res.on('data', c => d += c); res.on('end', () => { try { resolve(JSON.parse(d).text || ''); } catch { resolve(''); } });
+    });
+    r.on('error', reject);
+    r.write(body);
+    r.end();
+  });
+}
+
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 
@@ -1201,12 +1222,24 @@ app.post('/chat/send', async (req, res) => {
   if (audio) {
     const audioId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     const audioFile = audioId + '.webm';
+    const audioPath = path.join(UPLOADS_DIR, audioFile);
     try {
       const b64 = audio.includes(',') ? audio.split(',')[1] : audio;
-      fs.writeFileSync(path.join(UPLOADS_DIR, audioFile), Buffer.from(b64, 'base64'));
+      fs.writeFileSync(audioPath, Buffer.from(b64, 'base64'));
     } catch(e) { console.log('[chat] audio save error:', e.message); }
     const audioUrl = '/uploads/' + audioFile;
-    chat.push({ role: 'user', content: msg || '[语音]', audioUrl, time, pending: true });
+    let audioContent = msg || '[语音]';
+    chat.push({ role: 'user', content: audioContent, audioUrl, time, pending: true });
+    const whisperKey = readApiConfig().whisper_key || readApiConfig().openai_key || '';
+    if (whisperKey && fs.existsSync(audioPath)) {
+      transcribeAudio(audioPath, whisperKey).then(text => {
+        if (text) {
+          const c = readChat();
+          const idx = c.findIndex(m => m.audioUrl === audioUrl);
+          if (idx !== -1) { c[idx].content = '[语音] ' + text; writeChat(c); console.log('[whisper] transcribed:', text); }
+        }
+      }).catch(e => console.log('[whisper] error:', e.message));
+    }
   } else if (image) {
     const imgId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     const ext = image.includes('image/png') ? '.png' : '.jpg';
