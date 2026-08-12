@@ -2911,26 +2911,17 @@ body {
 .quote-preview { flex:1; font-size:12px; color:var(--text-mid); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-left:2px solid var(--accent); padding-left:8px; }
 .quote-close { background:none; border:none; color:var(--text-soft); font-size:18px; cursor:pointer; padding:4px; line-height:1; }
 .input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
-.desk-pet { position:absolute; top:-38px; right:24px; width:36px; height:36px; cursor:pointer; z-index:50; animation:petFloat 3s ease-in-out infinite; }
-.pet-body { position:relative; width:100%; height:100%; }
-.pet-head { width:32px; height:28px; background:var(--accent,#D97A54); border-radius:50% 50% 45% 45%; position:absolute; bottom:0; left:2px; }
-.pet-ear { position:absolute; top:-2px; width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-bottom:10px solid var(--accent,#D97A54); }
-.pet-ear-l { left:2px; transform:rotate(-10deg); }
-.pet-ear-r { right:2px; transform:rotate(10deg); }
-.pet-eye { position:absolute; top:10px; width:5px; height:5px; background:#2a1a0a; border-radius:50%; }
-.pet-eye-l { left:7px; }
-.pet-eye-r { right:7px; }
-.pet-pupil { width:2px; height:2px; background:#fff; border-radius:50%; position:absolute; top:1px; left:1px; }
-.pet-nose { position:absolute; top:16px; left:50%; transform:translateX(-50%); width:3px; height:2px; background:#8B4513; border-radius:50%; }
-.pet-mouth { position:absolute; top:19px; left:50%; transform:translateX(-50%); width:8px; height:3px; border-bottom:1.5px solid #8B4513; border-radius:0 0 50% 50%; }
-.pet-blush { position:absolute; top:14px; width:5px; height:3px; background:rgba(255,150,150,.4); border-radius:50%; }
-.pet-blush-l { left:2px; }
-.pet-blush-r { right:2px; }
-.pet-tail { position:absolute; bottom:4px; right:-6px; width:12px; height:12px; border:2px solid var(--accent,#D97A54); border-color:transparent var(--accent,#D97A54) var(--accent,#D97A54) transparent; border-radius:0 0 50% 0; animation:petTail 1.5s ease-in-out infinite; transform-origin:left top; }
-@keyframes petFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
-@keyframes petTail { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(15deg)} }
-.desk-pet.poked .pet-eye { height:2px; top:12px; border-radius:2px; }
-.desk-pet.poked .pet-mouth { border-bottom:none; width:6px; height:4px; background:#8B4513; border-radius:50%; top:18px; }
+.desk-pet { position:absolute; top:-42px; right:24px; width:40px; height:40px; cursor:pointer; z-index:50; animation:petFloat 3s ease-in-out infinite; filter:drop-shadow(0 2px 6px rgba(217,122,84,.3)); }
+.pet-claude { width:100%; height:100%; }
+.pet-sparkle { animation:petSpin 8s linear infinite; transform-origin:20px 20px; }
+@keyframes petFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+@keyframes petSpin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+.desk-pet.poked .pet-sparkle { animation:petSpin 0.4s linear infinite; }
+.desk-pet.poked .pet-face-l, .desk-pet.poked .pet-face-r { ry:0.6; rx:2.5; }
+.desk-pet.poked .pet-smile { d:path("M15 23 Q20 28 25 23"); }
+@keyframes petBlink { 0%,42%,46%,100%{ry:1.8} 44%{ry:0.3} }
+.pet-face-l, .pet-face-r { animation:petBlink 4s ease-in-out infinite; }
+.pet-face-r { animation-delay:0.1s; }
 .input-box {
   background: var(--input-bg); border-radius: 24px;
   border: 1px solid var(--border); overflow: hidden; transition: border-color .2s;
@@ -3081,19 +3072,22 @@ body {
         <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md,.json,.csv,.xlsx,.xls,.ppt,.pptx,.zip,.rar" style="display:none">
       </div>
       <div class="desk-pet" id="deskPet" onclick="petPoke()">
-        <div class="pet-body">
-          <div class="pet-ear pet-ear-l"></div>
-          <div class="pet-ear pet-ear-r"></div>
-          <div class="pet-head">
-            <div class="pet-eye pet-eye-l"><div class="pet-pupil"></div></div>
-            <div class="pet-eye pet-eye-r"><div class="pet-pupil"></div></div>
-            <div class="pet-nose"></div>
-            <div class="pet-mouth"></div>
-            <div class="pet-blush pet-blush-l"></div>
-            <div class="pet-blush pet-blush-r"></div>
-          </div>
-          <div class="pet-tail"></div>
-        </div>
+        <svg class="pet-claude" viewBox="0 0 40 40" fill="none">
+          <circle cx="20" cy="20" r="16" fill="#D97A54"/>
+          <g class="pet-sparkle" stroke="#FFF3E8" stroke-width="2.2" stroke-linecap="round">
+            <line x1="20" y1="8" x2="20" y2="14"/>
+            <line x1="20" y1="26" x2="20" y2="32"/>
+            <line x1="8" y1="20" x2="14" y2="20"/>
+            <line x1="26" y1="20" x2="32" y2="20"/>
+            <line x1="11.5" y1="11.5" x2="15.5" y2="15.5"/>
+            <line x1="24.5" y1="24.5" x2="28.5" y2="28.5"/>
+            <line x1="28.5" y1="11.5" x2="24.5" y2="15.5"/>
+            <line x1="15.5" y1="24.5" x2="11.5" y2="28.5"/>
+          </g>
+          <circle class="pet-face-l" cx="15" cy="19" r="1.8" fill="#FFF3E8"/>
+          <circle class="pet-face-r" cx="25" cy="19" r="1.8" fill="#FFF3E8"/>
+          <path class="pet-smile" d="M16 24 Q20 27 24 24" stroke="#FFF3E8" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        </svg>
       </div>
       <div class="input-box">
         <div class="input-field-wrap"><textarea class="input-field" rows="1" placeholder="Message..." oninput="autoResize(this)"></textarea></div>
