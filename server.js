@@ -2822,18 +2822,32 @@ body {
 .voice-text-content { font-size: 14px; line-height: 1.5; color: var(--text); margin-top: 6px; padding: 8px 12px; background: var(--surface, #f5f5f5); border-radius: 10px; word-break: break-word; }
 #micRecBtn.recording { color: #e44; animation: pulse-rec 1.2s infinite; }
 @keyframes pulse-rec { 0%,100%{opacity:1} 50%{opacity:.4} }
-.rec-overlay { position:absolute;left:0;right:0;bottom:0;height:56px;background:var(--surface);z-index:100;display:flex;align-items:center;padding:0 16px;gap:12px; }
-.rec-dot { width:10px;height:10px;border-radius:50%;background:#e44;animation:pulse-rec 1s infinite; }
-.rec-time { font-size:14px;color:var(--text-faint);font-variant-numeric:tabular-nums; }
-.rec-cancel { font-size:13px;color:var(--text-faint);cursor:pointer;margin-left:auto; }
-.rec-send { background:var(--accent,#D97A54);color:#fff;border:none;padding:6px 18px;border-radius:999px;font-size:14px;cursor:pointer;margin-left:8px; }
-.audio-bubble { display:flex;align-items:center;gap:10px;padding:10px 14px!important;min-width:160px;cursor:pointer; }
-.audio-icon { width:18px;height:18px;flex-shrink:0;color:var(--accent,#D97A54); }
+.rec-overlay { position:absolute;left:0;right:0;bottom:0;height:56px;background:var(--surface);z-index:100;display:flex;align-items:center;padding:0 16px;gap:10px;border-top:1px solid var(--divider,#E8E3DB); }
+.rec-dot { width:8px;height:8px;border-radius:50%;background:#e44;animation:pulse-rec 1s infinite;flex-shrink:0; }
+.rec-time { font-size:14px;color:var(--text);font-variant-numeric:tabular-nums;min-width:36px; }
+.rec-cancel { font-size:13px;color:#e44;cursor:pointer;margin-left:auto;padding:6px 12px;border-radius:999px;border:1px solid #e44;background:transparent;transition:background .15s; }
+.rec-cancel:active { background:rgba(228,68,68,.1); }
+.rec-send { background:var(--accent,#D97A54);color:#fff;border:none;padding:6px 18px;border-radius:999px;font-size:14px;cursor:pointer;margin-left:6px;transition:opacity .15s; }
+.rec-send:active { opacity:.7; }
+.audio-bubble { display:flex;align-items:center;gap:8px;padding:10px 14px!important;min-width:120px;max-width:220px;cursor:pointer;border-radius:18px!important; }
+.ke .audio-bubble { background:var(--surface,#F5F0E8)!important; }
+.yao .audio-bubble { background:var(--accent,#D97A54)!important;color:#fff; }
+.yao .audio-icon { color:#fff; }
+.yao .audio-dur { color:rgba(255,255,255,.8); }
+.yao .audio-waveform span { background:rgba(255,255,255,.7); }
+.yao .audio-bubble.playing .audio-waveform span { background:#fff; }
+.audio-icon { width:16px;height:16px;flex-shrink:0;color:var(--accent,#D97A54); }
 .audio-bubble.playing .audio-icon polygon { display:none; }
-.audio-bubble.playing .audio-icon::after { content:'❚❚';font-size:12px; }
-.audio-bar { flex:1;height:4px;background:var(--divider,#E8E3DB);border-radius:2px;overflow:hidden; }
+.audio-bubble.playing .audio-icon::after { content:'❚❚';font-size:11px; }
+.audio-waveform { display:flex;align-items:center;gap:2px;flex:1;height:20px; }
+.audio-waveform span { display:inline-block;width:3px;border-radius:2px;background:var(--accent,#D97A54);opacity:.5;transition:opacity .15s; }
+.audio-bubble.playing .audio-waveform span { opacity:1;animation:waveAnim .6s ease-in-out infinite alternate; }
+.audio-bubble.playing .audio-waveform span:nth-child(2n) { animation-delay:.15s; }
+.audio-bubble.playing .audio-waveform span:nth-child(3n) { animation-delay:.3s; }
+@keyframes waveAnim { 0%{transform:scaleY(.5)} 100%{transform:scaleY(1.3)} }
+.audio-bar { display:none; }
 .audio-bar-fill { width:0%;height:100%;background:var(--accent,#D97A54);border-radius:2px;transition:width .1s linear; }
-.audio-dur { font-size:12px;color:var(--text-faint);min-width:28px;text-align:right; }
+.audio-dur { font-size:12px;color:var(--text-faint);min-width:24px;text-align:right;flex-shrink:0; }
 .sheet-overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,.25);
   z-index: 200; opacity: 0; pointer-events: none; transition: opacity .3s;
@@ -3180,9 +3194,10 @@ function toggleVoiceText(el, b64) {
   el.textContent = '收起';
 }
 
-var _recorder = null, _recStream = null, _recChunks = [], _recStart = 0, _recTimer = null;
+var _recorder = null, _recStream = null, _recChunks = [], _recStart = 0, _recTimer = null, _recCancelled = false;
 function toggleRecord() {
-  if (_recorder && _recorder.state === 'recording') { _recorder.stop(); return; }
+  if (_recorder && _recorder.state === 'recording') { stopRecord(); return; }
+  _recCancelled = false;
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream) {
     _recStream = stream;
     _recorder = new MediaRecorder(stream, {mimeType:'audio/webm;codecs=opus'});
@@ -3194,7 +3209,7 @@ function toggleRecord() {
       document.getElementById('micRecBtn').classList.remove('recording');
       var el = document.querySelector('.rec-overlay');
       if (el) el.remove();
-      if (_recChunks.length === 0) return;
+      if (_recCancelled || _recChunks.length === 0) { _recChunks = []; return; }
       var blob = new Blob(_recChunks, {type:'audio/webm'});
       var reader = new FileReader();
       reader.onload = function() { sendAudio(reader.result); };
@@ -3218,7 +3233,7 @@ function toggleRecord() {
   });
 }
 function cancelRecord() {
-  _recChunks = [];
+  _recCancelled = true;
   if (_recorder && _recorder.state === 'recording') _recorder.stop();
 }
 function stopRecord() {
@@ -3291,7 +3306,9 @@ function renderMessage(msg, idx, stagger) {
     colHtml += '<div class="msg-bubble" style="padding:4px"><img class="msg-img" src="'+msg.imageUrl+'" onclick="viewImg(this.src)"></div>';
   }
   if (msg.audioUrl) {
-    colHtml += '<div class="msg-bubble audio-bubble" onclick="playAudioMsg(this,\\''+msg.audioUrl+'\\')"><svg class="audio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg><div class="audio-bar"><div class="audio-bar-fill"></div></div><span class="audio-dur"></span></div>';
+    var waveBars = '';
+    for (var wb = 0; wb < 12; wb++) { var wh = 4 + Math.floor(Math.random() * 16); waveBars += '<span style="height:'+wh+'px"></span>'; }
+    colHtml += '<div class="msg-bubble audio-bubble" onclick="playAudioMsg(this,\\''+msg.audioUrl+'\\')"><svg class="audio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg><div class="audio-waveform">' + waveBars + '</div><span class="audio-dur"></span></div>';
   }
   if (msg.file) {
     var fn = escHtml(msg.filename || '文件');
@@ -3318,7 +3335,8 @@ function renderMessage(msg, idx, stagger) {
       + '<div class="voice-text-content" style="display:none"></div>'
       + '</div>';
   } else {
-  var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l && !(msg.image && l === '[图片]')});
+  var hasMedia = msg.image || msg.imageUrl || msg.audioUrl || msg.file || msg.fileUrl;
+  var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l && !(hasMedia && /^\\[(图片|语音|文件)\\]/.test(l))});
   var bubbleIdx = 0;
   lines.forEach(function(line) {
     var delay = stagger ? 'style="opacity:0;animation:fadeInBubble 0.3s ease '+((bubbleIdx)*0.4)+'s forwards"' : '';
