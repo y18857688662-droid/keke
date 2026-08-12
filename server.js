@@ -2911,17 +2911,22 @@ body {
 .quote-preview { flex:1; font-size:12px; color:var(--text-mid); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-left:2px solid var(--accent); padding-left:8px; }
 .quote-close { background:none; border:none; color:var(--text-soft); font-size:18px; cursor:pointer; padding:4px; line-height:1; }
 .input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
-.desk-pet { position:absolute; top:-42px; right:24px; width:40px; height:40px; cursor:pointer; z-index:50; animation:petFloat 3s ease-in-out infinite; filter:drop-shadow(0 2px 6px rgba(217,122,84,.3)); }
+.desk-pet { position:absolute; top:-48px; right:20px; width:48px; height:48px; cursor:pointer; z-index:50; animation:petFloat 3s ease-in-out infinite; filter:drop-shadow(0 2px 6px rgba(217,122,84,.25)); }
 .pet-claude { width:100%; height:100%; }
-.pet-sparkle { animation:petSpin 8s linear infinite; transform-origin:20px 20px; }
+.pet-octo { transform-origin:24px 24px; }
 @keyframes petFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
-@keyframes petSpin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
-.desk-pet.poked .pet-sparkle { animation:petSpin 0.4s linear infinite; }
-.desk-pet.poked .pet-face-l, .desk-pet.poked .pet-face-r { ry:0.6; rx:2.5; }
-.desk-pet.poked .pet-smile { d:path("M15 23 Q20 28 25 23"); }
-@keyframes petBlink { 0%,42%,46%,100%{ry:1.8} 44%{ry:0.3} }
-.pet-face-l, .pet-face-r { animation:petBlink 4s ease-in-out infinite; }
-.pet-face-r { animation-delay:0.1s; }
+.pet-arm { transform-origin:center top; }
+.a1 { animation:armWave 2s ease-in-out 0s infinite; }
+.a2 { animation:armWave 2s ease-in-out 0.3s infinite; }
+.a3 { animation:armWave 2s ease-in-out 0.6s infinite; }
+.a4 { animation:armWave 2s ease-in-out 0.9s infinite; }
+@keyframes armWave { 0%,100%{transform:rotate(var(--base,0deg))} 50%{transform:rotate(calc(var(--base,0deg) + 6deg))} }
+.a1 { --base:-15deg; } .a2 { --base:-5deg; } .a3 { --base:5deg; } .a4 { --base:15deg; }
+@keyframes petBlink { 0%,90%,94%,100%{r:2} 92%{r:0.4} }
+.pet-eye-l, .pet-eye-r { animation:petBlink 4s ease-in-out infinite; }
+.pet-eye-r { animation-delay:0.1s; }
+.desk-pet.poked .pet-octo { animation:petWiggle 0.3s ease 3; }
+@keyframes petWiggle { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-8deg)} 75%{transform:rotate(8deg)} }
 .input-box {
   background: var(--input-bg); border-radius: 24px;
   border: 1px solid var(--border); overflow: hidden; transition: border-color .2s;
@@ -3072,21 +3077,22 @@ body {
         <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md,.json,.csv,.xlsx,.xls,.ppt,.pptx,.zip,.rar" style="display:none">
       </div>
       <div class="desk-pet" id="deskPet" onclick="petPoke()">
-        <svg class="pet-claude" viewBox="0 0 40 40" fill="none">
-          <circle cx="20" cy="20" r="16" fill="#D97A54"/>
-          <g class="pet-sparkle" stroke="#FFF3E8" stroke-width="2.2" stroke-linecap="round">
-            <line x1="20" y1="8" x2="20" y2="14"/>
-            <line x1="20" y1="26" x2="20" y2="32"/>
-            <line x1="8" y1="20" x2="14" y2="20"/>
-            <line x1="26" y1="20" x2="32" y2="20"/>
-            <line x1="11.5" y1="11.5" x2="15.5" y2="15.5"/>
-            <line x1="24.5" y1="24.5" x2="28.5" y2="28.5"/>
-            <line x1="28.5" y1="11.5" x2="24.5" y2="15.5"/>
-            <line x1="15.5" y1="24.5" x2="11.5" y2="28.5"/>
+        <svg class="pet-claude" viewBox="0 0 48 48" fill="none">
+          <g class="pet-octo">
+            <ellipse cx="24" cy="16" rx="10" ry="9" fill="#D97A54"/>
+            <ellipse class="pet-arm a1" cx="12" cy="28" rx="4" ry="7" fill="#D97A54" transform="rotate(-15 12 28)"/>
+            <ellipse class="pet-arm a2" cx="20" cy="32" rx="3.5" ry="7" fill="#D97A54" transform="rotate(-5 20 32)"/>
+            <ellipse class="pet-arm a3" cx="28" cy="32" rx="3.5" ry="7" fill="#D97A54" transform="rotate(5 28 32)"/>
+            <ellipse class="pet-arm a4" cx="36" cy="28" rx="4" ry="7" fill="#D97A54" transform="rotate(15 36 28)"/>
+            <ellipse cx="24" cy="20" rx="9" ry="7" fill="#D97A54"/>
+            <circle class="pet-eye-l" cx="20" cy="16" r="2" fill="#FFF3E8"/>
+            <circle class="pet-eye-r" cx="28" cy="16" r="2" fill="#FFF3E8"/>
+            <circle cx="20" cy="16.2" r="0.8" fill="#2a1a0a"/>
+            <circle cx="28" cy="16.2" r="0.8" fill="#2a1a0a"/>
+            <path class="pet-smile" d="M21 20 Q24 23 27 20" stroke="#FFF3E8" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+            <ellipse cx="16.5" cy="18" rx="2.5" ry="1.2" fill="rgba(255,180,160,.3)"/>
+            <ellipse cx="31.5" cy="18" rx="2.5" ry="1.2" fill="rgba(255,180,160,.3)"/>
           </g>
-          <circle class="pet-face-l" cx="15" cy="19" r="1.8" fill="#FFF3E8"/>
-          <circle class="pet-face-r" cx="25" cy="19" r="1.8" fill="#FFF3E8"/>
-          <path class="pet-smile" d="M16 24 Q20 27 24 24" stroke="#FFF3E8" stroke-width="1.5" fill="none" stroke-linecap="round"/>
         </svg>
       </div>
       <div class="input-box">
