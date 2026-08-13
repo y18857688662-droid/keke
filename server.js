@@ -3733,7 +3733,7 @@ function renderMessage(msg, idx, stagger) {
   }
   colHtml += '</div>';
   group.innerHTML = avaHtml + colHtml;
-  if (stagger && lines.length > 1) {
+  if (stagger && lines && lines.length > 1) {
     setTimeout(function(){ scrollBottom(); }, lines.length * 400 + 100);
   }
   return group;
