@@ -1501,6 +1501,230 @@ load();
 <\/script></body></html>`);
 });
 
+// ── Bookmarks / Content Discovery ──
+const BOOKMARKS_FILE = path.join(__dirname, 'bookmarks.json');
+function readBookmarks() { try { return JSON.parse(fs.readFileSync(BOOKMARKS_FILE, 'utf8')); } catch { return []; } }
+function writeBookmarks(data) { fs.writeFileSync(BOOKMARKS_FILE, JSON.stringify(data)); }
+
+async function fetchJSON(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const mod = u.protocol === 'https:' ? require('https') : require('http');
+    const req = mod.get(url, { headers: { 'User-Agent': 'Mozilla/5.0', ...headers }, timeout: 10000 }, (res) => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch { reject(new Error('parse error')); } });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+  });
+}
+
+async function discoverBilibili() {
+  const items = [];
+  try {
+    const keywords = ['有趣', '搞笑', '治愈', '日常', '科技', '美食', '手工', '猫'];
+    const kw = keywords[Math.floor(Math.random() * keywords.length)];
+    const data = await fetchJSON(`https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=${encodeURIComponent(kw)}&page=1&pagesize=5`);
+    if (data && data.data && data.data.result) {
+      for (const v of data.data.result.slice(0, 5)) {
+        items.push({
+          id: 'bili_' + v.aid,
+          source: 'bilibili',
+          title: (v.title || '').replace(/<[^>]*>/g, ''),
+          desc: (v.description || '').slice(0, 120),
+          url: `https://www.bilibili.com/video/${v.bvid}`,
+          thumb: v.pic ? (v.pic.startsWith('//') ? 'https:' + v.pic : v.pic) : '',
+          author: v.author || '',
+          play: v.play || 0,
+          ts: Date.now()
+        });
+      }
+    }
+  } catch (e) { console.log('[bookmarks] bilibili error:', e.message); }
+  return items;
+}
+
+async function discoverGitHub() {
+  const items = [];
+  try {
+    const d = new Date(Date.now() - 7 * 86400000);
+    const since = d.toISOString().slice(0, 10);
+    const data = await fetchJSON(`https://api.github.com/search/repositories?q=stars:>50+created:>${since}&sort=stars&order=desc&per_page=5`, { Accept: 'application/vnd.github.v3+json' });
+    if (data && data.items) {
+      for (const r of data.items.slice(0, 5)) {
+        items.push({
+          id: 'gh_' + r.id,
+          source: 'github',
+          title: r.full_name,
+          desc: (r.description || '').slice(0, 120),
+          url: r.html_url,
+          thumb: r.owner ? r.owner.avatar_url : '',
+          author: r.owner ? r.owner.login : '',
+          stars: r.stargazers_count || 0,
+          lang: r.language || '',
+          ts: Date.now()
+        });
+      }
+    }
+  } catch (e) { console.log('[bookmarks] github error:', e.message); }
+  return items;
+}
+
+async function discoverYouTube() {
+  const items = [];
+  try {
+    const keywords = ['funny', 'satisfying', 'cute cats', 'cooking', 'tech', 'music'];
+    const kw = keywords[Math.floor(Math.random() * keywords.length)];
+    const data = await fetchJSON(`https://vid.puffyan.us/api/v1/search?q=${encodeURIComponent(kw)}&type=video&sort_by=relevance&page=1`);
+    if (Array.isArray(data)) {
+      for (const v of data.filter(x => x.type === 'video').slice(0, 5)) {
+        items.push({
+          id: 'yt_' + v.videoId,
+          source: 'youtube',
+          title: v.title || '',
+          desc: (v.descriptionHtml || '').replace(/<[^>]*>/g, '').slice(0, 120),
+          url: `https://www.youtube.com/watch?v=${v.videoId}`,
+          thumb: v.videoThumbnails && v.videoThumbnails.length > 0 ? v.videoThumbnails[v.videoThumbnails.length > 4 ? 4 : 0].url : '',
+          author: v.author || '',
+          views: v.viewCount || 0,
+          ts: Date.now()
+        });
+      }
+    }
+  } catch (e) { console.log('[bookmarks] youtube error:', e.message); }
+  return items;
+}
+
+app.get('/bookmarks/data', (req, res) => {
+  const bookmarks = readBookmarks();
+  const source = req.query.source;
+  const filtered = source ? bookmarks.filter(b => b.source === source) : bookmarks;
+  res.json({ bookmarks: filtered.slice(-60).reverse() });
+});
+
+app.post('/bookmarks/discover', async (req, res) => {
+  const existing = readBookmarks();
+  const existIds = new Set(existing.map(b => b.id));
+  const [bili, gh, yt] = await Promise.all([discoverBilibili(), discoverGitHub(), discoverYouTube()]);
+  const newItems = [...bili, ...gh, ...yt].filter(item => !existIds.has(item.id));
+  if (newItems.length > 0) {
+    const all = [...existing, ...newItems];
+    writeBookmarks(all.slice(-200));
+  }
+  res.json({ ok: true, added: newItems.length, total: readBookmarks().length });
+});
+
+app.post('/bookmarks/remove', (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.json({ ok: false });
+  const bookmarks = readBookmarks().filter(b => b.id !== id);
+  writeBookmarks(bookmarks);
+  res.json({ ok: true });
+});
+
+app.get('/bookmarks', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>克的收藏</title>
+<style>
+:root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1816;--text-soft:#6B6560;--text-faint:#999;--accent:#D97A54;--divider:#E8E3DB;
+  --font:-apple-system,"SF Pro Display","SF Pro Text","PingFang SC","Noto Sans SC",system-ui,sans-serif;
+  --shadow:0 2px 12px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#242220;--text:#E8E3DB;--text-soft:#9B9590;--text-faint:#6B6560;--accent:#E8A090;--divider:#333;--shadow:0 2px 12px rgba(0,0,0,.2)}}
+:root[data-theme="dark"]{--bg:#1A1816;--card:#242220;--text:#E8E3DB;--text-soft:#9B9590;--text-faint:#6B6560;--accent:#E8A090;--divider:#333;--shadow:0 2px 12px rgba(0,0,0,.2)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;font-family:var(--font);-webkit-font-smoothing:antialiased}
+.header{display:flex;align-items:center;padding:16px;gap:12px;position:sticky;top:0;background:var(--bg);z-index:10}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600;flex:1}
+.refresh-btn{background:none;border:1px solid var(--divider);color:var(--accent);font-size:13px;padding:6px 14px;border-radius:20px;cursor:pointer;font-family:var(--font)}
+.refresh-btn:active{opacity:.6}
+.tabs{display:flex;gap:0;padding:0 16px 12px;border-bottom:1px solid var(--divider)}
+.tab{flex:1;text-align:center;padding:8px 0;font-size:13px;color:var(--text-soft);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500}
+.cards{padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bk-card{background:var(--card);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;text-decoration:none;color:var(--text);display:flex;flex-direction:column;transition:transform .15s}
+.bk-card:active{transform:scale(.97)}
+.bk-thumb{width:100%;aspect-ratio:16/10;object-fit:cover;background:var(--divider)}
+.bk-thumb.gh{aspect-ratio:1;width:48px;height:48px;border-radius:12px;margin:12px auto 0}
+.bk-body{padding:10px 12px 12px;flex:1;display:flex;flex-direction:column}
+.bk-source{font-size:11px;color:var(--accent);font-weight:500;margin-bottom:4px;text-transform:uppercase}
+.bk-title{font-size:13px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bk-desc{font-size:12px;color:var(--text-soft);line-height:1.4;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bk-meta{font-size:11px;color:var(--text-faint);margin-top:auto;padding-top:6px}
+.gh-card{grid-column:1/-1;flex-direction:row;align-items:center;padding:12px 16px;gap:12px}
+.gh-card .bk-thumb{margin:0;flex-shrink:0}
+.gh-card .bk-body{padding:0}
+.empty{text-align:center;color:var(--text-faint);padding:60px 0;font-size:14px;grid-column:1/-1}
+.loading{text-align:center;padding:40px 0;color:var(--text-faint);font-size:13px;grid-column:1/-1}
+.subtitle{color:var(--text-soft);font-size:13px;padding:0 16px 8px;text-align:center}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinning{animation:spin .8s linear infinite;display:inline-block}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>📑 克的收藏</h1><button class="refresh-btn" onclick="discover()"><span id="ref-icon">↻</span> 发现</button></div>
+<div class="subtitle">克替你逛了互联网</div>
+<div class="tabs">
+  <div class="tab active" data-src="" onclick="switchTab(this)">全部</div>
+  <div class="tab" data-src="bilibili" onclick="switchTab(this)">B站</div>
+  <div class="tab" data-src="youtube" onclick="switchTab(this)">油管</div>
+  <div class="tab" data-src="github" onclick="switchTab(this)">GitHub</div>
+</div>
+<div class="cards" id="cards"><div class="loading">加载中…</div></div>
+<script>
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+var curSource='';
+function switchTab(el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  curSource=el.dataset.src;
+  load();
+}
+function fmtNum(n){if(n>=10000)return(n/10000).toFixed(1)+'万';if(n>=1000)return(n/1000).toFixed(1)+'k';return n}
+function renderCard(b){
+  if(b.source==='github'){
+    return '<a class="bk-card gh-card" href="'+esc(b.url)+'" target="_blank">'
+      +'<img class="bk-thumb gh" src="'+esc(b.thumb)+'" onerror="this.style.display=\\'none\\'">'
+      +'<div class="bk-body"><div class="bk-source">GitHub</div>'
+      +'<div class="bk-title">'+esc(b.title)+'</div>'
+      +'<div class="bk-desc">'+esc(b.desc)+'</div>'
+      +'<div class="bk-meta">⭐ '+fmtNum(b.stars||0)+(b.lang?' · '+esc(b.lang):'')+'</div></div></a>';
+  }
+  var src=b.source==='bilibili'?'B站':'YouTube';
+  var meta=b.source==='bilibili'?('▶ '+fmtNum(b.play||0)+' · '+esc(b.author)):('▶ '+fmtNum(b.views||0)+' · '+esc(b.author));
+  return '<a class="bk-card" href="'+esc(b.url)+'" target="_blank">'
+    +(b.thumb?'<img class="bk-thumb" src="'+esc(b.thumb)+'" onerror="this.style.display=\\'none\\'">':'')
+    +'<div class="bk-body"><div class="bk-source">'+src+'</div>'
+    +'<div class="bk-title">'+esc(b.title)+'</div>'
+    +'<div class="bk-desc">'+esc(b.desc)+'</div>'
+    +'<div class="bk-meta">'+meta+'</div></div></a>';
+}
+async function load(){
+  var el=document.getElementById('cards');
+  el.innerHTML='<div class="loading">加载中…</div>';
+  try{
+    var url='/bookmarks/data'+(curSource?'?source='+curSource:'');
+    var r=await fetch(url);var d=await r.json();
+    if(!d.bookmarks||d.bookmarks.length===0){
+      el.innerHTML='<div class="empty">还没有收藏<br><span style="font-size:12px;margin-top:8px;display:block">点击右上角「发现」让克去逛逛</span></div>';
+      return;
+    }
+    el.innerHTML=d.bookmarks.map(renderCard).join('');
+  }catch(e){el.innerHTML='<div class="empty">加载失败</div>';}
+}
+async function discover(){
+  var icon=document.getElementById('ref-icon');
+  icon.classList.add('spinning');
+  try{
+    var r=await fetch('/bookmarks/discover',{method:'POST'});
+    var d=await r.json();
+    load();
+  }catch(e){}
+  icon.classList.remove('spinning');
+}
+load();
+<\/script></body></html>`);
+});
+
 function addAudioTags(text) {
   return text;
 }
@@ -3048,6 +3272,7 @@ body {
       <div class="nav-item" onclick="goPage('/thoughts')"><div class="icon">💭</div><span>克的碎碎念</span></div>
       <div class="nav-item" onclick="goPage('/garden')"><div class="icon">🌿</div><span>小院子</span></div>
       <div class="nav-item" onclick="goPage('/period')"><div class="icon">🌙</div><span>经期</span></div>
+      <div class="nav-item" onclick="goPage('/bookmarks')"><div class="icon">📑</div><span>克的收藏</span></div>
       <div class="nav-item" onclick="goPage('/music/player')"><div class="icon">🎵</div><span>音乐</span></div>
       <div class="nav-item" onclick="goPage('/voice')"><div class="icon">🎙</div><span>声音</span></div>
       <div class="nav-item" onclick="goPage('/screen')"><div class="icon">🖥</div><span>屏幕共享</span></div>
