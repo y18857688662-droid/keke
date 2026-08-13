@@ -500,7 +500,7 @@ loadData();
 
 // === 心情日记 ===
 const DIARY_FILE = path.join(__dirname, 'diary.json');
-function readDiary() { try { return JSON.parse(fs.readFileSync(DIARY_FILE, 'utf8')); } catch { return []; } }
+function readDiary() { try { const d = JSON.parse(fs.readFileSync(DIARY_FILE, 'utf8')); return Array.isArray(d) ? d : []; } catch { return []; } }
 function writeDiary(data) { fs.writeFileSync(DIARY_FILE, JSON.stringify(data)); }
 
 app.get('/diary', (req, res) => {
