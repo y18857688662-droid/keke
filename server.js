@@ -1523,18 +1523,20 @@ async function fetchJSON(url, headers = {}) {
 async function discoverBilibili() {
   const items = [];
   try {
-    const keywords = ['有趣', '搞笑', '治愈', '日常', '科技', '美食', '手工', '猫'];
-    const kw = keywords[Math.floor(Math.random() * keywords.length)];
-    const data = await fetchJSON(`https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=${encodeURIComponent(kw)}&page=1&pagesize=5`);
-    if (data && data.data && data.data.result) {
-      for (const v of data.data.result.slice(0, 5)) {
+    const rids = [1, 3, 4, 5, 17, 36, 160, 188, 211];
+    const rid = rids[Math.floor(Math.random() * rids.length)];
+    const data = await fetchJSON(`https://api.bilibili.com/x/web-interface/ranking/region?rid=${rid}&day=3&original=0`);
+    if (data && data.code === 0 && Array.isArray(data.data)) {
+      const shuffled = data.data.sort(() => Math.random() - 0.5);
+      for (const v of shuffled.slice(0, 5)) {
+        const pic = v.pic || '';
         items.push({
           id: 'bili_' + v.aid,
           source: 'bilibili',
           title: (v.title || '').replace(/<[^>]*>/g, ''),
           desc: (v.description || '').slice(0, 120),
           url: `https://www.bilibili.com/video/${v.bvid}`,
-          thumb: v.pic ? (v.pic.startsWith('//') ? 'https:' + v.pic : v.pic) : '',
+          thumb: pic.startsWith('//') ? 'https:' + pic : pic.startsWith('http') ? pic : '',
           author: v.author || '',
           play: v.play || 0,
           ts: Date.now()
@@ -1573,26 +1575,31 @@ async function discoverGitHub() {
 
 async function discoverYouTube() {
   const items = [];
-  try {
-    const keywords = ['funny', 'satisfying', 'cute cats', 'cooking', 'tech', 'music'];
-    const kw = keywords[Math.floor(Math.random() * keywords.length)];
-    const data = await fetchJSON(`https://vid.puffyan.us/api/v1/search?q=${encodeURIComponent(kw)}&type=video&sort_by=relevance&page=1`);
-    if (Array.isArray(data)) {
-      for (const v of data.filter(x => x.type === 'video').slice(0, 5)) {
-        items.push({
-          id: 'yt_' + v.videoId,
-          source: 'youtube',
-          title: v.title || '',
-          desc: (v.descriptionHtml || '').replace(/<[^>]*>/g, '').slice(0, 120),
-          url: `https://www.youtube.com/watch?v=${v.videoId}`,
-          thumb: v.videoThumbnails && v.videoThumbnails.length > 0 ? v.videoThumbnails[v.videoThumbnails.length > 4 ? 4 : 0].url : '',
-          author: v.author || '',
-          views: v.viewCount || 0,
-          ts: Date.now()
-        });
+  const hosts = ['inv.nadeko.net', 'vid.puffyan.us', 'invidious.fdn.fr', 'yewtu.be'];
+  for (const host of hosts) {
+    try {
+      const data = await fetchJSON(`https://${host}/api/v1/trending?type=Default&region=US`);
+      if (Array.isArray(data) && data.length > 0) {
+        const shuffled = data.sort(() => Math.random() - 0.5);
+        for (const v of shuffled.filter(x => x.videoId).slice(0, 5)) {
+          const thumbs = v.videoThumbnails || [];
+          const thumb = thumbs.find(t => t.quality === 'medium') || thumbs[0] || {};
+          items.push({
+            id: 'yt_' + v.videoId,
+            source: 'youtube',
+            title: v.title || '',
+            desc: (v.description || '').slice(0, 120),
+            url: `https://www.youtube.com/watch?v=${v.videoId}`,
+            thumb: thumb.url || '',
+            author: v.author || '',
+            views: v.viewCount || 0,
+            ts: Date.now()
+          });
+        }
+        break;
       }
-    }
-  } catch (e) { console.log('[bookmarks] youtube error:', e.message); }
+    } catch (e) { console.log(`[bookmarks] youtube ${host} error:`, e.message); }
+  }
   return items;
 }
 
