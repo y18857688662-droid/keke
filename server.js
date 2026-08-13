@@ -2914,7 +2914,7 @@ body {
 .input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
 .desk-pet { position:absolute; top:-78px; left:12px; width:80px; height:80px; cursor:pointer; z-index:50; animation:petWalk 12s ease-in-out infinite; }
 .pet-clawd { width:100%; height:100%; image-rendering:pixelated; pointer-events:none; transition:filter .5s; }
-.pet-mood-fx { position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:16px; pointer-events:none; opacity:0; transition:opacity .4s; white-space:nowrap; }
+.pet-mood-fx { position:absolute; top:-4px; left:50%; transform:translateX(-50%); font-size:14px; pointer-events:none; opacity:0; transition:opacity .4s; white-space:nowrap; }
 .desk-pet[data-mood] .pet-mood-fx { opacity:1; }
 @keyframes petWalk { 0%{left:12px;transform:translateY(0) scaleX(1)} 5%{transform:translateY(-3px) scaleX(1)} 10%{transform:translateY(0) scaleX(1)} 15%{transform:translateY(-3px) scaleX(1)} 20%{transform:translateY(0) scaleX(1)} 25%{left:12px;transform:translateY(0) scaleX(1)} 50%{left:calc(100% - 92px);transform:translateY(0) scaleX(-1)} 55%{transform:translateY(-3px) scaleX(-1)} 60%{transform:translateY(0) scaleX(-1)} 65%{transform:translateY(-3px) scaleX(-1)} 70%{transform:translateY(0) scaleX(-1)} 75%{left:calc(100% - 92px);transform:translateY(0) scaleX(-1)} 100%{left:12px;transform:translateY(0) scaleX(1)} }
 .desk-pet.poked { animation:petJump 0.5s ease 1; }
@@ -3318,23 +3318,34 @@ function stopRecord() {
   if (_recorder && _recorder.state === 'recording') _recorder.stop();
 }
 var _petMoodEmoji = {love:'💕',happy:'♪',sleepy:'💤',thinking:'💭',annoyed:'💢'};
+var _petMoodSprite = {love:'/static/clawd-wave.gif',happy:'/static/clawd-wave.gif',sleepy:'/static/clawd-lurk.gif',thinking:'/static/clawd-magnifier.gif',annoyed:'/static/clawd-lurk.gif'};
 function petPoke() {
   var pet = document.getElementById('deskPet');
   pet.style.animation = 'none';
   pet.offsetHeight;
   pet.classList.add('poked');
+  var img = pet.querySelector('.pet-clawd');
+  if (img) img.src = '/static/clawd-wave.gif';
   setTimeout(function(){
     pet.classList.remove('poked');
     pet.style.animation = '';
-  }, 600);
+    if (img && !pet.getAttribute('data-mood')) img.src = '/static/clawd-idle.gif';
+  }, 1200);
 }
 function petMood(mood) {
   var pet = document.getElementById('deskPet');
   var fx = document.getElementById('petMoodFx');
+  var img = pet ? pet.querySelector('.pet-clawd') : null;
   if (!pet) return;
-  if (!mood) { pet.removeAttribute('data-mood'); if(fx) fx.textContent=''; return; }
+  if (!mood) {
+    pet.removeAttribute('data-mood');
+    if (fx) fx.textContent = '';
+    if (img) img.src = '/static/clawd-idle.gif';
+    return;
+  }
   pet.setAttribute('data-mood', mood);
   if (fx) fx.textContent = _petMoodEmoji[mood] || '';
+  if (img && _petMoodSprite[mood]) img.src = _petMoodSprite[mood];
 }
 function detectMood(text) {
   if (!text) return '';
