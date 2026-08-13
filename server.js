@@ -1392,14 +1392,19 @@ app.post('/chat/reply', async (req, res) => {
   writeChat(chat);
   sseBroadcast({ type: 'message', role: 'assistant', content: reply, time, imageUrl: msg.imageUrl, audioUrl: msg.audioUrl });
   const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-  const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
+  const isVoiceMsg = /^\[voice\]/i.test(cleanReply);
+  const lines = isVoiceMsg ? [] : cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
   if (sseClients.size === 0) {
     (async () => {
-      for (const line of lines) {
-        const isAction = line.startsWith('*') && line.endsWith('*');
-        const text = isAction ? line.slice(1, -1) : line;
-        await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
-        if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+      if (isVoiceMsg) {
+        await sendPushNotification('克', '语音消息');
+      } else {
+        for (const line of lines) {
+          const isAction = line.startsWith('*') && line.endsWith('*');
+          const text = isAction ? line.slice(1, -1) : line;
+          await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+          if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+        }
       }
     })().catch(() => {});
   }
@@ -1414,11 +1419,15 @@ app.post('/chat/reply', async (req, res) => {
           await tgSendHtml(tgId, '🐙 <blockquote expandable>' + escaped + '</blockquote>');
         }
       }
-      for (const line of lines) {
-        const isAction = line.startsWith('*') && line.endsWith('*');
-        await tgSendTyping(tgId);
-        await new Promise(r => setTimeout(r, isAction ? 400 : 600 + Math.random() * 800));
-        await tgSend(tgId, line, isAction);
+      if (isVoiceMsg) {
+        await tgSend(tgId, '🎤 语音消息', false);
+      } else {
+        for (const line of lines) {
+          const isAction = line.startsWith('*') && line.endsWith('*');
+          await tgSendTyping(tgId);
+          await new Promise(r => setTimeout(r, isAction ? 400 : 600 + Math.random() * 800));
+          await tgSend(tgId, line, isAction);
+        }
       }
       if (voice_line) {
         await tgSendTyping(tgId);
