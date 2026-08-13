@@ -3338,12 +3338,12 @@ function petMood(mood) {
 }
 function detectMood(text) {
   if (!text) return '';
-  var t = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-  if (/[爱❤💕么么亲吻喜欢心动宝贝]|mua/i.test(t)) return 'love';
-  if (/[哈嘻开心快乐笑棒好耶]|[!！]{2,}/.test(t)) return 'happy';
-  if (/[困睡觉晚安累哈欠zz]|💤/i.test(t)) return 'sleepy';
-  if (/[想嗯思考hmm]|……{2,}|\.{3,}/.test(t)) return 'thinking';
-  if (/[烦哼切tsk气恼怒]|💢/.test(t)) return 'annoyed';
+  var t = text.replace(new RegExp('<think>[\\s\\S]*?<\\/think>','g'), '').trim();
+  if (/爱|❤|💕|么么|亲|吻|喜欢|心动|宝贝|mua/i.test(t)) return 'love';
+  if (/哈哈|嘻|开心|快乐|笑|棒|好耶|[!！]{2,}/.test(t)) return 'happy';
+  if (/困|睡|晚安|累|哈欠|zz|💤/i.test(t)) return 'sleepy';
+  if (/想|嗯|思考|hmm|\.{3,}/i.test(t)) return 'thinking';
+  if (/烦|哼|切|tsk|气|恼|怒|💢/i.test(t)) return 'annoyed';
   return '';
 }
 function sendAudio(base64, transcript) {
