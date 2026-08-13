@@ -2913,7 +2913,8 @@ body {
 .quote-close { background:none; border:none; color:var(--text-soft); font-size:18px; cursor:pointer; padding:4px; line-height:1; }
 .input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
 .desk-pet { position:absolute; top:-78px; left:12px; width:80px; height:80px; cursor:pointer; z-index:50; animation:petWalk 12s ease-in-out infinite; }
-.pet-clawd { width:100%; height:100%; image-rendering:pixelated; pointer-events:none; transition:filter .5s, opacity .4s; }
+.desk-pet { overflow:hidden; }
+.pet-clawd { width:80px; height:80px; object-fit:contain; image-rendering:pixelated; pointer-events:none; transition:filter .5s, opacity .4s; }
 .pet-mood-fx { position:absolute; top:-4px; left:50%; transform:translateX(-50%); font-size:14px; pointer-events:none; opacity:0; transition:opacity .4s; white-space:nowrap; }
 .desk-pet[data-mood] .pet-mood-fx { opacity:1; }
 @keyframes petWalk { 0%{left:12px;transform:translateY(0) scaleX(1)} 5%{transform:translateY(-3px) scaleX(1)} 10%{transform:translateY(0) scaleX(1)} 15%{transform:translateY(-3px) scaleX(1)} 20%{transform:translateY(0) scaleX(1)} 25%{left:12px;transform:translateY(0) scaleX(1)} 50%{left:calc(100% - 92px);transform:translateY(0) scaleX(-1)} 55%{transform:translateY(-3px) scaleX(-1)} 60%{transform:translateY(0) scaleX(-1)} 65%{transform:translateY(-3px) scaleX(-1)} 70%{transform:translateY(0) scaleX(-1)} 75%{left:calc(100% - 92px);transform:translateY(0) scaleX(-1)} 100%{left:12px;transform:translateY(0) scaleX(1)} }
