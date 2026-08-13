@@ -2915,7 +2915,7 @@ body {
 .desk-pet { position:absolute; top:-78px; left:12px; width:80px; height:80px; cursor:pointer; z-index:50; animation:petWalk 12s ease-in-out infinite; }
 .desk-pet { overflow:hidden; }
 .pet-clawd { width:80px; height:80px; object-fit:contain; image-rendering:pixelated; pointer-events:none; transition:filter .5s, opacity .4s; }
-.pet-mood-fx { position:absolute; top:-4px; left:50%; transform:translateX(-50%); font-size:14px; pointer-events:none; opacity:0; transition:opacity .4s; white-space:nowrap; }
+.pet-mood-fx { position:absolute; top:6px; left:50%; transform:translateX(-50%); font-size:12px; pointer-events:none; opacity:0; transition:opacity .4s; white-space:nowrap; z-index:51; }
 .desk-pet[data-mood] .pet-mood-fx { opacity:1; }
 @keyframes petWalk { 0%{left:12px;transform:translateY(0)} 5%{transform:translateY(-3px)} 10%{transform:translateY(0)} 15%{transform:translateY(-3px)} 20%{transform:translateY(0)} 25%{left:12px;transform:translateY(0)} 50%{left:calc(100% - 92px);transform:translateY(0)} 55%{transform:translateY(-3px)} 60%{transform:translateY(0)} 65%{transform:translateY(-3px)} 70%{transform:translateY(0)} 75%{left:calc(100% - 92px);transform:translateY(0)} 100%{left:12px;transform:translateY(0)} }
 .desk-pet.poked { animation:petJump 0.5s ease 1; }
