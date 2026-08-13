@@ -2913,12 +2913,24 @@ body {
 .quote-close { background:none; border:none; color:var(--text-soft); font-size:18px; cursor:pointer; padding:4px; line-height:1; }
 .input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
 .desk-pet { position:absolute; top:-78px; left:12px; width:80px; height:80px; cursor:pointer; z-index:50; animation:petWalk 12s ease-in-out infinite; }
-.pet-clawd { width:100%; height:100%; image-rendering:pixelated; pointer-events:none; transition:transform .3s; }
+.pet-clawd { width:100%; height:100%; image-rendering:pixelated; pointer-events:none; transition:filter .5s; }
+.pet-mood-fx { position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:16px; pointer-events:none; opacity:0; transition:opacity .4s; white-space:nowrap; }
+.desk-pet[data-mood] .pet-mood-fx { opacity:1; }
 @keyframes petWalk { 0%{left:12px;transform:translateY(0) scaleX(1)} 5%{transform:translateY(-3px) scaleX(1)} 10%{transform:translateY(0) scaleX(1)} 15%{transform:translateY(-3px) scaleX(1)} 20%{transform:translateY(0) scaleX(1)} 25%{left:12px;transform:translateY(0) scaleX(1)} 50%{left:calc(100% - 92px);transform:translateY(0) scaleX(-1)} 55%{transform:translateY(-3px) scaleX(-1)} 60%{transform:translateY(0) scaleX(-1)} 65%{transform:translateY(-3px) scaleX(-1)} 70%{transform:translateY(0) scaleX(-1)} 75%{left:calc(100% - 92px);transform:translateY(0) scaleX(-1)} 100%{left:12px;transform:translateY(0) scaleX(1)} }
 .desk-pet.poked { animation:petJump 0.5s ease 1; }
 @keyframes petJump { 0%{transform:translateY(0) rotate(0)} 30%{transform:translateY(-20px) rotate(-10deg)} 50%{transform:translateY(-24px) rotate(5deg)} 70%{transform:translateY(-8px) rotate(-3deg)} 100%{transform:translateY(0) rotate(0)} }
-.desk-pet.sleepy .pet-clawd { filter:brightness(0.85); }
-.desk-pet.happy .pet-clawd { filter:saturate(1.3) brightness(1.1); }
+.desk-pet[data-mood="love"] .pet-clawd { filter:hue-rotate(-20deg) saturate(1.4) brightness(1.05); }
+.desk-pet[data-mood="love"] .pet-mood-fx { animation:moodFloat 1.5s ease-in-out infinite; }
+.desk-pet[data-mood="happy"] .pet-clawd { filter:saturate(1.3) brightness(1.15); }
+.desk-pet[data-mood="happy"] .pet-mood-fx { animation:moodFloat 1.2s ease-in-out infinite; }
+.desk-pet[data-mood="sleepy"] .pet-clawd { filter:brightness(0.75) saturate(0.7); }
+.desk-pet[data-mood="sleepy"] .pet-mood-fx { animation:moodFloat 2.5s ease-in-out infinite; }
+.desk-pet[data-mood="thinking"] .pet-clawd { filter:brightness(0.95) contrast(1.1); }
+.desk-pet[data-mood="thinking"] .pet-mood-fx { animation:moodFloat 2s ease-in-out infinite; }
+.desk-pet[data-mood="annoyed"] .pet-clawd { filter:hue-rotate(10deg) saturate(1.2); animation:petShake 0.3s ease-in-out infinite; }
+.desk-pet[data-mood="annoyed"] .pet-mood-fx { animation:moodFloat 1s ease-in-out infinite; }
+@keyframes moodFloat { 0%,100%{transform:translateX(-50%) translateY(0);opacity:1} 50%{transform:translateX(-50%) translateY(-6px);opacity:.7} }
+@keyframes petShake { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-3deg)} 75%{transform:rotate(3deg)} }
 .input-box {
   background: var(--input-bg); border-radius: 24px;
   border: 1px solid var(--border); overflow: hidden; transition: border-color .2s;
@@ -3069,6 +3081,7 @@ body {
         <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md,.json,.csv,.xlsx,.xls,.ppt,.pptx,.zip,.rar" style="display:none">
       </div>
       <div class="desk-pet" id="deskPet" onclick="petPoke()">
+        <span class="pet-mood-fx" id="petMoodFx"></span>
         <img class="pet-clawd" src="/static/clawd-idle.gif" alt="Clawd" draggable="false">
       </div>
       <div class="input-box">
@@ -3304,9 +3317,9 @@ function cancelRecord() {
 function stopRecord() {
   if (_recorder && _recorder.state === 'recording') _recorder.stop();
 }
+var _petMoodEmoji = {love:'💕',happy:'♪',sleepy:'💤',thinking:'💭',annoyed:'💢'};
 function petPoke() {
   var pet = document.getElementById('deskPet');
-  var walkAnim = pet.style.animation || '';
   pet.style.animation = 'none';
   pet.offsetHeight;
   pet.classList.add('poked');
@@ -3317,9 +3330,21 @@ function petPoke() {
 }
 function petMood(mood) {
   var pet = document.getElementById('deskPet');
+  var fx = document.getElementById('petMoodFx');
   if (!pet) return;
-  pet.classList.remove('sleepy','happy');
-  if (mood) pet.classList.add(mood);
+  if (!mood) { pet.removeAttribute('data-mood'); if(fx) fx.textContent=''; return; }
+  pet.setAttribute('data-mood', mood);
+  if (fx) fx.textContent = _petMoodEmoji[mood] || '';
+}
+function detectMood(text) {
+  if (!text) return '';
+  var t = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  if (/[爱❤💕么么亲吻喜欢心动宝贝]|mua/i.test(t)) return 'love';
+  if (/[哈嘻开心快乐笑棒好耶]|[!！]{2,}/.test(t)) return 'happy';
+  if (/[困睡觉晚安累哈欠zz]|💤/i.test(t)) return 'sleepy';
+  if (/[想嗯思考hmm]|……{2,}|\.{3,}/.test(t)) return 'thinking';
+  if (/[烦哼切tsk气恼怒]|💢/.test(t)) return 'annoyed';
+  return '';
 }
 function sendAudio(base64, transcript) {
   var contentText = transcript ? '[语音] ' + transcript : '[语音]';
@@ -3721,6 +3746,7 @@ evtSource.onmessage = function(e) {
       msgContainer.appendChild(renderTime(data.time));
       msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length, true));
       scrollBottom();
+      petMood(detectMood(data.content));
     }
   } catch(err) {}
 };
