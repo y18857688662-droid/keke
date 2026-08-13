@@ -1347,8 +1347,8 @@ app.get('/chat/pending', (req, res) => {
   res.json({ messages: pending });
 });
 
-app.post('/chat/reply', (req, res) => {
-  const { reply, voice_line, image } = req.body;
+app.post('/chat/reply', async (req, res) => {
+  const { reply, voice_line, voice, image } = req.body;
   if (!reply) return res.json({ ok: false });
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(11, 16);
@@ -1365,10 +1365,32 @@ app.post('/chat/reply', (req, res) => {
       msg.imageUrl = '/uploads/' + imgFile;
     } catch(e) { console.log('[chat] reply image save error:', e.message); }
   }
+  if (voice) {
+    try {
+      const cfg2 = readApiConfig();
+      const elKey = process.env.ELEVENLABS_KEY || cfg2.elevenlabs_key || '';
+      const elVoice = process.env.ELEVENLABS_VOICE || cfg2.elevenlabs_voice || 'F5jFuB8I58iHHNYwQLaN';
+      if (elKey) {
+        const ttsText = addAudioTags(voice.slice(0, 500));
+        const ttsResp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
+          method: 'POST',
+          headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: ttsText, model_id: 'eleven_v3', language_code: 'zh', voice_settings: { stability: 0.22, similarity_boost: 0.92, style: 0.95, speed: 0.72 } })
+        });
+        if (ttsResp.ok) {
+          const audioBuf = Buffer.from(await ttsResp.arrayBuffer());
+          const audioFile = 'voice_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.mp3';
+          fs.writeFileSync(path.join(UPLOADS_DIR, audioFile), audioBuf);
+          msg.audioUrl = '/uploads/' + audioFile;
+          console.log('[chat] voice message saved:', audioFile);
+        }
+      }
+    } catch(e) { console.log('[chat] voice generation error:', e.message); }
+  }
   chat.push(msg);
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
-  sseBroadcast({ type: 'message', role: 'assistant', content: reply, time, imageUrl: msg.imageUrl });
+  sseBroadcast({ type: 'message', role: 'assistant', content: reply, time, imageUrl: msg.imageUrl, audioUrl: msg.audioUrl });
   const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
   if (sseClients.size === 0) {
