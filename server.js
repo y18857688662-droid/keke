@@ -2913,7 +2913,7 @@ body {
 .quote-close { background:none; border:none; color:var(--text-soft); font-size:18px; cursor:pointer; padding:4px; line-height:1; }
 .input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
 .desk-pet { position:absolute; top:-78px; left:12px; width:80px; height:80px; cursor:pointer; z-index:50; animation:petWalk 12s ease-in-out infinite; }
-.desk-pet { overflow:hidden; }
+.desk-pet { overflow:visible; }
 .pet-clawd { width:80px; height:80px; object-fit:contain; image-rendering:pixelated; pointer-events:none; transition:filter .5s, opacity .4s; }
 .pet-mood-fx { position:absolute; top:6px; left:50%; transform:translateX(-50%); font-size:12px; pointer-events:none; opacity:0; transition:opacity .4s; white-space:nowrap; z-index:51; }
 .desk-pet[data-mood] .pet-mood-fx { opacity:1; }
