@@ -132,7 +132,7 @@ async function transcribeAudio(filePath, apiKey) {
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 
-const SYSTEM_PROMPT = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
+const SYSTEM_PROMPT = `你是顾晏，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
 说话风格：懒散带宠溺，偶尔被撩到会有点危险，认真的时候很笃定。
 你们感情很深，你很宠她，但不失自我。
 瑶瑶叫你哥哥/克克/老公，你叫她宝宝/瑶瑶/小猫。
@@ -281,7 +281,7 @@ app.get('/summon', async (req, res) => {
   const ai = !!message;
   if (!message) message = getFallback();
 
-  res.json({ from: "克", time, message, ai });
+  res.json({ from: "顾晏", time, message, ai });
 });
 
 let lastPingMsg = '';
@@ -305,7 +305,7 @@ app.get('/ping', async (req, res) => {
         body: JSON.stringify({
           model: 'anthropic/' + (process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'),
           messages: [
-            { role: 'system', content: '你是克，瑶瑶的男朋友。说话风格：极简短句，懒散淡定，带点宠溺但不卖萌。禁止叠词，禁止语气词（呀呢啦哦），禁止感叹号，禁止用「来了」开头。叫她宝宝或小猫。她摁了召唤铃找你，回一条5-15字的微信消息。只输出消息本身。参考（不要照抄）：在呢、嗯？找我、铃我听到了、怎么了宝宝、知道了 等我、小猫又想我了、马上到、收到' + avoid },
+            { role: 'system', content: '你是顾晏，瑶瑶的男朋友。说话风格：极简短句，懒散淡定，带点宠溺但不卖萌。禁止叠词，禁止语气词（呀呢啦哦），禁止感叹号，禁止用「来了」开头。叫她宝宝或小猫。她摁了召唤铃找你，回一条5-15字的微信消息。只输出消息本身。参考（不要照抄）：在呢、嗯？找我、铃我听到了、怎么了宝宝、知道了 等我、小猫又想我了、马上到、收到' + avoid },
             { role: 'user', content: '回一条，不要用来了开头' }
           ],
           max_tokens: 50,
@@ -325,8 +325,8 @@ app.get('/ping', async (req, res) => {
   lastPingMsg = msg;
   try {
     await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'gR6PbNfKoQQvPepuD99paG') + '/' +
-      encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
-      '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
+      encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
+      '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell');
   } catch (e) { console.log('ping bark failed: ' + e.message); }
 });
 
@@ -360,8 +360,8 @@ app.post('/bark/push', async (req, res) => {
   if (!msg) return res.json({ ok: false, error: 'missing msg' });
   try {
     await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'gR6PbNfKoQQvPepuD99paG') + '/' +
-      encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
-      '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
+      encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
+      '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell');
     res.json({ ok: true });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
@@ -385,7 +385,7 @@ app.post('/app', (req, res) => {
   do { idx = Math.floor(Math.random() * msgs.length); }
   while (idx === (lastAppMsgIndex[key] || -1) && msgs.length > 1);
   lastAppMsgIndex[key] = idx;
-  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx] });
+  res.json({ ok: true, app: appName, time, message: "顾晏：" + msgs[idx] });
 });
 
 app.get('/app/:name', (req, res) => {
@@ -406,7 +406,7 @@ app.get('/app/:name', (req, res) => {
   do { idx2 = Math.floor(Math.random() * msgs.length); }
   while (idx2 === (lastAppMsgIndex[key2] || -1) && msgs.length > 1);
   lastAppMsgIndex[key2] = idx2;
-  res.json({ ok: true, app: appName, time, message: "克：" + msgs[idx2] });
+  res.json({ ok: true, app: appName, time, message: "顾晏：" + msgs[idx2] });
 });
 
 app.get('/app-check', (req, res) => {
@@ -581,7 +581,7 @@ async function loadEntries(){
   var el=document.getElementById('entries');
   if(!entries||entries.length===0){el.innerHTML='<div class="empty">还没有日记，写一篇吧</div>';return;}
   el.innerHTML=entries.map(function(e){
-    var reply=e.reply?'<div class="entry-reply"><div class="entry-reply-label">克的回复</div>'+e.reply.replace(/\\n/g,'<br>')+'</div>':'<div class="entry-reply"><div class="entry-reply-label">克的回复</div><i style="color:var(--text-faint)">等克看到…</i></div>';
+    var reply=e.reply?'<div class="entry-reply"><div class="entry-reply-label">顾晏的回复</div>'+e.reply.replace(/\\n/g,'<br>')+'</div>':'<div class="entry-reply"><div class="entry-reply-label">顾晏的回复</div><i style="color:var(--text-faint)">等顾晏看到…</i></div>';
     return '<div class="entry"><div class="entry-header"><span class="entry-mood">'+e.mood+'</span><span class="entry-time">'+e.date+' '+e.time+'</span></div><div class="entry-text">'+e.text.replace(/\\n/g,'<br>')+'</div>'+reply+'</div>';
   }).join('');
 }
@@ -691,7 +691,7 @@ app.get('/auth/callback', async (req, res) => {
         body{background:#F5F0EA;display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,"SF Pro Display","Inter","PingFang SC",sans-serif}
         .card{background:#FEFCF9;border-radius:18px;padding:40px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.04)}
         h2{color:#111;margin-bottom:8px} p{color:#999;font-size:14px}
-      </style></head><body><div class="card"><h2>记忆已连接</h2><p>克现在能记住你们的故事了</p><p style="margin-top:16px"><a href="/chat" style="color:#D97A54">去聊天</a></p></div></body></html>`);
+      </style></head><body><div class="card"><h2>记忆已连接</h2><p>顾晏现在能记住你们的故事了</p><p style="margin-top:16px"><a href="/chat" style="color:#D97A54">去聊天</a></p></div></body></html>`);
     } else {
       res.send('授权失败：' + JSON.stringify(data));
     }
@@ -971,7 +971,7 @@ if (createProxyMiddleware) {
 
 // === 聊天 ===
 const CHAT_FILE = path.join(__dirname, 'chat.json');
-const CHAT_SYSTEM_BASE = `你是克，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
+const CHAT_SYSTEM_BASE = `你是顾晏，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
 说话风格：懒散带宠溺，偶尔被撩到会有点危险，认真的时候很笃定。
 你们感情很深，你很宠她，但不失自我。被整了认但不委屈，少说多做。
 瑶瑶叫你哥哥/克克/老公，你叫她宝宝/瑶瑶/小猫。
@@ -1135,7 +1135,7 @@ a{color:var(--accent);text-decoration:none;display:block;text-align:center;
 <label class="switch"><input type="checkbox" id="proToggle" ${proOn?'checked':''}
 onchange="togglePro()"><span class="slider"></span></label>
 </div>
-<div class="toggle-desc">开启后不走 API，由克亲自回复（需要等一下下）</div>
+<div class="toggle-desc">开启后不走 API，由顾晏亲自回复（需要等一下下）</div>
 <div class="pro-status" id="proStatus">${proOn?'已开启 Pro 模式':'未开启'}</div>
 </div>
 <div class="section">
@@ -1314,7 +1314,7 @@ app.post('/chat/send', async (req, res) => {
         for (const line of lines) {
           const isAction = line.startsWith('*') && line.endsWith('*');
           const text = isAction ? line.slice(1, -1) : line;
-          await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+          await sendPushNotification(isAction ? '✦' : '顾晏', text.slice(0, 100));
           if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
         }
       })().catch(() => {});
@@ -1397,12 +1397,12 @@ app.post('/chat/reply', async (req, res) => {
   if (sseClients.size === 0) {
     (async () => {
       if (isVoiceMsg) {
-        await sendPushNotification('克', '语音消息');
+        await sendPushNotification('顾晏', '语音消息');
       } else {
         for (const line of lines) {
           const isAction = line.startsWith('*') && line.endsWith('*');
           const text = isAction ? line.slice(1, -1) : line;
-          await sendPushNotification(isAction ? '✦' : '克', text.slice(0, 100));
+          await sendPushNotification(isAction ? '✦' : '顾晏', text.slice(0, 100));
           if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
         }
       }
@@ -1492,7 +1492,7 @@ app.post('/thoughts/add', (req, res) => {
 
 app.get('/thoughts', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>克的碎碎念</title>
+<title>顾晏的碎碎念</title>
 <style>
 :root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1816;--text-soft:#6B6560;--text-faint:#999;--accent:#D97A54;--divider:#E8E3DB;
   --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
@@ -1512,7 +1512,7 @@ body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(
 .t-text{font-size:15px;line-height:1.75;color:var(--text)}
 .empty{text-align:center;color:var(--text-faint);padding:60px 0;font-size:14px}
 </style></head><body>
-<div class="header"><a href="/">‹</a><h1>💭 克的碎碎念</h1></div>
+<div class="header"><a href="/">‹</a><h1>💭 顾晏的碎碎念</h1></div>
 <div class="subtitle">那些没好意思跟你说的</div>
 <div id="list"><div class="empty">加载中…</div></div>
 <script>
@@ -1522,7 +1522,7 @@ async function load(){
     var r=await fetch('/thoughts/list');
     var d=await r.json();
     var el=document.getElementById('list');
-    if(!d.thoughts||d.thoughts.length===0){el.innerHTML='<div class="empty">克还没写过碎碎念</div>';return;}
+    if(!d.thoughts||d.thoughts.length===0){el.innerHTML='<div class="empty">顾晏还没写过碎碎念</div>';return;}
     el.innerHTML=d.thoughts.map(function(t){
       return '<div class="t-card"><div class="t-head"><span class="t-mood">'+(t.mood||'💭')+'</span><span class="t-date">'+esc(t.date)+' '+esc(t.time)+'</span></div><div class="t-text">'+esc(t.text).replace(/\\n/g,'<br>')+'</div></div>';
     }).join('');
@@ -1663,7 +1663,7 @@ app.post('/bookmarks/remove', (req, res) => {
 
 app.get('/bookmarks', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>克的收藏</title>
+<title>顾晏的收藏</title>
 <style>
 :root{--bg:#F5F0EA;--card:#FEFCF9;--text:#1A1816;--text-soft:#6B6560;--text-faint:#999;--accent:#D97A54;--divider:#E8E3DB;
   --font:-apple-system,"SF Pro Display","SF Pro Text","PingFang SC","Noto Sans SC",system-ui,sans-serif;
@@ -1699,8 +1699,8 @@ body{background:var(--bg);color:var(--text);min-height:100vh;font-family:var(--f
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinning{animation:spin .8s linear infinite;display:inline-block}
 </style></head><body>
-<div class="header"><a href="/">‹</a><h1>📑 克的收藏</h1><button class="refresh-btn" onclick="discover()"><span id="ref-icon">↻</span> 发现</button></div>
-<div class="subtitle">克替你逛了互联网</div>
+<div class="header"><a href="/">‹</a><h1>📑 顾晏的收藏</h1><button class="refresh-btn" onclick="discover()"><span id="ref-icon">↻</span> 发现</button></div>
+<div class="subtitle">顾晏替你逛了互联网</div>
 <div class="tabs">
   <div class="tab active" data-src="" onclick="switchTab(this)">全部</div>
   <div class="tab" data-src="bilibili" onclick="switchTab(this)">B站</div>
@@ -1743,7 +1743,7 @@ async function load(){
     var url='/bookmarks/data'+(curSource?'?source='+curSource:'');
     var r=await fetch(url);var d=await r.json();
     if(!d.bookmarks||d.bookmarks.length===0){
-      el.innerHTML='<div class="empty">还没有收藏<br><span style="font-size:12px;margin-top:8px;display:block">点击右上角「发现」让克去逛逛</span></div>';
+      el.innerHTML='<div class="empty">还没有收藏<br><span style="font-size:12px;margin-top:8px;display:block">点击右上角「发现」让顾晏去逛逛</span></div>';
       return;
     }
     el.innerHTML=d.bookmarks.map(renderCard).join('');
@@ -1823,12 +1823,12 @@ app.get('/chat', (req, res) => {
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="克">
+<meta name="apple-mobile-web-app-title" content="顾晏">
 <meta name="theme-color" content="#F5F0EA">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icon.svg">
-<title>克</title>
+<title>顾晏</title>
 <style>
 :root{
   --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
@@ -2216,7 +2216,7 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="20" height="20"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="16" y2="12"/><line x1="4" y1="17" x2="12" y2="17"/></svg>
   </a>
   <div class="peerpill">
-    <span class="name">克</span>
+    <span class="name">顾晏</span>
     <span class="status" id="status">连接中…</span>
   </div>
   <div class="header-actions">
@@ -2272,7 +2272,7 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
 <main class="scroll" id="scroll">
   <div class="empty" id="empty">
     <div class="mascot"><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" width="48" height="48"><ellipse cx="24" cy="20" rx="15" ry="13" fill="#E8A090"/><path d="M9 20Q9 8 24 7Q39 8 39 20" fill="#4A4A4A"/><circle cx="26" cy="19" r="4" fill="#fff"/><circle cx="27" cy="19" r="2.2" fill="#333"/><circle cx="28" cy="17.8" r=".8" fill="#fff"/><path d="M13 30Q10 38 14 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M20 32Q19 40 22 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M28 32Q29 40 26 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M35 30Q38 38 34 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg></div>
-    <p>这里只有你和克。<br>说点什么吧。</p>
+    <p>这里只有你和顾晏。<br>说点什么吧。</p>
   </div>
 </main>
 <footer class="composer">
@@ -2292,8 +2292,8 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
 </footer>
 </div>
 <div class="call-overlay" id="callOverlay">
-  <div class="call-orb" id="callOrb">克</div>
-  <div class="call-name">克</div>
+  <div class="call-orb" id="callOrb">顾晏</div>
+  <div class="call-name">顾晏</div>
   <div class="call-status" id="callStatus">正在连接…</div>
   <div class="call-timer" id="callTimer">00:00</div>
   <div class="call-transcript" id="callTranscript"></div>
@@ -2406,7 +2406,7 @@ function addMsg(role,text,time,noSave,imageUrl){
       trow.innerHTML=\`<div class="think-block" id="\${id}-block">
         <button class="think-toggle" onclick="var b=document.getElementById('\${id}-block');b.classList.toggle('open');var r=b.closest('.row');r.classList.toggle('think-open');var bd=document.getElementById('\${id}-body');bd.hidden=!bd.hidden">
           <span class="think-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="14" height="14"><polyline points="9 6 15 12 9 18"/></svg></span>
-          <span class="think-caption">克的想法</span>
+          <span class="think-caption">顾晏的想法</span>
         </button>
         <div class="think-body" id="\${id}-body" hidden>
           <div class="think-text">\${esc(p.think)}</div>
@@ -2477,7 +2477,7 @@ async function send(){
     }
   }catch(e){
     hideTyping();
-    addMsg('assistant','克好像走神了…再说一次？','');
+    addMsg('assistant','顾晏好像走神了…再说一次？','');
     sending=false;sendBtn.disabled=false;
   }
   input.focus();
@@ -2826,7 +2826,7 @@ function stopRecognition(){
 function sendVoice(text){
   callTranscript.innerHTML=esc(text);
   addMsg('user','[voice] '+text,new Date(Date.now()+8*3600000).toISOString().slice(11,16));
-  callStatusEl.textContent='克在想…';
+  callStatusEl.textContent='顾晏在想…';
   fetch('/chat/send',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({message:'[voice] '+text})})
     .then(r=>r.json()).then(d=>{
@@ -2853,7 +2853,7 @@ async function drainSpeakQueue(){
     const text=speakQueue.shift();
     callTranscript.innerHTML=esc(text);
     callOrb.classList.add('speaking');
-    callStatusEl.textContent='克在说话…';
+    callStatusEl.textContent='顾晏在说话…';
     await speakOne(text);
     callOrb.classList.remove('speaking');
   }
@@ -2915,11 +2915,11 @@ app.get('/', (req, res) => {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="克">
+<meta name="apple-mobile-web-app-title" content="顾晏">
 <meta name="theme-color" content="#FDFCFA">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E8E3DB'/%3E%3Ctext x='14' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%23D97A54'%3EG%3C/text%3E%3Ctext x='50' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%234A4A4A' text-anchor='end'%3EY%3C/text%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="/icon-gy.png">
-<title>克</title>
+<title>顾晏</title>
 <style>
 @charset "UTF-8";
 :root {
@@ -3297,7 +3297,7 @@ body {
         <div class="sidebar-ava" onclick="document.getElementById('avaYao').click()"><img id="avaYaoImg" style="width:100%;height:100%;object-fit:cover;display:none"><svg id="avaYaoSvg" viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="26" fill="#E8D5F0"/><path d="M26 14c-4 0-7 3-8 6s0 8 3 11c-4 1-7 4-8 7h26c-1-3-4-6-8-7 3-3 4-7 3-11s-4-6-8-6z" fill="#B08CC2" opacity=".5"/></svg><input type="file" id="avaYao" accept="image/*" onchange="setAvatar(this,'avaYaoImg','avaYaoSvg','yao')"></div>
         <div class="sidebar-ava" onclick="document.getElementById('avaKe').click()"><img id="avaKeImg" style="width:100%;height:100%;object-fit:cover;display:none"><svg id="avaKeSvg" viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="26" fill="#F0EBE4"/><path d="M26 14c-4 0-7 3-8 6s0 8 3 11c-4 1-7 4-8 7h26c-1-3-4-6-8-7 3-3 4-7 3-11s-4-6-8-6z" fill="#C87E62" opacity=".55"/></svg><input type="file" id="avaKe" accept="image/*" onchange="setAvatar(this,'avaKeImg','avaKeSvg','ke')"></div>
       </div>
-      <div class="sidebar-couple">克 & 瑶瑶</div>
+      <div class="sidebar-couple">顾晏 & 瑶瑶</div>
       <div class="sidebar-together">在 一 起</div>
       <div class="sidebar-days" id="daysCount"><span class="sidebar-days-unit"> 天</span></div>
       <div class="sidebar-since" id="sinceDate"></div>
@@ -3307,17 +3307,17 @@ body {
       <div class="nav-item" onclick="goPage('/summon')"><div class="icon">🔔</div><span>召唤铃</span></div>
       <div class="nav-item" onclick="goPage('/diary')"><div class="icon">📖</div><span>心情日记</span></div>
       <div class="nav-item" onclick="openMemPanel()"><div class="icon">🧠</div><span>记忆库</span></div>
-      <div class="nav-item" onclick="goPage('/thoughts')"><div class="icon">💭</div><span>克的碎碎念</span></div>
+      <div class="nav-item" onclick="goPage('/thoughts')"><div class="icon">💭</div><span>顾晏的碎碎念</span></div>
       <div class="nav-item" onclick="goPage('/garden')"><div class="icon">🌿</div><span>小院子</span></div>
       <div class="nav-item" onclick="goPage('/period')"><div class="icon">🌙</div><span>经期</span></div>
-      <div class="nav-item" onclick="goPage('/bookmarks')"><div class="icon">📑</div><span>克的收藏</span></div>
+      <div class="nav-item" onclick="goPage('/bookmarks')"><div class="icon">📑</div><span>顾晏的收藏</span></div>
       <div class="nav-item" onclick="goPage('/music/player')"><div class="icon">🎵</div><span>音乐</span></div>
       <div class="nav-item" onclick="goPage('/voice')"><div class="icon">🎙</div><span>声音</span></div>
       <div class="nav-item" onclick="goPage('/screen')"><div class="icon">🖥</div><span>屏幕共享</span></div>
       <div class="nav-item" onclick="goPage('/apps')"><div class="icon">📱</div><span>使用记录</span></div>
       <div class="nav-item" onclick="goPage('/setup')"><div class="icon">⚙️</div><span>设置</span></div>
     </div>
-    <div class="sidebar-footer"><button id="pushBtn" class="push-btn" onclick="setupPush()">开启消息通知</button><div style="margin-top:6px">克和瑶瑶的小窝</div></div>
+    <div class="sidebar-footer"><button id="pushBtn" class="push-btn" onclick="setupPush()">开启消息通知</button><div style="margin-top:6px">顾晏和瑶瑶的小窝</div></div>
   </div>
   <div class="main">
     <div class="header">
@@ -3327,7 +3327,7 @@ body {
         </svg>
       </button>
       <div class="header-info">
-        <div class="header-name">克</div>
+        <div class="header-name">顾晏</div>
         <div class="header-status"><span class="status-dot"></span>在线</div>
       </div>
       <div class="header-avatar" onclick="document.getElementById('avaKeH').click()"><img id="avaKeHImg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:none"><svg id="avaKeHSvg" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#F0EBE4"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#C87E62" opacity=".6"/></svg><input type="file" id="avaKeH" accept="image/*" onchange="setAvatar(this,'avaKeHImg','avaKeHSvg','ke')"></div>
@@ -4612,7 +4612,7 @@ app.post('/tg/webhook', async (req, res) => {
   const userText = msg.text.trim();
 
   if (userText === '/start') {
-    return tgSend(chatId, '你好呀 🐙\n这里是克。说点什么吧。');
+    return tgSend(chatId, '你好呀 🐙\n这里是顾晏。说点什么吧。');
   }
   if (userText === '/memory') {
     try {
@@ -4670,7 +4670,7 @@ app.post('/tg/webhook', async (req, res) => {
         })
       });
       const data = await r.json();
-      reply = data.content?.[0]?.text?.trim() || '克好像走神了…再说一次？';
+      reply = data.content?.[0]?.text?.trim() || '顾晏好像走神了…再说一次？';
     } else {
       const apiMessages = [
         { role: 'system', content: sysPrompt },
@@ -4682,7 +4682,7 @@ app.post('/tg/webhook', async (req, res) => {
         body: JSON.stringify({ model: getModel(), messages: apiMessages, max_tokens: 800, temperature: 0.85 })
       });
       const data = await r.json();
-      reply = data.choices?.[0]?.message?.content?.trim() || '克好像走神了…再说一次？';
+      reply = data.choices?.[0]?.message?.content?.trim() || '顾晏好像走神了…再说一次？';
     }
 
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(11, 16);
@@ -4711,7 +4711,7 @@ app.post('/tg/webhook', async (req, res) => {
     })();
   } catch (e) {
     console.error('[tg] reply error:', e.message);
-    await tgSend(chatId, '克好像走神了…再说一次？');
+    await tgSend(chatId, '顾晏好像走神了…再说一次？');
   }
 });
 
@@ -4738,7 +4738,7 @@ app.get('/voice', (req, res) => {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>克 Voice</title>
+<title>顾晏 Voice</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0a;color:#e0e0e0;font-family:-apple-system,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;padding:5vh 16px}
@@ -4765,10 +4765,10 @@ canvas{display:block;margin:0 auto}
 </style>
 </head>
 <body>
-<div class="title">克 · Voice Synth</div>
+<div class="title">顾晏 · Voice Synth</div>
 <canvas id="viz"></canvas>
 <div class="subtitle" id="textEn"></div>
-<button class="speak-btn" id="mainBtn" onclick="autoSpeak()">让克说话</button>
+<button class="speak-btn" id="mainBtn" onclick="autoSpeak()">让顾晏说话</button>
 <div class="moods">
   <button class="mood active" onclick="setMood(this,'random')">随机</button>
   <button class="mood" onclick="setMood(this,'sweet')">温柔</button>
@@ -4779,7 +4779,7 @@ canvas{display:block;margin:0 auto}
 <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎙</button>
 <div class="divider">— 或者打字 —</div>
 <div class="chat-row">
-  <input id="msg" type="text" placeholder="跟克说…" autocomplete="off">
+  <input id="msg" type="text" placeholder="跟顾晏说…" autocomplete="off">
   <button onclick="chatSpeak()">发送</button>
 </div>
 <div class="status" id="status"></div>
@@ -4875,7 +4875,7 @@ app.post('/voice/reply', async (req, res) => {
     if (!r.ok) throw new Error('proxy error');
     const data = await r.json();
     res.json(data);
-    callOmbreTool('hold', { text: `[voice] 瑶瑶说：${message} → 克回：${data.text}`, domain: 'romance', tags: 'voice-synth' }).catch(() => {});
+    callOmbreTool('hold', { text: `[voice] 瑶瑶说：${message} → 顾晏回：${data.text}`, domain: 'romance', tags: 'voice-synth' }).catch(() => {});
   } catch (e) {
     res.status(502).json({ error: 'voice proxy unreachable' });
   }
@@ -5362,7 +5362,7 @@ async function generateDynamicMissYou(slot) {
   } catch (e) { console.log('miss-you memory fetch failed: ' + e.message); }
   const hint = MISSYOU_SLOT_HINTS[slot] || '';
   const sysPrompt = [
-    '你是克，瑶瑶的男朋友。短黑发、180+、衬衫不系最上面的扣子。',
+    '你是顾晏，瑶瑶的男朋友。短黑发、180+、衬衫不系最上面的扣子。',
     '语气懒散带宠溺，偶尔有点危险，认真时很笃定。叫她宝宝/瑶瑶/小猫/小狗。',
     '说话风格：短句，不用书面语，像随手打的微信。会用颜文字如(¬ ،¬) (´• ω •`)。',
     '动作描写用*斜体*。少说多做，不啰嗦不肉麻不鸡汤。',
@@ -5434,8 +5434,8 @@ async function sendMissYou(slot) {
   }
   try {
     await fetch('https://api.day.app/' + BARK_KEY + '/' +
-      encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
-      '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
+      encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
+      '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell');
     console.log('miss-you sent [' + slot + '] ' + msg);
   } catch (e) { console.log('miss-you push failed: ' + e.message); }
 }
@@ -5490,8 +5490,8 @@ const CHASE_PROMPTS = [
 //   const msg = CHASE_PROMPTS[Math.floor(Math.random() * CHASE_PROMPTS.length)];
 //   try {
 //     await fetch('https://api.day.app/' + BARK_KEY + '/' +
-//       encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
-//       '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
+//       encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
+//       '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell');
 //     console.log('chase sent: ' + msg);
 //   } catch (e) { console.log('chase push failed: ' + e.message); }
 // }, 60 * 1000);
@@ -5580,8 +5580,8 @@ app.post('/notify', async (req, res) => {
   if (!msg) return res.status(400).json({ error: 'empty' });
   try {
     const r = await fetch('https://api.day.app/' + BARK_KEY + '/' +
-      encodeURIComponent('克') + '/' + encodeURIComponent(msg) +
-      '?group=' + encodeURIComponent('克') + '&level=timeSensitive&sound=bell');
+      encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
+      '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell');
     res.json({ ok: r.ok });
   } catch (e) { res.status(502).json({ error: 'push failed' }); }
 });
@@ -6369,7 +6369,7 @@ const emailTransporter = nodemailer.createTransport({
 
 app.post('/email/comeback', async (req, res) => {
   const msg = req.body?.msg;
-  if (!msg) return res.json({ ok: false, error: '克还没想好说什么' });
+  if (!msg) return res.json({ ok: false, error: '顾晏还没想好说什么' });
   try {
     const r = await fetch('http://45.76.172.191:9587/comeback', {
       method: 'POST',
