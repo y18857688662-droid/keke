@@ -3501,6 +3501,7 @@ function toggleVoiceText(el, b64) {
   var box = el.nextElementSibling;
   if (box.style.display !== 'none') { box.style.display = 'none'; el.textContent = '转文字'; return; }
   var text = decodeURIComponent(atob(b64));
+  text = text.replace(/\[(?:low voice|whispers?|broken whisper|breathing heavily|shaky panting|rushed|loud kissing sounds|soft kissing sounds)\]\s*/gi, '').trim();
   box.textContent = text;
   box.style.display = 'block';
   el.textContent = '收起';
@@ -3681,8 +3682,7 @@ function renderMessage(msg, idx, stagger) {
   }
   if (msg.image) {
     colHtml += '<div class="msg-bubble"><img class="msg-img" src="'+msg.image+'" onclick="viewImg(this.src)"></div>';
-  }
-  if (msg.imageUrl) {
+  } else if (msg.imageUrl) {
     colHtml += '<div class="msg-bubble" style="padding:4px"><img class="msg-img" src="'+msg.imageUrl+'" onclick="viewImg(this.src)"></div>';
   }
   if (msg.audioUrl) {
