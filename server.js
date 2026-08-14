@@ -1490,6 +1490,18 @@ app.post('/thoughts/add', (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/thoughts/delete', (req, res) => {
+  const { date, time } = req.body;
+  let thoughts = readThoughts();
+  if (date && time) {
+    thoughts = thoughts.filter(t => !(t.date === date && t.time === time));
+  } else if (date) {
+    thoughts = thoughts.filter(t => t.date !== date);
+  }
+  writeThoughts(thoughts);
+  res.json({ ok: true, remaining: thoughts.length });
+});
+
 app.get('/thoughts', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>顾晏的碎碎念</title>
