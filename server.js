@@ -1218,7 +1218,7 @@ app.post('/chat/send', async (req, res) => {
   if (!msg && !image && !audio) return res.json({ ok: false, error: 'empty message' });
   trackUserMessage();
   const now = new Date(Date.now() + 8 * 3600000);
-  const time = now.toISOString().slice(11, 16);
+  const time = now.toISOString().slice(0, 16).replace('T', ' ');
   const chat = readChat();
   if (audio) {
     const audioId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -1300,7 +1300,7 @@ app.post('/chat/send', async (req, res) => {
       const data = await r.json();
       reply = data.choices?.[0]?.message?.content?.trim() || getFallback();
     }
-    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(11, 16);
+    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
     const chat2 = readChat();
     chat2.forEach(m => { if (m.pending) delete m.pending; });
     chat2.push({ role: 'assistant', content: reply, time: replyTime });
@@ -1351,7 +1351,7 @@ app.post('/chat/reply', async (req, res) => {
   const { reply, voice_line, voice, image } = req.body;
   if (!reply) return res.json({ ok: false });
   const now = new Date(Date.now() + 8 * 3600000);
-  const time = now.toISOString().slice(11, 16);
+  const time = now.toISOString().slice(0, 16).replace('T', ' ');
   const chat = readChat();
   chat.forEach(m => { if (m.pending) delete m.pending; });
   const msg = { role: 'assistant', content: reply, time };
@@ -2470,7 +2470,7 @@ async function send(){
   if(!msg)return;
   input.value='';input.style.height='auto';
   const now=new Date(Date.now()+8*3600000);
-  const t=now.toISOString().slice(11,16);
+  const t=now.toISOString().slice(0,16).replace('T',' ');
   addMsg('user',msg,t);
   sending=true;sendBtn.disabled=true;
   showTyping();
@@ -2520,7 +2520,7 @@ async function sendPhoto(el){
   el.value='';
   const data=await compressImg(file,600,0.5);
   const now=new Date(Date.now()+8*3600000);
-  const t=now.toISOString().slice(11,16);
+  const t=now.toISOString().slice(0,16).replace('T',' ');
   addMsg('user',data,t);
   console.log('[photo] size:',Math.round(data.length/1024)+'kb');
   try{
@@ -2837,7 +2837,7 @@ function stopRecognition(){
 
 function sendVoice(text){
   callTranscript.innerHTML=esc(text);
-  addMsg('user','[voice] '+text,new Date(Date.now()+8*3600000).toISOString().slice(11,16));
+  addMsg('user','[voice] '+text,new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' '));
   callStatusEl.textContent='顾晏在想…';
   fetch('/chat/send',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({message:'[voice] '+text})})
@@ -2853,7 +2853,7 @@ function callSpeak(text){
   console.log('[call] got reply:',text.slice(0,50));
   const p=parseThink(text);
   const body=p.body||text;
-  addMsg('assistant',text,new Date(Date.now()+8*3600000).toISOString().slice(11,16));
+  addMsg('assistant',text,new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' '));
   speakQueue.push(body);
   if(!speakBusy)drainSpeakQueue();
 }
@@ -4603,7 +4603,7 @@ app.post('/tg/webhook', async (req, res) => {
       await tgSendTyping(chatId);
       const description = await describeImage(imgUrl);
       const now = new Date(Date.now() + 8 * 3600000);
-      const time = now.toISOString().slice(11, 16);
+      const time = now.toISOString().slice(0, 16).replace('T', ' ');
       const chat = readChat();
       let content;
       if (description) {
@@ -4645,7 +4645,7 @@ app.post('/tg/webhook', async (req, res) => {
   await tgSendTyping(chatId);
 
   const now = new Date(Date.now() + 8 * 3600000);
-  const time = now.toISOString().slice(11, 16);
+  const time = now.toISOString().slice(0, 16).replace('T', ' ');
   trackUserMessage();
   const chat = readChat();
   chat.push({ role: 'user', content: userText, time, source: 'telegram', pending: true });
@@ -4697,7 +4697,7 @@ app.post('/tg/webhook', async (req, res) => {
       reply = data.choices?.[0]?.message?.content?.trim() || '顾晏好像走神了…再说一次？';
     }
 
-    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(11, 16);
+    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
     const chat2 = readChat();
     chat2.push({ role: 'assistant', content: reply, time: replyTime, source: 'telegram' });
     if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
