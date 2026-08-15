@@ -3771,8 +3771,10 @@ function formatTimeDisplay(t) {
   var dp = datePart.split('-');
   if (dp.length === 3) {
     var thisYear = today.toISOString().slice(0, 4);
-    if (dp[0] === thisYear) return parseInt(dp[1]) + '月' + parseInt(dp[2]) + '日 ' + timePart;
-    return dp[0] + '年' + parseInt(dp[1]) + '月' + parseInt(dp[2]) + '日 ' + timePart;
+    var mm = dp[1].length < 2 ? '0' + dp[1] : dp[1];
+    var dd = dp[2].length < 2 ? '0' + dp[2] : dp[2];
+    if (dp[0] === thisYear) return mm + '/' + dd + ' ' + timePart;
+    return dp[0] + '/' + mm + '/' + dd + ' ' + timePart;
   }
   return t;
 }
