@@ -2407,18 +2407,23 @@ function addMsg(role,text,time,noSave,imageUrl){
     scroll.scrollTop=scroll.scrollHeight;
     return;
   }
-  var voiceMatch=text.match(/^\[voice\]\s*/i);
+  var cleanText=text.replace(/<think>[\s\S]*?<\/think>/g,'').trim();
+  var voiceMatch=cleanText.match(/^\[voice\]\s*/i);
   if(voiceMatch){
-    var voiceText=text.slice(voiceMatch[0].length).trim();
+    var voiceText=cleanText.slice(voiceMatch[0].length).trim();
     var dur=Math.max(2,Math.min(Math.ceil(voiceText.length/4),60));
     var bars='';for(var bi=0;bi<18;bi++){var h=4+Math.floor(Math.random()*14);bars+='<span style="height:'+h+'px"></span>';}
+    var vB64=btoa(encodeURIComponent(voiceText));
     const row=document.createElement('div');
     row.className=role==='assistant'?'row ai tail':'row human tail';
-    row.innerHTML='<div class="voice-msg'+(role==='user'?' voice-human':'')+'" title="'+esc(voiceText)+'">'
+    row.innerHTML='<div class="voice-wrap'+(role==='assistant'?'':' voice-wrap-human')+'">'
+      +'<div class="voice-msg'+(role==='user'?' voice-human':'')+'" onclick="playVoice(this,\''+vB64+'\')">'
       +'<div class="voice-play"><svg viewBox="0 0 10 12" fill="currentColor"><polygon points="1,0 10,6 1,12"/></svg></div>'
       +'<div class="voice-bars">'+bars+'</div>'
       +'<span class="voice-dur">'+dur+'&Prime;</span>'
-      +'<span class="meta">'+(time||'')+'</span>'
+      +'</div>'
+      +'<div class="voice-to-text" onclick="toggleVoiceText(this,\''+vB64+'\')">转文字</div>'
+      +'<div class="voice-text-content" style="display:none"></div>'
       +'</div>';
     scroll.appendChild(row);
     scroll.scrollTop=scroll.scrollHeight;
