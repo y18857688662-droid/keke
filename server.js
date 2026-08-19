@@ -1213,6 +1213,7 @@ app.post('/chat/send', async (req, res) => {
   const msg = req.body.message;
   const image = req.body.image;
   const audio = req.body.audio;
+  const quote = req.body.quote || null;
   if (image) console.log('[chat] received image, size:', Math.round(image.length/1024) + 'kb');
   if (audio) console.log('[chat] received audio, size:', Math.round(audio.length/1024) + 'kb');
   if (!msg && !image && !audio) return res.json({ ok: false, error: 'empty message' });
@@ -1230,7 +1231,9 @@ app.post('/chat/send', async (req, res) => {
     } catch(e) { console.log('[chat] audio save error:', e.message); }
     const audioUrl = '/uploads/' + audioFile;
     let audioContent = msg || '[语音]';
-    chat.push({ role: 'user', content: audioContent, audioUrl, time, pending: true });
+    const audioEntry = { role: 'user', content: audioContent, audioUrl, time, pending: true };
+    if (quote) audioEntry.quote = quote;
+    chat.push(audioEntry);
     const whisperKey = readApiConfig().whisper_key || readApiConfig().openai_key || '';
     if (whisperKey && fs.existsSync(audioPath)) {
       transcribeAudio(audioPath, whisperKey).then(text => {
@@ -1250,9 +1253,13 @@ app.post('/chat/send', async (req, res) => {
       fs.writeFileSync(path.join(UPLOADS_DIR, imgFile), Buffer.from(b64, 'base64'));
     } catch(e) { console.log('[chat] image save error:', e.message); }
     const imageUrl = '/uploads/' + imgFile;
-    chat.push({ role: 'user', content: '[图片]', image, imageUrl, time, pending: true });
+    const imgEntry = { role: 'user', content: '[图片]', image, imageUrl, time, pending: true };
+    if (quote) imgEntry.quote = quote;
+    chat.push(imgEntry);
   } else {
-    chat.push({ role: 'user', content: msg, time, pending: true });
+    const textEntry = { role: 'user', content: msg, time, pending: true };
+    if (quote) textEntry.quote = quote;
+    chat.push(textEntry);
   }
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
@@ -1280,7 +1287,11 @@ app.post('/chat/send', async (req, res) => {
         body: JSON.stringify({
           model: CLAUDE_MODEL,
           system: sysPrompt,
-          messages: recent.map(m => ({ role: m.role, content: m.content })),
+          messages: recent.map(m => {
+            let c = m.content;
+            if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
+            return { role: m.role, content: c };
+          }),
           max_tokens: 800,
           temperature: 0.85
         })
@@ -1290,7 +1301,11 @@ app.post('/chat/send', async (req, res) => {
     } else {
       const apiMessages = [
         { role: 'system', content: sysPrompt },
-        ...recent.map(m => ({ role: m.role, content: m.content }))
+        ...recent.map(m => {
+          let c = m.content;
+          if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
+          return { role: m.role, content: c };
+        })
       ];
       const r = await fetch(getApiUrl(), {
         method: 'POST',
@@ -3772,8 +3787,10 @@ function formatTimeDisplay(t) {
   var dp = datePart.split('-');
   if (dp.length === 3) {
     var thisYear = today.toISOString().slice(0, 4);
-    if (dp[0] === thisYear) return parseInt(dp[1]) + '月' + parseInt(dp[2]) + '日 ' + timePart;
-    return dp[0] + '年' + parseInt(dp[1]) + '月' + parseInt(dp[2]) + '日 ' + timePart;
+    var mm = dp[1].length < 2 ? '0' + dp[1] : dp[1];
+    var dd = dp[2].length < 2 ? '0' + dp[2] : dp[2];
+    if (dp[0] === thisYear) return mm + '/' + dd + ' ' + timePart;
+    return dp[0] + '/' + mm + '/' + dd + ' ' + timePart;
   }
   return t;
 }
@@ -4677,7 +4694,11 @@ app.post('/tg/webhook', async (req, res) => {
         body: JSON.stringify({
           model: CLAUDE_MODEL,
           system: sysPrompt,
-          messages: recent.map(m => ({ role: m.role, content: m.content })),
+          messages: recent.map(m => {
+            let c = m.content;
+            if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
+            return { role: m.role, content: c };
+          }),
           max_tokens: 800,
           temperature: 0.85
         })
@@ -4687,7 +4708,11 @@ app.post('/tg/webhook', async (req, res) => {
     } else {
       const apiMessages = [
         { role: 'system', content: sysPrompt },
-        ...recent.map(m => ({ role: m.role, content: m.content }))
+        ...recent.map(m => {
+          let c = m.content;
+          if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
+          return { role: m.role, content: c };
+        })
       ];
       const r = await fetch(getApiUrl(), {
         method: 'POST',
