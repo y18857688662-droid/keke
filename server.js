@@ -3706,7 +3706,7 @@ function renderMessage(msg, idx, stagger) {
   } else if (msg.imageUrl) {
     colHtml += '<div class="msg-bubble" style="padding:4px"><img class="msg-img" src="'+msg.imageUrl+'" onclick="viewImg(this.src)"></div>';
   }
-  if (msg.audioUrl) {
+  if (msg.audioUrl && !/^\\[voice\\]/i.test(content)) {
     var waveBars = '';
     for (var wb = 0; wb < 12; wb++) { var wh = 4 + Math.floor(Math.random() * 16); waveBars += '<span style="height:'+wh+'px"></span>'; }
     colHtml += '<div class="msg-bubble audio-bubble" onclick="playAudioMsg(this,\\''+msg.audioUrl+'\\')"><svg class="audio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg><div class="audio-waveform">' + waveBars + '</div><span class="audio-dur"></span></div>';
@@ -3726,8 +3726,9 @@ function renderMessage(msg, idx, stagger) {
     var vBars = '';
     for (var vb = 0; vb < 18; vb++) { var vh = 4 + Math.floor(Math.random() * 14); vBars += '<span style="height:'+vh+'px"></span>'; }
     var vB64 = btoa(encodeURIComponent(vText));
+    var vOnClick = msg.audioUrl ? 'playAudioMsg(this,\\''+msg.audioUrl+'\\')' : 'playVoice(this,\\''+vB64+'\\')';
     colHtml += '<div class="voice-wrap' + (isKe ? '' : ' voice-wrap-human') + '">'
-      + '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" onclick="playVoice(this,\\''+vB64+'\\')\">'
+      + '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" onclick="' + vOnClick + '">'
       + '<div class="voice-play"><svg viewBox="0 0 10 12" fill="currentColor"><polygon points="1,0 10,6 1,12"/></svg></div>'
       + '<div class="voice-bars">' + vBars + '</div>'
       + '<span class="voice-dur">' + vDur + '&Prime;</span>'
