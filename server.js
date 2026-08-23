@@ -3814,7 +3814,8 @@ function renderMessage(msg, idx, stagger) {
     var fn2 = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\\'a\\');a.href=\\''+msg.fileUrl+'\\';a.download=\\''+escHtml(msg.filename||'file')+'\\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn2 + '</div>';
   }
-  var voiceIdx = content.search(/\\[voice\\]/i);
+  var voiceLineRe = content.match(/(^|\\n)\\s*\\[voice\\]/i);
+  var voiceIdx = voiceLineRe ? content.indexOf(voiceLineRe[0]) + voiceLineRe[0].indexOf('[') : -1;
   var voicePart = '', textPart = content;
   if (voiceIdx !== -1) {
     textPart = content.slice(0, voiceIdx).trim();
