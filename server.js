@@ -3805,11 +3805,6 @@ function renderMessage(msg, idx, stagger) {
   } else if (msg.imageUrl) {
     colHtml += '<div class="msg-bubble" style="padding:4px"><img class="msg-img" src="'+msg.imageUrl+'" onclick="viewImg(this.src)"></div>';
   }
-  if (msg.audioUrl && !isKe && !/\\[voice\\]/i.test(content)) {
-    var waveBars = '';
-    for (var wb = 0; wb < 12; wb++) { var wh = 4 + Math.floor(Math.random() * 16); waveBars += '<span style="height:'+wh+'px"></span>'; }
-    colHtml += '<div class="msg-bubble audio-bubble" onclick="playAudioMsg(this,\\''+msg.audioUrl+'\\')"><svg class="audio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg><div class="audio-waveform">' + waveBars + '</div><span class="audio-dur"></span></div>';
-  }
   if (msg.file) {
     var fn = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\\'a\\');a.href=\\''+msg.file+'\\';a.download=\\''+escHtml(msg.filename||'file')+'\\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn + '</div>';
