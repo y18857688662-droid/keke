@@ -2813,6 +2813,8 @@ sse.onmessage=(e)=>{
         hideTyping();
         addMsg('assistant',d.content,d.time,false,d.imageUrl);
         lastMsgCount++;
+        chatPollKnown++;
+        lastRenderedKey=msgKey({role:'assistant',time:d.time,content:d.content});
         sending=false;sendBtn.disabled=false;
         input.focus();
       }
@@ -2823,23 +2825,30 @@ let sseConn=sse;
 sse.onerror=()=>{console.log('[sse] reconnecting...');};
 
 var chatPollKnown=-1;
+var lastRenderedKey='';
+function msgKey(m){return m.role+':'+m.time+':'+(m.content||'').slice(0,30)}
 setInterval(function(){
   fetch('/chat/history?_t='+Date.now()).then(r=>r.json()).then(d=>{
-    if(!d.messages)return;
+    if(!d.messages||!d.messages.length)return;
     var count=d.messages.length;
-    if(chatPollKnown>=0&&count>chatPollKnown){
+    var lastKey=msgKey(d.messages[count-1]);
+    if(chatPollKnown>=0&&count>chatPollKnown&&lastKey!==lastRenderedKey){
       var newM=d.messages.slice(chatPollKnown);
       for(var i=0;i<newM.length;i++){
         if(newM[i].role==='assistant'){
+          var k=msgKey(newM[i]);
+          if(k===lastRenderedKey)continue;
           hideTyping();
           addMsg('assistant',newM[i].content,newM[i].time,false,newM[i].imageUrl);
           sending=false;sendBtn.disabled=false;
+          lastRenderedKey=k;
         }
       }
     }
     chatPollKnown=count;
+    if(!lastRenderedKey)lastRenderedKey=lastKey;
   }).catch(()=>{});
-},3000);
+},2000);
 
 document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='visible'){
@@ -2849,6 +2858,7 @@ document.addEventListener('visibilitychange',function(){
       scroll.innerHTML='';empty.style.display='none';
       d.messages.forEach(m=>addMsg(m.role,m.image||m.content,m.time,true,m.imageUrl,m.imageUrls));
       scroll.scrollTop=scroll.scrollHeight;
+      if(d.messages.length)lastRenderedKey=msgKey(d.messages[d.messages.length-1]);
     }).catch(()=>{});
     if(sseConn.readyState===2){
       sseConn=new EventSource('/chat/stream');
