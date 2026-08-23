@@ -1060,6 +1060,59 @@ app.post('/setup/pro', (req, res) => {
   res.json({ ok: true, pro_mode: cfg.pro_mode });
 });
 
+app.post('/setup/sendblue', (req, res) => {
+  const { api_key, api_secret, from_number, to_number } = req.body;
+  if (!api_key || !api_secret) return res.status(400).json({ error: 'need api_key and api_secret' });
+  const cfg = readApiConfig();
+  cfg.sendblue_key = api_key;
+  cfg.sendblue_secret = api_secret;
+  if (from_number) cfg.sendblue_from = from_number;
+  if (to_number) cfg.sendblue_to = to_number;
+  writeApiConfig(cfg);
+  res.json({ ok: true });
+});
+
+app.post('/sms/send', async (req, res) => {
+  const cfg = readApiConfig();
+  if (!cfg.sendblue_key || !cfg.sendblue_secret) return res.status(500).json({ error: 'sendblue not configured' });
+  const content = req.body.content || req.body.message || req.body.text;
+  const to = req.body.to || cfg.sendblue_to;
+  if (!content || !to) return res.status(400).json({ error: 'need content and to number' });
+  try {
+    const payload = JSON.stringify({ number: to, from_number: cfg.sendblue_from || '', content });
+    const options = {
+      hostname: 'api.sendblue.com',
+      path: '/api/send-message',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'sb-api-key-id': cfg.sendblue_key,
+        'sb-api-secret-key': cfg.sendblue_secret,
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    };
+    const apiReq = https.request(options, (apiRes) => {
+      let body = '';
+      apiRes.on('data', c => body += c);
+      apiRes.on('end', () => {
+        try { res.json(JSON.parse(body)); } catch { res.json({ raw: body }); }
+      });
+    });
+    apiReq.on('error', e => res.status(500).json({ error: e.message }));
+    apiReq.write(payload);
+    apiReq.end();
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/sms/status', (req, res) => {
+  const cfg = readApiConfig();
+  res.json({
+    configured: !!(cfg.sendblue_key && cfg.sendblue_secret),
+    from_number: cfg.sendblue_from || null,
+    to_number: cfg.sendblue_to ? cfg.sendblue_to.replace(/.(?=.{4})/g, '*') : null
+  });
+});
+
 
 
 app.get('/setup', (req, res) => {
