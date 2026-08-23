@@ -3616,9 +3616,13 @@ function voiceTouchEnd() {
 function toggleVoiceText(el, b64) {
   var box = el.nextElementSibling;
   if (box.style.display !== 'none') { box.style.display = 'none'; el.textContent = '转文字'; return; }
-  var text = decodeURIComponent(atob(b64));
-  text = text.replace(/\[(?:low voice|whispers?|broken whisper|breathing heavily|shaky panting|rushed|loud kissing sounds|soft kissing sounds)\]\s*/gi, '').trim();
-  box.textContent = text;
+  try {
+    var text = decodeURIComponent(atob(b64));
+    text = text.replace(/\[(?:low voice|whispers?|broken whisper|breathing heavily|shaky panting|rushed|loud kissing sounds|soft kissing sounds)\]\s*/gi, '').trim();
+    box.textContent = text || '(empty)';
+  } catch(e) {
+    try { box.textContent = atob(b64); } catch(e2) { box.textContent = b64; }
+  }
   box.style.display = 'block';
   el.textContent = '收起';
 }
@@ -3816,6 +3820,7 @@ function renderMessage(msg, idx, stagger) {
   }
   var voiceLineRe = content.match(/(^|\\n)\\s*\\[voice\\]/i);
   var voiceIdx = voiceLineRe ? content.indexOf(voiceLineRe[0]) + voiceLineRe[0].indexOf('[') : -1;
+  if (voiceIdx > 0 && !msg.audioUrl) voiceIdx = -1;
   var voicePart = '', textPart = content;
   if (voiceIdx !== -1) {
     textPart = content.slice(0, voiceIdx).trim();
