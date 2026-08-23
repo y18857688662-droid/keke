@@ -1355,6 +1355,25 @@ app.post('/chat/send', async (req, res) => {
         }
       }).catch(e => console.log('[whisper] error:', e.message));
     }
+  } else if (req.body.images && req.body.images.length > 0) {
+    const images = req.body.images;
+    const imageUrls = [];
+    const imageDataArr = [];
+    for (const img of images) {
+      const imgId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      const ext = img.includes('image/png') ? '.png' : '.jpg';
+      const imgFile = imgId + ext;
+      try {
+        const b64 = img.includes(',') ? img.split(',')[1] : img;
+        fs.writeFileSync(path.join(UPLOADS_DIR, imgFile), Buffer.from(b64, 'base64'));
+      } catch(e) { console.log('[chat] image save error:', e.message); }
+      imageUrls.push('/uploads/' + imgFile);
+      imageDataArr.push(img);
+    }
+    console.log('[chat] received', images.length, 'images');
+    const imgEntry = { role: 'user', content: '[图片]', images: imageDataArr, imageUrls, time, pending: true };
+    if (quote) imgEntry.quote = quote;
+    chat.push(imgEntry);
   } else if (image) {
     const imgId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     const ext = image.includes('image/png') ? '.png' : '.jpg';
@@ -2152,6 +2171,13 @@ body{position:fixed;inset:0;width:100%;
 .photobtn{flex:none;background:none;border:none;cursor:pointer;color:var(--text-faint);padding:4px;display:flex;align-items:center}
 .photobtn:active{color:var(--text)}
 .chat-img{max-width:min(240px,70vw);border-radius:12px;cursor:pointer;display:block}
+.img-grid{display:grid;gap:3px;border-radius:12px;overflow:hidden;position:relative}
+.img-grid-2{grid-template-columns:1fr 1fr;max-width:min(280px,70vw)}
+.img-grid-3{grid-template-columns:1fr 1fr;max-width:min(280px,70vw)}
+.img-grid-3 .grid-img:first-child{grid-row:span 2}
+.img-grid-4{grid-template-columns:1fr 1fr;max-width:min(280px,70vw)}
+.grid-img{width:100%;height:100%;object-fit:cover;cursor:pointer;border-radius:0;max-width:none;display:block;min-height:80px;max-height:180px}
+.img-grid .meta{position:absolute;bottom:4px;right:8px;font-size:11px;color:rgba(255,255,255,.7);text-shadow:0 1px 3px rgba(0,0,0,.5)}
 .chat-img-full{position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .chat-img-full img{max-width:95vw;max-height:95vh;border-radius:8px}
 .floatbtn{flex:none;width:clamp(34px,4.5vw,40px);height:clamp(34px,4.5vw,40px);
@@ -2415,7 +2441,7 @@ textarea,input,.composer,.composer *{-webkit-user-select:text!important;
 </main>
 <footer class="composer">
   <div class="field">
-    <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="sendPhoto(this)">
+    <input type="file" id="photoInput" accept="image/*" multiple style="display:none" onchange="sendPhoto(this)">
     <button class="photobtn" onclick="document.getElementById('photoInput').click()" aria-label="发照片">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
     </button>
@@ -2507,9 +2533,20 @@ function hideTyping(){
 function isImg(t){return t&&(t.startsWith('data:image/')||t.startsWith('/uploads/'))}
 function imgHtml(src,time){return \`<div class="bubble" style="padding:6px"><img class="chat-img" src="\${src}" onclick="viewImg(this.src)"><span class="meta">\${time||''}</span></div>\`}
 function viewImg(src){const d=document.createElement('div');d.className='chat-img-full';d.innerHTML=\`<img src="\${src}">\`;d.onclick=()=>d.remove();document.body.appendChild(d)}
-function addMsg(role,text,time,noSave,imageUrl){
+function addMsg(role,text,time,noSave,imageUrl,images){
   empty.style.display='none';
-  if(!noSave){chatStore.push({role,content:text,time:time||'',imageUrl:imageUrl||''});saveLocal();}
+  if(!noSave){chatStore.push({role,content:text,time:time||'',imageUrl:imageUrl||'',imageUrls:images?images.map(()=>''):undefined});saveLocal();}
+  if(images&&images.length>1){
+    const row=document.createElement('div');
+    row.className=role==='assistant'?'row ai tail':'row human tail';
+    var grid='<div class="img-grid img-grid-'+Math.min(images.length,4)+'" style="padding:4px">';
+    images.forEach(function(src){grid+='<img class="chat-img grid-img" src="'+src+'" onclick="viewImg(this.src)">';});
+    grid+='<span class="meta">'+(time||'')+'</span></div>';
+    row.innerHTML='<div class="bubble" style="padding:4px">'+grid+'</div>';
+    scroll.appendChild(row);
+    scroll.scrollTop=scroll.scrollHeight;
+    return;
+  }
   if(isImg(text)){
     const row=document.createElement('div');
     row.className=role==='assistant'?'row ai tail':'row human tail';
@@ -2646,24 +2683,41 @@ function compressImg(file,maxW,quality){
 }
 
 async function sendPhoto(el){
-  const file=el.files[0];
-  if(!file)return;
+  const files=Array.from(el.files);
+  if(!files.length)return;
   el.value='';
-  const data=await compressImg(file,600,0.5);
   const now=new Date(Date.now()+8*3600000);
   const t=now.toISOString().slice(0,16).replace('T',' ');
-  addMsg('user',data,t);
-  console.log('[photo] size:',Math.round(data.length/1024)+'kb');
-  try{
-    const r=await fetch('/chat/send',{method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:'[图片]',image:data})});
-    const d=await r.json();
-    console.log('[photo] server:',d);
-    if(!d.ok) addMsg('assistant','图片发送失败: '+(d.error||'未知错误'),'');
-  }catch(e){
-    console.warn('[photo] send failed:',e);
-    addMsg('assistant','图片发送失败，请重试','');
+  if(files.length===1){
+    const data=await compressImg(files[0],600,0.5);
+    addMsg('user',data,t);
+    console.log('[photo] size:',Math.round(data.length/1024)+'kb');
+    try{
+      const r=await fetch('/chat/send',{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({message:'[图片]',image:data})});
+      const d=await r.json();
+      if(!d.ok) addMsg('assistant','图片发送失败: '+(d.error||'未知错误'),'');
+    }catch(e){
+      addMsg('assistant','图片发送失败，请重试','');
+    }
+  }else{
+    const images=[];
+    for(const f of files){
+      const data=await compressImg(f,600,0.5);
+      images.push(data);
+    }
+    addMsg('user','[多图]',t,false,null,images);
+    console.log('[photo] multi:',images.length,'images');
+    try{
+      const r=await fetch('/chat/send',{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({message:'[图片]',images:images})});
+      const d=await r.json();
+      if(!d.ok) addMsg('assistant','图片发送失败: '+(d.error||'未知错误'),'');
+    }catch(e){
+      addMsg('assistant','图片发送失败，请重试','');
+    }
   }
 }
 
@@ -2795,10 +2849,10 @@ async function loadHistory(){
   }
   msgs=msgs.slice(-200);
   chatStore.length=0;
-  msgs.forEach(m=>{chatStore.push({role:m.role,content:m.image||m.content,time:m.time||'',imageUrl:m.imageUrl||''});});
+  msgs.forEach(m=>{chatStore.push({role:m.role,content:m.image||m.content,time:m.time||'',imageUrl:m.imageUrl||'',imageUrls:m.imageUrls||undefined});});
   saveLocal();
   if(msgs.length>0){
-    msgs.forEach(m=>addMsg(m.role,m.image||m.content,m.time,true,m.imageUrl));
+    msgs.forEach(m=>addMsg(m.role,m.image||m.content,m.time,true,m.imageUrl,m.imageUrls));
     lastMsgCount=msgs.length;
   }
 }
