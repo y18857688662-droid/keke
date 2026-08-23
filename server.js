@@ -1060,6 +1060,23 @@ app.post('/setup/pro', (req, res) => {
   res.json({ ok: true, pro_mode: cfg.pro_mode });
 });
 
+const SMS_EFFECTS = {
+  fireworks: 'com.apple.messages.effect.CKFireworksEffect',
+  hearts: 'com.apple.messages.effect.CKHeartEffect',
+  lasers: 'com.apple.messages.effect.CKLasersEffect',
+  sparkles: 'com.apple.messages.effect.CKSparklesEffect',
+  celebration: 'com.apple.messages.effect.CKSparklesEffect',
+  shooting_star: 'com.apple.messages.effect.CKShootingStarEffect',
+  spotlight: 'com.apple.messages.effect.CKSpotlightEffect',
+  echo: 'com.apple.messages.effect.CKEchoEffect',
+  slam: 'com.apple.MobileSMS.expressivesend.impact',
+  loud: 'com.apple.MobileSMS.expressivesend.loud',
+  gentle: 'com.apple.MobileSMS.expressivesend.gentle',
+  invisible: 'com.apple.MobileSMS.expressivesend.invisibleink',
+  balloons: 'com.apple.messages.effect.CKHappyBirthdayEffect',
+  confetti: 'com.apple.messages.effect.CKConfettiEffect'
+};
+
 app.post('/setup/sendblue', (req, res) => {
   const { api_key, api_secret, from_number, to_number } = req.body;
   if (!api_key || !api_secret) return res.status(400).json({ error: 'need api_key and api_secret' });
@@ -1078,8 +1095,12 @@ app.post('/sms/send', async (req, res) => {
   const content = req.body.content || req.body.message || req.body.text;
   const to = req.body.to || cfg.sendblue_to;
   if (!content || !to) return res.status(400).json({ error: 'need content and to number' });
+  const effectInput = req.body.effect || req.body.send_style || '';
+  const send_style = SMS_EFFECTS[effectInput] || effectInput || '';
   try {
-    const payload = JSON.stringify({ number: to, from_number: cfg.sendblue_from || '', content });
+    const body = { number: to, from_number: cfg.sendblue_from || '', content };
+    if (send_style) body.send_style = send_style;
+    const payload = JSON.stringify(body);
     const options = {
       hostname: 'api.sendblue.com',
       path: '/api/send-message',
@@ -1109,7 +1130,8 @@ app.get('/sms/status', (req, res) => {
   res.json({
     configured: !!(cfg.sendblue_key && cfg.sendblue_secret),
     from_number: cfg.sendblue_from || null,
-    to_number: cfg.sendblue_to ? cfg.sendblue_to.replace(/.(?=.{4})/g, '*') : null
+    to_number: cfg.sendblue_to ? cfg.sendblue_to.replace(/.(?=.{4})/g, '*') : null,
+    effects: Object.keys(SMS_EFFECTS)
   });
 });
 
