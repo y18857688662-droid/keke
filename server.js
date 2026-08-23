@@ -1554,18 +1554,17 @@ app.post('/chat/cleanup-voice', (req, res) => {
   const chat = readChat();
   let cleaned = 0;
   chat.forEach(m => {
-    if (m.role === 'assistant' && m.audioUrl && m.content) {
-      const clean = m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-      const match = clean.match(/(^|\n)\s*\[voice\]/i);
-      if (match) {
-        const idx = clean.indexOf(match[0]) + match[0].indexOf('[');
-        if (idx > 0) {
-          m.content = m.content.replace(/\n*\[voice\][^\n]*/i, '');
-          delete m.audioUrl;
-          cleaned++;
-        }
-      }
-    }
+    if (m.role !== 'assistant' || !m.content) return;
+    const outside = m.content.replace(/<think>[\s\S]*?<\/think>/g, '');
+    if (!/\[voice\]/i.test(outside) && !m.audioUrl) return;
+    let c = m.content;
+    const thinkMatch = c.match(/^(<think>[\s\S]*?<\/think>)\s*/);
+    const think = thinkMatch ? thinkMatch[1] : '';
+    let body = thinkMatch ? c.slice(thinkMatch[0].length) : c;
+    body = body.replace(/\n*\[voice\][^\n]*/gi, '').trim();
+    m.content = think ? think + '\n' + body : body;
+    if (m.audioUrl) delete m.audioUrl;
+    cleaned++;
   });
   if (cleaned > 0) writeChat(chat);
   res.json({ ok: true, cleaned });
