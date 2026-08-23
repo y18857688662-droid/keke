@@ -3618,7 +3618,7 @@ function toggleVoiceText(el, b64) {
   if (box.style.display !== 'none') { box.style.display = 'none'; el.textContent = '转文字'; return; }
   try {
     var text = decodeURIComponent(atob(b64));
-    text = text.replace(/\[(?:low voice|whispers?|broken whisper|breathing heavily|shaky panting|rushed|loud kissing sounds|soft kissing sounds)\]\s*/gi, '').trim();
+    text = text.replace(/\\[(?:low voice|whispers?|broken whisper|breathing heavily|shaky panting|rushed|loud kissing sounds|soft kissing sounds)\\]\\s*/gi, '').trim();
     box.textContent = text || '(empty)';
   } catch(e) {
     try { box.textContent = atob(b64); } catch(e2) { box.textContent = b64; }
