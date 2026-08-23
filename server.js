@@ -1550,26 +1550,6 @@ app.get('/chat/history', (req, res) => {
   res.json({ messages: chat.slice(-50) });
 });
 
-app.post('/chat/cleanup-voice', (req, res) => {
-  const chat = readChat();
-  let cleaned = 0;
-  chat.forEach(m => {
-    if (m.role !== 'assistant' || !m.content) return;
-    const outside = m.content.replace(/<think>[\s\S]*?<\/think>/g, '');
-    if (!/\[voice\]/i.test(outside) && !m.audioUrl) return;
-    let c = m.content;
-    const thinkMatch = c.match(/^(<think>[\s\S]*?<\/think>)\s*/);
-    const think = thinkMatch ? thinkMatch[1] : '';
-    let body = thinkMatch ? c.slice(thinkMatch[0].length) : c;
-    body = body.replace(/\n*\[voice\][^\n]*/gi, '').trim();
-    m.content = think ? think + '\n' + body : body;
-    if (m.audioUrl) delete m.audioUrl;
-    cleaned++;
-  });
-  if (cleaned > 0) writeChat(chat);
-  res.json({ ok: true, cleaned });
-});
-
 app.get('/chat/archive', (req, res) => {
   const chat = readChat();
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
