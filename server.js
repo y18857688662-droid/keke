@@ -1158,8 +1158,8 @@ app.post('/sms/setup-webhook', async (req, res) => {
   if (!cfg.sendblue_key || !cfg.sendblue_secret) return res.status(500).json({ error: 'sendblue not configured' });
   const webhookUrl = 'https://yyaokeke.top/sms/incoming';
   try {
-    const payload = JSON.stringify({ url: webhookUrl });
-    const options = { hostname: 'api.sendblue.com', path: '/api/accounts/set-receive-callback', method: 'POST',
+    const payload = JSON.stringify({ receive_callback: webhookUrl });
+    const options = { hostname: 'api.sendblue.co', path: '/accounts', method: 'POST',
       headers: { 'Content-Type': 'application/json', 'sb-api-key-id': cfg.sendblue_key, 'sb-api-secret-key': cfg.sendblue_secret, 'Content-Length': Buffer.byteLength(payload) }
     };
     const apiReq = https.request(options, (apiRes) => {
