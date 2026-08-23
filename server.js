@@ -3814,9 +3814,32 @@ function renderMessage(msg, idx, stagger) {
     var fn2 = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\\'a\\');a.href=\\''+msg.fileUrl+'\\';a.download=\\''+escHtml(msg.filename||'file')+'\\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn2 + '</div>';
   }
-  var voiceRe = content.match(/^\\[voice\\]\\s*/i);
-  if (voiceRe) {
-    var vText = content.slice(voiceRe[0].length).trim();
+  var voiceIdx = content.search(/\\[voice\\]/i);
+  var voicePart = '', textPart = content;
+  if (voiceIdx !== -1) {
+    textPart = content.slice(0, voiceIdx).trim();
+    var afterTag = content.slice(voiceIdx).replace(/^\\[voice\\]\\s*/i, '');
+    voicePart = afterTag.trim();
+  }
+  if (textPart) {
+  var hasMedia = msg.image || msg.imageUrl || msg.audioUrl || msg.file || msg.fileUrl;
+  var lines = textPart.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l && !(hasMedia && /^\\[(图片|语音|文件)\\]/.test(l)) && !(msg.audioUrl && /^\\[语音\\]/.test(l))});
+  var bubbleIdx = 0;
+  lines.forEach(function(line) {
+    var delay = stagger ? 'style="opacity:0;animation:fadeInBubble 0.3s ease '+((bubbleIdx)*0.4)+'s forwards"' : '';
+    var imgMatch = line.match(/^\\[图片\\]\\(([^)]+)\\)$/);
+    if (imgMatch) {
+      colHtml += '<div class="msg-bubble" '+delay+' style="padding:4px"><img class="msg-img" src="'+imgMatch[1]+'" onclick="viewImg(this.src)"></div>';
+    } else if (line.startsWith('*') && line.endsWith('*') && line.length > 2) {
+      colHtml += '<div class="msg-action" '+delay+'>' + escHtml(line.slice(1,-1)) + '</div>';
+    } else {
+      colHtml += '<div class="msg-bubble" '+delay+' onclick="quoteThis(this)">' + escHtml(line) + '</div>';
+    }
+    bubbleIdx++;
+  });
+  }
+  if (voiceIdx !== -1) {
+    var vText = voicePart;
     var vDur = Math.max(2, Math.min(Math.ceil(vText.length / 4), 60));
     var vBars = '';
     for (var vb = 0; vb < 18; vb++) { var vh = 4 + Math.floor(Math.random() * 14); vBars += '<span style="height:'+vh+'px"></span>'; }
@@ -3831,22 +3854,6 @@ function renderMessage(msg, idx, stagger) {
       + '<div class="voice-to-text" onclick="toggleVoiceText(this,\\''+vB64+'\\')">\u8F6C\u6587\u5B57</div>'
       + '<div class="voice-text-content" style="display:none"></div>'
       + '</div>';
-  } else {
-  var hasMedia = msg.image || msg.imageUrl || msg.audioUrl || msg.file || msg.fileUrl;
-  var lines = content.split(/\\n+/).map(function(l){return l.trim()}).filter(function(l){return l && !(hasMedia && /^\\[(图片|语音|文件)\\]/.test(l)) && !(msg.audioUrl && /^\\[语音\\]/.test(l))});
-  var bubbleIdx = 0;
-  lines.forEach(function(line) {
-    var delay = stagger ? 'style="opacity:0;animation:fadeInBubble 0.3s ease '+((bubbleIdx)*0.4)+'s forwards"' : '';
-    var imgMatch = line.match(/^\\[图片\\]\\(([^)]+)\\)$/);
-    if (imgMatch) {
-      colHtml += '<div class="msg-bubble" '+delay+' style="padding:4px"><img class="msg-img" src="'+imgMatch[1]+'" onclick="viewImg(this.src)"></div>';
-    } else if (line.startsWith('*') && line.endsWith('*') && line.length > 2) {
-      colHtml += '<div class="msg-action" '+delay+'>' + escHtml(line.slice(1,-1)) + '</div>';
-    } else {
-      colHtml += '<div class="msg-bubble" '+delay+' onclick="quoteThis(this)">' + escHtml(line) + '</div>';
-    }
-    bubbleIdx++;
-  });
   }
   colHtml += '</div>';
   group.innerHTML = avaHtml + colHtml;
