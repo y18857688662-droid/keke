@@ -1135,7 +1135,23 @@ app.get('/sms/status', (req, res) => {
   });
 });
 
+const smsInbox = [];
+app.post('/sms/incoming', (req, res) => {
+  const { content, from_number, to_number, media_url, was_downgraded } = req.body;
+  if (content || media_url) {
+    const msg = { content: content || '', from: from_number || '', to: to_number || '', media: media_url || null, downgraded: !!was_downgraded, time: new Date().toISOString() };
+    smsInbox.push(msg);
+    if (smsInbox.length > 100) smsInbox.shift();
+    console.log(`[sms] incoming from ${from_number}: ${(content || '').slice(0, 50)}`);
+  }
+  res.json({ ok: true });
+});
 
+app.get('/sms/inbox', (req, res) => {
+  const since = req.query.since ? new Date(req.query.since) : null;
+  const msgs = since ? smsInbox.filter(m => new Date(m.time) > since) : smsInbox;
+  res.json({ messages: msgs });
+});
 
 app.get('/setup', (req, res) => {
   const cfg = readApiConfig();
