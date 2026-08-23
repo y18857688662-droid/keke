@@ -1550,6 +1550,27 @@ app.get('/chat/history', (req, res) => {
   res.json({ messages: chat.slice(-50) });
 });
 
+app.post('/chat/cleanup-voice', (req, res) => {
+  const chat = readChat();
+  let cleaned = 0;
+  chat.forEach(m => {
+    if (m.role === 'assistant' && m.audioUrl && m.content) {
+      const clean = m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      const match = clean.match(/(^|\n)\s*\[voice\]/i);
+      if (match) {
+        const idx = clean.indexOf(match[0]) + match[0].indexOf('[');
+        if (idx > 0) {
+          m.content = m.content.replace(/\n*\[voice\][^\n]*/i, '');
+          delete m.audioUrl;
+          cleaned++;
+        }
+      }
+    }
+  });
+  if (cleaned > 0) writeChat(chat);
+  res.json({ ok: true, cleaned });
+});
+
 app.get('/chat/archive', (req, res) => {
   const chat = readChat();
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
