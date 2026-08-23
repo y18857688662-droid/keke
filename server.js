@@ -1550,6 +1550,24 @@ app.get('/chat/history', (req, res) => {
   res.json({ messages: chat.slice(-50) });
 });
 
+app.post('/chat/repair', (req, res) => {
+  const { fixes } = req.body;
+  if (!fixes || !Array.isArray(fixes)) return res.json({ ok: false });
+  const chat = readChat();
+  let fixed = 0;
+  fixes.forEach(f => {
+    const idx = f.index;
+    if (idx >= 0 && idx < chat.length && chat[idx].role === 'assistant') {
+      if (f.content !== undefined) chat[idx].content = f.content;
+      if (f.audioUrl !== undefined) chat[idx].audioUrl = f.audioUrl || undefined;
+      if (f.audioUrl === null) delete chat[idx].audioUrl;
+      fixed++;
+    }
+  });
+  if (fixed > 0) writeChat(chat);
+  res.json({ ok: true, fixed });
+});
+
 app.get('/chat/archive', (req, res) => {
   const chat = readChat();
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
