@@ -1153,6 +1153,26 @@ app.get('/sms/inbox', (req, res) => {
   res.json({ messages: msgs });
 });
 
+app.post('/sms/setup-webhook', async (req, res) => {
+  const cfg = readApiConfig();
+  if (!cfg.sendblue_key || !cfg.sendblue_secret) return res.status(500).json({ error: 'sendblue not configured' });
+  const webhookUrl = 'https://yyaokeke.top/sms/incoming';
+  try {
+    const payload = JSON.stringify({ url: webhookUrl });
+    const options = { hostname: 'api.sendblue.com', path: '/api/accounts/set-receive-callback', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'sb-api-key-id': cfg.sendblue_key, 'sb-api-secret-key': cfg.sendblue_secret, 'Content-Length': Buffer.byteLength(payload) }
+    };
+    const apiReq = https.request(options, (apiRes) => {
+      let body = '';
+      apiRes.on('data', c => body += c);
+      apiRes.on('end', () => { try { res.json(JSON.parse(body)); } catch { res.json({ raw: body }); } });
+    });
+    apiReq.on('error', e => res.status(500).json({ error: e.message }));
+    apiReq.write(payload);
+    apiReq.end();
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/setup', (req, res) => {
   const cfg = readApiConfig();
   const hasKey = !!(cfg.api_key || cfg.anthropic_key);
