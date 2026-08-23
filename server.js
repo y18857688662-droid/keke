@@ -1866,7 +1866,7 @@ load();
 });
 
 function addAudioTags(text) {
-  return text;
+  return '... ' + text + ' ...';
 }
 
 app.post('/chat/tts', async (req, res) => {
