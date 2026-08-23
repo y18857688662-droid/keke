@@ -2819,7 +2819,44 @@ sse.onmessage=(e)=>{
     }
   }catch(err){}
 };
+let sseConn=sse;
 sse.onerror=()=>{console.log('[sse] reconnecting...');};
+
+var chatPollKnown=-1;
+setInterval(function(){
+  fetch('/chat/history?_t='+Date.now()).then(r=>r.json()).then(d=>{
+    if(!d.messages)return;
+    var count=d.messages.length;
+    if(chatPollKnown>=0&&count>chatPollKnown){
+      var newM=d.messages.slice(chatPollKnown);
+      for(var i=0;i<newM.length;i++){
+        if(newM[i].role==='assistant'){
+          hideTyping();
+          addMsg('assistant',newM[i].content,newM[i].time,false,newM[i].imageUrl);
+          sending=false;sendBtn.disabled=false;
+        }
+      }
+    }
+    chatPollKnown=count;
+  }).catch(()=>{});
+},3000);
+
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible'){
+    fetch('/chat/history?_t='+Date.now()).then(r=>r.json()).then(d=>{
+      if(!d.messages)return;
+      chatPollKnown=d.messages.length;
+      scroll.innerHTML='';empty.style.display='none';
+      d.messages.forEach(m=>addMsg(m.role,m.image||m.content,m.time,true,m.imageUrl,m.imageUrls));
+      scroll.scrollTop=scroll.scrollHeight;
+    }).catch(()=>{});
+    if(sseConn.readyState===2){
+      sseConn=new EventSource('/chat/stream');
+      sseConn.onmessage=sse.onmessage;
+      sseConn.onerror=()=>{console.log('[sse] reconnecting...');};
+    }
+  }
+});
 
 async function waitForReply(){}
 
