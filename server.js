@@ -2561,7 +2561,7 @@ function hideTyping(){
 }
 
 function renderSearchBubble(query){
-  return '<div class="search-bubble"><span class="search-icon">🔍</span>去网上看了看「<span class="search-query">'+esc(query)+'</span>」</div>';
+  return '<div style="text-align:center;padding:8px 16px;border-radius:20px;background:rgba(217,122,84,.15);border:1px dashed rgba(217,122,84,.4);font-size:13px;color:#888;display:inline-block"><span style="margin-right:6px">🔍</span>去网上看了看「<span style="color:var(--accent,#d97a54);font-weight:600">'+esc(query)+'</span>」</div>';
 }
 
 function isImg(t){return t&&(t.startsWith('data:image/')||t.startsWith('/uploads/'))}
@@ -2570,12 +2570,10 @@ function viewImg(src){const d=document.createElement('div');d.className='chat-im
 function addMsg(role,text,time,noSave,imageUrl,images){
   empty.style.display='none';
   var searchQ=null;
-  if(role==='assistant'){
+  if(role==='assistant'&&text.indexOf('[search:')>=0){
     var sIdx=text.indexOf('[search:');
-    if(sIdx>=0){
-      var sEnd=text.indexOf(']',sIdx+8);
-      if(sEnd>sIdx){searchQ=text.slice(sIdx+8,sEnd);text=text.slice(0,sIdx)+text.slice(sEnd+1);}
-    }
+    var sEnd=text.indexOf(']',sIdx+8);
+    if(sEnd>sIdx){searchQ=text.slice(sIdx+8,sEnd);text=text.slice(0,sIdx)+text.slice(sEnd+1);console.log('SEARCH DETECTED:',searchQ);}
   }
   if(!noSave){chatStore.push({role,content:(searchQ?'[search:'+searchQ+']':'')+text,time:time||'',imageUrl:imageUrl||'',imageUrls:images?images.map(()=>''):undefined});saveLocal();}
   if(images&&images.length>1){
