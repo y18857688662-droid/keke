@@ -5925,46 +5925,52 @@ app.post('/api/xhs-images', async (req, res) => {
   res.json({ ok: true, images: results });
 });
 
-// ── Gemini 生图 ──
+// ── 生图（支持 Silicon Flow / Gemini）──
 app.post('/api/generate-image', async (req, res) => {
   const { prompt, size, style } = req.body || {};
   if (!prompt) return res.status(400).json({ error: 'missing prompt' });
   const cfg = readApiConfig();
+  const sfKey = cfg.siliconflow_key || process.env.SILICONFLOW_KEY || '';
   const geminiKey = cfg.gemini_key || process.env.GEMINI_KEY || '';
-  if (!geminiKey) return res.status(500).json({ error: 'no gemini key configured' });
-  const model = 'gemini-3.6-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
-  const sizeHint = size ? ` Image size: ${size}.` : '';
-  const styleHint = style ? ` Style: ${style}.` : '';
-  const fullPrompt = `Generate an image: ${prompt}${sizeHint}${styleHint}`;
-  try {
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: fullPrompt }] }],
-        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
-      })
-    });
-    if (!r.ok) {
-      const err = await r.text();
-      return res.status(r.status).json({ error: `Gemini API error: ${r.status}`, detail: err });
-    }
-    const data = await r.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    const images = [];
-    let text = '';
-    for (const p of parts) {
-      if (p.inlineData) {
-        images.push({ base64: p.inlineData.data, mime: p.inlineData.mimeType });
-      }
-      if (p.text) text += p.text;
-    }
-    if (!images.length) return res.json({ ok: false, error: 'no image generated', text });
-    res.json({ ok: true, images, text });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  const styleHint = style ? `，${style}风格` : '';
+  const fullPrompt = prompt + styleHint;
+  if (sfKey) {
+    try {
+      const r = await fetch('https://api.siliconflow.cn/v1/images/generations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sfKey}` },
+        body: JSON.stringify({ model: 'black-forest-labs/FLUX.1-schnell', prompt: fullPrompt, image_size: size || '1024x1024' })
+      });
+      if (!r.ok) { const err = await r.text(); return res.status(r.status).json({ error: `SiliconFlow error: ${r.status}`, detail: err }); }
+      const data = await r.json();
+      const images = (data.images || data.data || []).map(img => {
+        if (img.b64_json) return { base64: img.b64_json, mime: 'image/png' };
+        if (img.url) return { url: img.url };
+        return img;
+      });
+      if (!images.length) return res.json({ ok: false, error: 'no image generated' });
+      return res.json({ ok: true, images });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
   }
+  if (geminiKey) {
+    const model = 'gemini-3.6-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: `Generate an image: ${fullPrompt}` }] }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'] } })
+      });
+      if (!r.ok) { const err = await r.text(); return res.status(r.status).json({ error: `Gemini error: ${r.status}`, detail: err }); }
+      const data = await r.json();
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const images = []; let text = '';
+      for (const p of parts) { if (p.inlineData) images.push({ base64: p.inlineData.data, mime: p.inlineData.mimeType }); if (p.text) text += p.text; }
+      if (!images.length) return res.json({ ok: false, error: 'no image generated', text });
+      return res.json({ ok: true, images, text });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+  res.status(500).json({ error: 'no image API key configured (need siliconflow_key or gemini_key in api_config.json)' });
 });
 
 app.get('/draw', (req, res) => {
@@ -6046,7 +6052,7 @@ async function generate() {
     status.innerHTML = '';
     let html = '';
     for (const img of data.images) {
-      const src = 'data:' + img.mime + ';base64,' + img.base64;
+      const src = img.url || ('data:' + (img.mime||'image/png') + ';base64,' + img.base64);
       html += '<img src="' + src + '" alt="generated">';
       history.unshift(src);
     }
