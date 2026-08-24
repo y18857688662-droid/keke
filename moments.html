@@ -101,9 +101,18 @@ body{background:var(--bg);color:var(--text);min-height:100vh;font-family:var(--s
 <div class="modal-img-preview" id="imgPreview"><img id="previewImg"><button class="remove-img" onclick="removeImg()">&times;</button></div>
 <div class="modal-btns">
 <button class="btn-img" onclick="pickImg()">&#128247; 图片</button>
+<button class="btn-img" onclick="openAiGen()">&#10024; AI生图</button>
 <button class="btn-post" id="postBtn" onclick="submitPost()">发布</button>
 </div>
 <input type="file" id="imgInput" accept="image/*" style="display:none" onchange="onImgPicked(event)">
+<div id="aiGenPanel" style="display:none;margin-top:12px">
+<input id="aiPrompt" class="cmt-input" style="width:100%;border-radius:14px;padding:12px 14px;background:var(--bg);border:1px solid var(--divider);margin-bottom:8px" placeholder="描述你想生成的图片…">
+<div style="display:flex;gap:8px">
+<button class="btn-img" style="flex:1;padding:10px;border-radius:10px;font-size:14px" onclick="generateAiImg()">生成</button>
+<button class="btn-img" style="padding:10px 16px;border-radius:10px;font-size:14px" onclick="closeAiGen()">取消</button>
+</div>
+<div id="aiStatus" style="text-align:center;font-size:13px;color:var(--text-faint);margin-top:8px;display:none"></div>
+</div>
 </div>
 </div>
 <script>
@@ -198,6 +207,27 @@ async function submitPost(){
     loadFeed();
   }catch(e){alert('发布失败');}
   document.getElementById('postBtn').disabled=false;
+}
+
+function openAiGen(){document.getElementById('aiGenPanel').style.display='block';document.getElementById('aiPrompt').focus();}
+function closeAiGen(){document.getElementById('aiGenPanel').style.display='none';document.getElementById('aiPrompt').value='';document.getElementById('aiStatus').style.display='none';}
+async function generateAiImg(){
+  var prompt=document.getElementById('aiPrompt').value.trim();
+  if(!prompt)return;
+  var status=document.getElementById('aiStatus');
+  status.style.display='block';status.textContent='生成中……';
+  try{
+    var r=await fetch('/api/generate-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt})});
+    var d=await r.json();
+    if(d.ok&&d.image){
+      pendingImg=d.image;
+      document.getElementById('previewImg').src=pendingImg;
+      document.getElementById('imgPreview').style.display='block';
+      closeAiGen();
+    }else{
+      status.textContent='生成失败: '+(d.error||'未知错误');
+    }
+  }catch(e){status.textContent='网络错误';}
 }
 
 loadFeed();
