@@ -2149,6 +2149,14 @@ body{position:fixed;inset:0;width:100%;
 .think-body{margin-top:clamp(8px,1.2vw,12px)}
 .row.narration{justify-content:center;padding:2px 0}
 .row.narration .bubble{background:none;box-shadow:none;font-style:italic;color:var(--text-faint);font-size:0.85em;opacity:0.7;padding:2px 12px}
+.msg-del-btn{display:block;margin-top:6px;padding:2px 10px;
+  border:none;border-radius:12px;
+  background:rgba(220,60,60,.12);color:#d44;
+  font-size:12px;cursor:pointer;
+  animation:msgIn .15s ease-out both}
+.msg-del-btn:active{background:rgba(220,60,60,.25)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .msg-del-btn{background:rgba(255,80,80,.15);color:#f66}}
+:root[data-theme="dark"] .msg-del-btn{background:rgba(255,80,80,.15);color:#f66}
 .think-text{width:100%;margin:0 0 clamp(8px,1.2vw,12px);
   color:var(--think-body);
   font-size:clamp(13px,1.4vw,14px);line-height:1.65;
@@ -2643,25 +2651,30 @@ function addMsg(role,text,time,noSave,imageUrl,images){
   scroll.scrollTop=scroll.scrollHeight;
 }
 
-var lpTimer=null;
-scroll.addEventListener('touchstart',function(e){
-  var row=e.target.closest('.row');
-  if(!row)return;
-  lpTimer=setTimeout(function(){
-    lpTimer=null;
+scroll.addEventListener('click',function(e){
+  if(e.target.classList.contains('msg-del-btn')){
+    var row=e.target.closest('.row');
+    if(!row)return;
     var txt=row.querySelector('.txt');
     var meta=row.querySelector('.meta');
     var content=txt?txt.textContent:'';
     var time=meta?meta.textContent:'';
     var role=row.classList.contains('human')?'user':'assistant';
-    if(!confirm('删除这条消息？'))return;
     fetch('/chat/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:role,content:content,time:time})}).then(function(r){return r.json()}).then(function(d){
       if(d.ok){row.remove();chatStore=chatStore.filter(function(m){return!(m.role===role&&m.content===content)});saveLocal();}
     });
-  },600);
-},{passive:true});
-scroll.addEventListener('touchend',function(){if(lpTimer){clearTimeout(lpTimer);lpTimer=null;}});
-scroll.addEventListener('touchmove',function(){if(lpTimer){clearTimeout(lpTimer);lpTimer=null;}},{passive:true});
+    return;
+  }
+  var row=e.target.closest('.row');
+  if(!row||row.classList.contains('think')||row.classList.contains('narration'))return;
+  var existing=row.querySelector('.msg-del-btn');
+  document.querySelectorAll('.msg-del-btn').forEach(function(b){b.remove();});
+  if(existing)return;
+  var btn=document.createElement('button');
+  btn.className='msg-del-btn';
+  btn.textContent='删除';
+  row.querySelector('.bubble').appendChild(btn);
+});
 
 async function send(){
   if(sending)return;
