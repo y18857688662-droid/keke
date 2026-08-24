@@ -5932,7 +5932,7 @@ app.post('/api/generate-image', async (req, res) => {
   const cfg = readApiConfig();
   const geminiKey = cfg.gemini_key || process.env.GEMINI_KEY || '';
   if (!geminiKey) return res.status(500).json({ error: 'no gemini key configured' });
-  const model = 'gemini-2.0-flash-exp';
+  const model = 'gemini-2.0-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
   const sizeHint = size ? ` Image size: ${size}.` : '';
   const styleHint = style ? ` Style: ${style}.` : '';
