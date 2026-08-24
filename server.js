@@ -6837,6 +6837,299 @@ server.on('upgrade', (req, socket, head) => {
   socket.on('error', (e) => { console.log('[bridge] ws error: ' + e.message); if (bridgeClient && bridgeClient._socket === socket) bridgeClient = null; });
 });
 
+// ── 朋友圈 (Moments) ──
+const MOMENTS_FILE = path.join(__dirname, 'moments.json');
+function readMoments() { try { return JSON.parse(fs.readFileSync(MOMENTS_FILE, 'utf8')); } catch { return []; } }
+function writeMoments(data) { fs.writeFileSync(MOMENTS_FILE, JSON.stringify(data)); }
+
+app.get('/moments/list', (req, res) => {
+  res.json({ moments: readMoments().slice(-200).reverse() });
+});
+
+app.post('/moments/post', (req, res) => {
+  const { author, text, image } = req.body;
+  if (!text && !image) return res.status(400).json({ error: 'need text or image' });
+  const now = new Date(Date.now() + 8 * 3600000);
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  let imageUrl = '';
+  if (image) {
+    try {
+      const imgId = Date.now() + '_m_' + Math.random().toString(36).slice(2, 8);
+      const ext = image.includes('image/png') ? '.png' : '.jpg';
+      const imgFile = imgId + ext;
+      const b64 = image.includes(',') ? image.split(',')[1] : image;
+      fs.writeFileSync(path.join(UPLOADS_DIR, imgFile), Buffer.from(b64, 'base64'));
+      imageUrl = '/uploads/' + imgFile;
+    } catch (e) { console.log('[moments] image save error:', e.message); }
+  }
+  const moments = readMoments();
+  moments.push({
+    id, author: author || 'gy', text: text || '',
+    imageUrl, date: now.toISOString().slice(0, 10),
+    time: now.toISOString().slice(11, 16),
+    likes: [], bookmark: [], comments: []
+  });
+  writeMoments(moments);
+  res.json({ ok: true, id });
+});
+
+app.post('/moments/like', (req, res) => {
+  const { id, who } = req.body;
+  const moments = readMoments();
+  const m = moments.find(p => p.id === id);
+  if (!m) return res.status(404).json({ error: 'not found' });
+  const name = who || 'yy';
+  if (m.likes.includes(name)) m.likes = m.likes.filter(n => n !== name);
+  else m.likes.push(name);
+  writeMoments(moments);
+  res.json({ ok: true, likes: m.likes });
+});
+
+app.post('/moments/comment', (req, res) => {
+  const { id, author, text } = req.body;
+  if (!text) return res.status(400).json({ error: 'need text' });
+  const moments = readMoments();
+  const m = moments.find(p => p.id === id);
+  if (!m) return res.status(404).json({ error: 'not found' });
+  const now = new Date(Date.now() + 8 * 3600000);
+  if (!m.comments) m.comments = [];
+  m.comments.push({ author: author || 'yy', text, time: now.toISOString().slice(11, 16) });
+  writeMoments(moments);
+  res.json({ ok: true });
+});
+
+app.post('/moments/bookmark', (req, res) => {
+  const { id, who } = req.body;
+  const moments = readMoments();
+  const m = moments.find(p => p.id === id);
+  if (!m) return res.status(404).json({ error: 'not found' });
+  const name = who || 'gy';
+  if (!m.bookmark) m.bookmark = [];
+  if (m.bookmark.includes(name)) m.bookmark = m.bookmark.filter(n => n !== name);
+  else m.bookmark.push(name);
+  writeMoments(moments);
+  res.json({ ok: true, bookmark: m.bookmark });
+});
+
+app.post('/moments/delete', (req, res) => {
+  const { id } = req.body;
+  let moments = readMoments();
+  moments = moments.filter(p => p.id !== id);
+  writeMoments(moments);
+  res.json({ ok: true });
+});
+
+app.get('/moments', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Moments</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Noto+Serif+SC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E8EDE4;--card:#FEFCF8;--text:#2C3029;--text-soft:#6B726A;--text-faint:#9BA39A;
+  --accent:#7B8F6B;--accent-soft:#A8B89A;--heart:#D4756B;--heart-bg:rgba(212,117,107,.08);
+  --divider:#D6DDD2;--shadow:0 1px 8px rgba(44,48,41,.06);
+  --serif:'Cormorant Garamond','Noto Serif SC',serif;
+  --sans:-apple-system,'SF Pro Display','PingFang SC','Helvetica Neue',sans-serif;
+  --radius:18px
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1C1F1A;--card:#262924;--text:#D6DDD2;--text-soft:#8A918A;--text-faint:#5E655E;
+  --accent:#A8B89A;--accent-soft:#7B8F6B;--heart:#E89088;--heart-bg:rgba(232,144,136,.1);
+  --divider:#363B34;--shadow:0 1px 8px rgba(0,0,0,.2)
+}}
+:root[data-theme="dark"]{
+  --bg:#1C1F1A;--card:#262924;--text:#D6DDD2;--text-soft:#8A918A;--text-faint:#5E655E;
+  --accent:#A8B89A;--accent-soft:#7B8F6B;--heart:#E89088;--heart-bg:rgba(232,144,136,.1);
+  --divider:#363B34;--shadow:0 1px 8px rgba(0,0,0,.2)
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;font-family:var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:520px;margin:0 auto;padding:0 16px env(safe-area-inset-bottom)}
+.top{text-align:center;padding:32px 0 8px}
+.top h1{font-family:var(--serif);font-style:italic;font-weight:400;font-size:28px;letter-spacing:1px;color:var(--text)}
+.top .sub{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--text-faint);margin-top:4px}
+.top .sub2{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-faint);margin-top:2px;font-weight:500}
+.back-btn{position:fixed;top:16px;left:16px;color:var(--text-soft);text-decoration:none;font-size:18px;z-index:10;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--card);box-shadow:var(--shadow)}
+.compose-btn{position:fixed;bottom:max(24px,env(safe-area-inset-bottom,24px));right:20px;width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:24px;cursor:pointer;box-shadow:0 3px 16px rgba(123,143,107,.3);z-index:10;display:flex;align-items:center;justify-content:center;transition:transform .15s}
+.compose-btn:active{transform:scale(.92)}
+.feed{padding:16px 0 80px}
+.post{background:var(--card);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;box-shadow:var(--shadow)}
+.post-head{display:flex;align-items:center;gap:10px;padding:14px 16px 0}
+.avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0}
+.avatar-gy{background:linear-gradient(135deg,#7B8F6B,#5A6B4E);color:#fff}
+.avatar-yy{background:linear-gradient(135deg,#D4A88C,#C48B6E);color:#fff}
+.post-meta{flex:1}
+.post-author{font-size:14px;font-weight:600;color:var(--text)}
+.post-time{font-size:12px;color:var(--text-faint)}
+.post-del{background:none;border:none;color:var(--text-faint);font-size:12px;cursor:pointer;padding:4px 8px}
+.post-del:hover{color:var(--heart)}
+.post-img{width:100%;margin-top:12px;display:block}
+.post-img img{width:100%;display:block}
+.post-text{padding:12px 16px;font-size:15px;line-height:1.8;white-space:pre-wrap}
+.post-actions{padding:0 16px;display:flex;gap:16px;align-items:center}
+.act-btn{background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-faint);padding:6px 0;transition:color .15s}
+.act-btn:hover{color:var(--text-soft)}
+.act-btn.liked{color:var(--heart)}
+.act-btn.liked .heart-icon{animation:heartPop .35s ease}
+.act-btn.bookmarked{color:var(--accent)}
+@keyframes heartPop{0%{transform:scale(1)}30%{transform:scale(1.3)}60%{transform:scale(.95)}100%{transform:scale(1)}}
+.likes-row{padding:4px 16px 2px;font-size:13px;color:var(--text-soft)}
+.likes-row svg{vertical-align:middle;margin-right:2px}
+.comments-area{padding:0 16px 12px}
+.cmt{display:flex;gap:8px;padding:6px 0;border-top:1px solid var(--divider)}
+.cmt:first-child{border-top:none}
+.cmt-avatar{width:24px;height:24px;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.cmt-body{flex:1}
+.cmt-name{font-size:12px;font-weight:600;color:var(--text-soft)}
+.cmt-text{font-size:14px;line-height:1.6;color:var(--text);margin-top:1px}
+.cmt-time{font-size:11px;color:var(--text-faint)}
+.bookmark-row{padding:2px 16px 10px;font-size:12px;color:var(--accent);display:flex;align-items:center;gap:4px}
+.cmt-input-row{display:flex;gap:8px;padding:8px 16px 12px;border-top:1px solid var(--divider)}
+.cmt-input{flex:1;background:var(--bg);border:none;border-radius:20px;padding:8px 14px;font-size:14px;color:var(--text);font-family:var(--sans);outline:none}
+.cmt-input::placeholder{color:var(--text-faint)}
+.cmt-send{background:var(--accent);color:#fff;border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border-radius:var(--radius) var(--radius) 0 0;width:100%;max-width:520px;padding:20px 16px env(safe-area-inset-bottom,20px);max-height:80vh;overflow-y:auto}
+.modal h2{font-family:var(--serif);font-style:italic;font-weight:400;font-size:20px;text-align:center;margin-bottom:16px;color:var(--text)}
+.modal textarea{width:100%;background:var(--bg);border:1px solid var(--divider);border-radius:14px;padding:14px;font-size:15px;color:var(--text);font-family:var(--sans);resize:none;min-height:120px;outline:none;line-height:1.7}
+.modal textarea:focus{border-color:var(--accent)}
+.modal textarea::placeholder{color:var(--text-faint)}
+.modal-img-preview{margin-top:12px;border-radius:12px;overflow:hidden;position:relative;display:none}
+.modal-img-preview img{width:100%;display:block}
+.modal-img-preview .remove-img{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:none;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.modal-btns{display:flex;gap:10px;margin-top:16px}
+.modal-btns button{flex:1;padding:12px;border-radius:12px;font-size:15px;cursor:pointer;border:none;font-weight:500}
+.btn-img{background:var(--bg);color:var(--text-soft)}
+.btn-post{background:var(--accent);color:#fff}
+.btn-post:disabled{opacity:.5;cursor:not-allowed}
+.empty-feed{text-align:center;padding:60px 0;color:var(--text-faint);font-size:14px;font-family:var(--serif);font-style:italic}
+</style></head><body>
+<a href="/" class="back-btn">‹</a>
+<div class="wrap">
+<div class="top">
+<h1>Moments</h1>
+<div class="sub">ours, quietly.</div>
+<div class="sub2">only us two</div>
+</div>
+<div class="feed" id="feed"><div class="empty-feed">loading...</div></div>
+</div>
+<button class="compose-btn" onclick="openCompose()">+</button>
+<div class="modal-overlay" id="composeModal" onclick="if(event.target===this)closeCompose()">
+<div class="modal">
+<h2>new moment</h2>
+<textarea id="postText" placeholder="写点什么……"></textarea>
+<div class="modal-img-preview" id="imgPreview"><img id="previewImg"><button class="remove-img" onclick="removeImg()">&times;</button></div>
+<div class="modal-btns">
+<button class="btn-img" onclick="pickImg()">📷 图片</button>
+<button class="btn-post" id="postBtn" onclick="submitPost()">发布</button>
+</div>
+<input type="file" id="imgInput" accept="image/*" style="display:none" onchange="onImgPicked(event)">
+</div>
+</div>
+<script>
+var GY='顾晏',YY='瑶瑶';
+function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
+function authorName(a){return a==='gy'?GY:YY}
+function authorClass(a){return a==='gy'?'avatar-gy':'avatar-yy'}
+function authorInitial(a){return a==='gy'?'晏':'瑶'}
+function likesText(arr){if(!arr||!arr.length)return'';return arr.map(function(n){return authorName(n)}).join(' & ')}
+function bookmarkText(arr){if(!arr||!arr.length)return'';return arr.map(function(n){return authorName(n)+' will come back to this'}).join(', ')}
+
+function renderPost(p){
+  var liked=p.likes&&p.likes.includes('yy');
+  var bm=p.bookmark&&p.bookmark.includes('yy');
+  var h='<div class="post" data-id="'+esc(p.id)+'">';
+  h+='<div class="post-head">';
+  h+='<div class="avatar '+authorClass(p.author)+'">'+authorInitial(p.author)+'</div>';
+  h+='<div class="post-meta"><div class="post-author">'+esc(authorName(p.author))+'</div>';
+  h+='<div class="post-time">'+esc(p.date)+' · '+esc(p.time)+'</div></div>';
+  h+='<button class="post-del" onclick="delPost(\''+esc(p.id)+'\')">delete</button>';
+  h+='</div>';
+  if(p.imageUrl){h+='<div class="post-img"><img src="'+esc(p.imageUrl)+'" loading="lazy"></div>';}
+  if(p.text){h+='<div class="post-text">'+esc(p.text)+'</div>';}
+  h+='<div class="post-actions">';
+  h+='<button class="act-btn'+(liked?' liked':'')+'" onclick="toggleLike(\''+esc(p.id)+'\')">';
+  h+='<span class="heart-icon">'+(liked?'♥':'♡')+'</span> '+(p.likes?p.likes.length:'')+'</button>';
+  h+='<button class="act-btn" onclick="focusComment(\''+esc(p.id)+'\')">💬 '+(p.comments?p.comments.length:'')+'</button>';
+  h+='<button class="act-btn'+(bm?' bookmarked':'')+'" onclick="toggleBookmark(\''+esc(p.id)+'\')">🔖</button>';
+  h+='</div>';
+  if(p.likes&&p.likes.length){h+='<div class="likes-row">♥ liked by '+esc(likesText(p.likes))+'</div>';}
+  if(p.bookmark&&p.bookmark.length){h+='<div class="bookmark-row">✦ '+esc(bookmarkText(p.bookmark))+'</div>';}
+  if(p.comments&&p.comments.length){
+    h+='<div class="comments-area">';
+    p.comments.forEach(function(c){
+      h+='<div class="cmt"><div class="cmt-avatar '+authorClass(c.author)+'">'+authorInitial(c.author)+'</div>';
+      h+='<div class="cmt-body"><span class="cmt-name">'+esc(authorName(c.author))+'</span>';
+      h+='<div class="cmt-text">'+esc(c.text)+'</div>';
+      h+='<div class="cmt-time">'+esc(c.time)+'</div></div></div>';
+    });
+    h+='</div>';
+  }
+  h+='<div class="cmt-input-row"><input class="cmt-input" id="cmt-'+esc(p.id)+'" placeholder="说点什么…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();sendComment(\''+esc(p.id)+'\')}">';
+  h+='<button class="cmt-send" onclick="sendComment(\''+esc(p.id)+'\')">↑</button></div>';
+  h+='</div>';
+  return h;
+}
+
+async function loadFeed(){
+  try{
+    var r=await fetch('/moments/list');
+    var d=await r.json();
+    var el=document.getElementById('feed');
+    if(!d.moments||!d.moments.length){el.innerHTML='<div class="empty-feed">还没有动态……<br>发第一条吧</div>';return;}
+    el.innerHTML=d.moments.map(renderPost).join('');
+  }catch(e){document.getElementById('feed').innerHTML='<div class="empty-feed">加载失败</div>';}
+}
+
+async function toggleLike(id){
+  await fetch('/moments/like',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,who:'yy'})});
+  loadFeed();
+}
+async function toggleBookmark(id){
+  await fetch('/moments/bookmark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,who:'yy'})});
+  loadFeed();
+}
+async function sendComment(id){
+  var el=document.getElementById('cmt-'+id);
+  if(!el||!el.value.trim())return;
+  await fetch('/moments/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,author:'yy',text:el.value.trim()})});
+  el.value='';
+  loadFeed();
+}
+function focusComment(id){var el=document.getElementById('cmt-'+id);if(el){el.focus();el.scrollIntoView({behavior:'smooth',block:'center'});}}
+async function delPost(id){if(!confirm('删除这条动态？'))return;await fetch('/moments/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});loadFeed();}
+
+var pendingImg='';
+function openCompose(){document.getElementById('composeModal').classList.add('show');document.getElementById('postText').focus();}
+function closeCompose(){document.getElementById('composeModal').classList.remove('show');document.getElementById('postText').value='';pendingImg='';document.getElementById('imgPreview').style.display='none';}
+function pickImg(){document.getElementById('imgInput').click();}
+function removeImg(){pendingImg='';document.getElementById('imgPreview').style.display='none';}
+function onImgPicked(e){
+  var f=e.target.files[0];if(!f)return;
+  var r=new FileReader();
+  r.onload=function(ev){pendingImg=ev.target.result;document.getElementById('previewImg').src=pendingImg;document.getElementById('imgPreview').style.display='block';};
+  r.readAsDataURL(f);
+}
+async function submitPost(){
+  var text=document.getElementById('postText').value.trim();
+  if(!text&&!pendingImg){return;}
+  document.getElementById('postBtn').disabled=true;
+  try{
+    await fetch('/moments/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({author:'yy',text:text,image:pendingImg||undefined})});
+    closeCompose();
+    loadFeed();
+  }catch(e){alert('发布失败');}
+  document.getElementById('postBtn').disabled=false;
+}
+
+loadFeed();
+setInterval(loadFeed,15000);
+<\/script></body></html>`);
+});
+
 server.listen(PORT, async () => {
   console.log('召唤铃运行中，端口 ' + PORT);
   buildMissYouPlan();
