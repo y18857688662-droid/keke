@@ -3984,6 +3984,14 @@ function renderMessage(msg, idx, stagger) {
   var isKe = msg.role === 'assistant';
   var who = isKe ? 'ke' : 'yao';
   var content = msg.content || '';
+  var searchQ = msg.searchQuery || null;
+  if (!searchQ && isKe) {
+    var sI = content.indexOf('[search:');
+    if (sI >= 0) {
+      var sE = content.indexOf(']', sI + 8);
+      if (sE > sI) { searchQ = content.slice(sI + 8, sE); content = content.slice(0, sI) + content.slice(sE + 1); }
+    }
+  }
   var think = '';
   var thinkMatch = content.match(/<think>([\\s\\S]*?)<\\/think>/);
   if (thinkMatch) {
@@ -4005,6 +4013,9 @@ function renderMessage(msg, idx, stagger) {
   var colHtml = '<div class="msg-col">';
   if (think && isKe) {
     colHtml += '<span class="thinking-cloud" onclick="openThinking('+idx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg></span>';
+  }
+  if (searchQ) {
+    colHtml += '<div style="text-align:center;padding:8px 12px;margin:4px 0;border-radius:20px;background:rgba(217,122,84,.12);border:1px dashed rgba(217,122,84,.4);font-size:13px;color:var(--text-mid,#888);display:inline-block"><span style="margin-right:6px">🔍</span>去网上看了看「<span style="color:var(--accent,#d97a54);font-weight:600">' + escHtml(searchQ) + '</span>」</div>';
   }
   if (msg.quote) {
     var qt = msg.quote.content || msg.quote.text || '';
@@ -4353,7 +4364,7 @@ evtSource.onmessage = function(e) {
     if (data.type === 'message' && data.role === 'assistant' && !sending) {
       lastMsgCount++;
       pollKnown++;
-      var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl, audioUrl: data.audioUrl};
+      var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl, audioUrl: data.audioUrl, searchQuery: data.searchQuery};
       msgContainer.appendChild(renderTime(data.time));
       msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length, true));
       scrollBottom();
@@ -4405,7 +4416,7 @@ document.addEventListener('visibilitychange', function() {
           if (data.type === 'message' && data.role === 'assistant' && !sending) {
             lastMsgCount++;
             pollKnown++;
-            var replyMsg = {role:'assistant', content: data.content, time: data.time};
+            var replyMsg = {role:'assistant', content: data.content, time: data.time, searchQuery: data.searchQuery};
             msgContainer.appendChild(renderTime(data.time));
             msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length));
             scrollBottom();
