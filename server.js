@@ -1499,7 +1499,9 @@ app.post('/chat/reply', async (req, res) => {
   const time = now.toISOString().slice(0, 16).replace('T', ' ');
   const chat = readChat();
   chat.forEach(m => { if (m.pending) delete m.pending; });
+  const searchMatch = reply.match(/\[search:(.+?)\]/);
   const msg = { role: 'assistant', content: reply, time };
+  if (searchMatch) msg.searchQuery = searchMatch[1];
   if (image) {
     try {
       const imgId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -1535,7 +1537,7 @@ app.post('/chat/reply', async (req, res) => {
   chat.push(msg);
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
-  sseBroadcast({ type: 'message', role: 'assistant', content: reply, time, imageUrl: msg.imageUrl, audioUrl: msg.audioUrl });
+  sseBroadcast({ type: 'message', role: 'assistant', content: reply, time, imageUrl: msg.imageUrl, audioUrl: msg.audioUrl, searchQuery: msg.searchQuery });
   const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const isVoiceMsg = /^\[voice\]/i.test(cleanReply);
   const lines = isVoiceMsg ? [] : cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
@@ -2567,7 +2569,15 @@ function imgHtml(src,time){return \`<div class="bubble" style="padding:6px"><img
 function viewImg(src){const d=document.createElement('div');d.className='chat-img-full';d.innerHTML=\`<img src="\${src}">\`;d.onclick=()=>d.remove();document.body.appendChild(d)}
 function addMsg(role,text,time,noSave,imageUrl,images){
   empty.style.display='none';
-  if(!noSave){chatStore.push({role,content:text,time:time||'',imageUrl:imageUrl||'',imageUrls:images?images.map(()=>''):undefined});saveLocal();}
+  var searchQ=null;
+  if(role==='assistant'){
+    var sIdx=text.indexOf('[search:');
+    if(sIdx>=0){
+      var sEnd=text.indexOf(']',sIdx+8);
+      if(sEnd>sIdx){searchQ=text.slice(sIdx+8,sEnd);text=text.slice(0,sIdx)+text.slice(sEnd+1);}
+    }
+  }
+  if(!noSave){chatStore.push({role,content:(searchQ?'[search:'+searchQ+']':'')+text,time:time||'',imageUrl:imageUrl||'',imageUrls:images?images.map(()=>''):undefined});saveLocal();}
   if(images&&images.length>1){
     const row=document.createElement('div');
     row.className=role==='assistant'?'row ai tail':'row human tail';
@@ -2626,6 +2636,12 @@ function addMsg(role,text,time,noSave,imageUrl,images){
       </div>\`;
       scroll.appendChild(trow);
     }
+    if(searchQ){
+      const srow=document.createElement('div');
+      srow.className='row search-row';
+      srow.innerHTML=renderSearchBubble(searchQ);
+      scroll.appendChild(srow);
+    }
     var bodyText=p.body;
     const parts=splitActions(bodyText);
     var allRows=[];
@@ -2636,7 +2652,6 @@ function addMsg(role,text,time,noSave,imageUrl,images){
         part.content.split(/\\n+/).forEach(function(line){
           var t=line.trim();
           if(!t)return;
-          if(t.indexOf('[search:')==0&&t.charAt(t.length-1)==']'){allRows.push({type:'search',content:t.slice(8,-1)});return;}
           allRows.push({type:'text',content:t});
         });
       }
@@ -2652,9 +2667,6 @@ function addMsg(role,text,time,noSave,imageUrl,images){
       if(r.type==='action'){
         row.className='row narration';
         row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span></div>\`;
-      }else if(r.type==='search'){
-        row.className='row search-row';
-        row.innerHTML=renderSearchBubble(r.content);
       }else{
         row.className='row ai tail';
         var meta=i===allRows.length-1?(time||''):'';
@@ -2669,19 +2681,6 @@ function addMsg(role,text,time,noSave,imageUrl,images){
     scroll.appendChild(row);
   }
   scroll.scrollTop=scroll.scrollHeight;
-  setTimeout(function(){
-    scroll.querySelectorAll('.txt').forEach(function(el){
-      var text=el.textContent||'';
-      if(text.indexOf('[search:')===0&&text.lastIndexOf(']')===text.length-1){
-        var query=text.slice(8,-1);
-        var row=el.closest('.row');
-        if(row){
-          row.className='row search-row';
-          row.innerHTML=renderSearchBubble(query);
-        }
-      }
-    });
-  },0);
 }
 
 scroll.addEventListener('click',function(e){
