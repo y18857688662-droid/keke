@@ -5935,22 +5935,32 @@ app.post('/api/generate-image', async (req, res) => {
   const styleHint = style ? `，${style}风格` : '';
   const fullPrompt = prompt + styleHint;
   if (sfKey) {
-    try {
-      const r = await fetch('https://api.siliconflow.cn/v1/images/generations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sfKey}` },
-        body: JSON.stringify({ model: 'black-forest-labs/FLUX.1-schnell', prompt: fullPrompt, image_size: size || '1024x1024' })
-      });
-      if (!r.ok) { const err = await r.text(); return res.status(r.status).json({ error: `SiliconFlow error: ${r.status}`, detail: err }); }
-      const data = await r.json();
-      const images = (data.images || data.data || []).map(img => {
-        if (img.b64_json) return { base64: img.b64_json, mime: 'image/png' };
-        if (img.url) return { url: img.url };
-        return img;
-      });
-      if (!images.length) return res.json({ ok: false, error: 'no image generated' });
-      return res.json({ ok: true, images });
-    } catch (e) { return res.status(500).json({ error: e.message }); }
+    const sfModels = [
+      'stabilityai/stable-diffusion-3-5-large',
+      'black-forest-labs/FLUX.1-schnell',
+      'Kwai-Kolors/Kolors',
+      'stabilityai/stable-diffusion-xl-base-1.0'
+    ];
+    let lastErr = '';
+    for (const model of sfModels) {
+      try {
+        const r = await fetch('https://api.siliconflow.cn/v1/images/generations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sfKey}` },
+          body: JSON.stringify({ model, prompt: fullPrompt, image_size: size || '1024x1024' })
+        });
+        if (!r.ok) { lastErr = await r.text(); continue; }
+        const data = await r.json();
+        const images = (data.images || data.data || []).map(img => {
+          if (img.b64_json) return { base64: img.b64_json, mime: 'image/png' };
+          if (img.url) return { url: img.url };
+          return img;
+        });
+        if (!images.length) continue;
+        return res.json({ ok: true, images, model });
+      } catch (e) { lastErr = e.message; continue; }
+    }
+    if (lastErr) return res.status(500).json({ error: 'SiliconFlow: all models failed', detail: lastErr });
   }
   if (geminiKey) {
     const model = 'gemini-3.6-flash';
