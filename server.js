@@ -2149,21 +2149,13 @@ body{position:fixed;inset:0;width:100%;
 .think-body{margin-top:clamp(8px,1.2vw,12px)}
 .row.narration{justify-content:center;padding:2px 0}
 .row.narration .bubble{background:none;box-shadow:none;font-style:italic;color:var(--text-faint);font-size:0.85em;opacity:0.7;padding:2px 12px}
-.search-card{display:block;margin-top:8px;padding:10px 12px;
+.search-bubble{display:flex;align-items:center;gap:6px;
+  padding:10px 14px;border-radius:16px;
   background:var(--surface);border:1px solid var(--divider);
-  border-radius:12px;text-decoration:none;color:var(--text);
-  transition:background .15s ease}
-.search-card:active{background:var(--divider)}
-.search-card-title{font-size:14px;font-weight:600;color:var(--accent);
-  line-height:1.4;margin-bottom:4px;display:-webkit-box;
-  -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.search-card-snippet{font-size:12px;color:var(--text-faint);
-  line-height:1.5;display:-webkit-box;
-  -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.search-card-url{font-size:11px;color:var(--text-faint);opacity:.6;
-  margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.search-label{font-size:12px;color:var(--text-faint);opacity:.7;
-  margin-bottom:6px;display:flex;align-items:center;gap:4px}
+  font-size:clamp(13px,1.4vw,14px);color:var(--text-faint);
+  line-height:1.5;max-width:min(82vw,500px)}
+.search-bubble .search-icon{flex-shrink:0;font-size:16px}
+.search-bubble .search-query{color:var(--accent);font-weight:500}
 .msg-del-btn{display:block;margin-top:6px;padding:2px 10px;
   border:none;border-radius:12px;
   background:rgba(220,60,60,.12);color:#d44;
@@ -2564,22 +2556,8 @@ function hideTyping(){
   checkMemory();
 }
 
-function renderSearchCards(jsonStr){
-  try{
-    var d=JSON.parse(jsonStr);
-    var q=d.query||'';var rs=d.results||[];
-    var h='<div class="search-results"><div class="search-label">🔍 搜索了「'+esc(q)+'」</div>';
-    rs.forEach(function(r){
-      var domain='';try{domain=new URL(r.url).hostname;}catch(e){}
-      h+='<a class="search-card" href="'+esc(r.url)+'" target="_blank" rel="noopener">'
-        +'<div class="search-card-title">'+esc(r.title)+'</div>'
-        +'<div class="search-card-snippet">'+esc(r.snippet)+'</div>'
-        +'<div class="search-card-url">'+esc(domain)+'</div>'
-        +'</a>';
-    });
-    h+='</div>';
-    return h;
-  }catch(e){return '';}
+function renderSearchBubble(query){
+  return '<div class="search-bubble"><span class="search-icon">🔍</span>去网上看了看「<span class="search-query">'+esc(query)+'</span>」</div>';
 }
 
 function isImg(t){return t&&(t.startsWith('data:image/')||t.startsWith('/uploads/'))}
@@ -2647,12 +2625,6 @@ function addMsg(role,text,time,noSave,imageUrl,images){
       scroll.appendChild(trow);
     }
     var bodyText=p.body;
-    var searchBlocks=[];
-    bodyText=bodyText.replace(/\[web-search\]([\s\S]*?)\[\/web-search\]/g,function(_,json){
-      var idx=searchBlocks.length;
-      searchBlocks.push(json);
-      return '[SEARCH_BLOCK_'+idx+']';
-    });
     const parts=splitActions(bodyText);
     var allRows=[];
     parts.forEach(function(part){
@@ -2662,8 +2634,8 @@ function addMsg(role,text,time,noSave,imageUrl,images){
         part.content.split(/\\n+/).forEach(function(line){
           var t=line.trim();
           if(!t)return;
-          var sm=t.match(/^\[SEARCH_BLOCK_(\d+)\]$/);
-          if(sm){allRows.push({type:'search',content:searchBlocks[parseInt(sm[1])]});return;}
+          var sm=t.match(/^\[search:(.+)\]$/);
+          if(sm){allRows.push({type:'search',content:sm[1]});return;}
           allRows.push({type:'text',content:t});
         });
       }
@@ -2681,8 +2653,7 @@ function addMsg(role,text,time,noSave,imageUrl,images){
         row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span></div>\`;
       }else if(r.type==='search'){
         row.className='row ai tail';
-        var cards=renderSearchCards(r.content);
-        row.innerHTML='<div class="bubble" style="padding:8px 12px">'+cards+'</div>';
+        row.innerHTML=renderSearchBubble(r.content);
       }else{
         row.className='row ai tail';
         var meta=i===allRows.length-1?(time||''):'';
