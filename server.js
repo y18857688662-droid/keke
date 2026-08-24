@@ -5925,6 +5925,151 @@ app.post('/api/xhs-images', async (req, res) => {
   res.json({ ok: true, images: results });
 });
 
+// ── Gemini 生图 ──
+app.post('/api/generate-image', async (req, res) => {
+  const { prompt, size, style } = req.body || {};
+  if (!prompt) return res.status(400).json({ error: 'missing prompt' });
+  const cfg = readApiConfig();
+  const geminiKey = cfg.gemini_key || process.env.GEMINI_KEY || '';
+  if (!geminiKey) return res.status(500).json({ error: 'no gemini key configured' });
+  const model = 'gemini-2.0-flash-exp';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+  const sizeHint = size ? ` Image size: ${size}.` : '';
+  const styleHint = style ? ` Style: ${style}.` : '';
+  const fullPrompt = `Generate an image: ${prompt}${sizeHint}${styleHint}`;
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: fullPrompt }] }],
+        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+      })
+    });
+    if (!r.ok) {
+      const err = await r.text();
+      return res.status(r.status).json({ error: `Gemini API error: ${r.status}`, detail: err });
+    }
+    const data = await r.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const images = [];
+    let text = '';
+    for (const p of parts) {
+      if (p.inlineData) {
+        images.push({ base64: p.inlineData.data, mime: p.inlineData.mimeType });
+      }
+      if (p.text) text += p.text;
+    }
+    if (!images.length) return res.json({ ok: false, error: 'no image generated', text });
+    res.json({ ok: true, images, text });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/draw', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>画画</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f0f17;color:#e8e4dd;font-family:system-ui,-apple-system,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:1.5rem}
+h1{font-size:1.4rem;font-weight:500;margin-bottom:1.2rem;color:#c4797a}
+.container{width:100%;max-width:600px}
+textarea{width:100%;background:#1a1a2e;border:1px solid rgba(232,228,221,0.1);border-radius:12px;color:#e8e4dd;padding:1rem;font-size:1rem;resize:vertical;min-height:100px;outline:none;font-family:inherit}
+textarea:focus{border-color:#c4797a}
+textarea::placeholder{color:#666}
+.options{display:flex;gap:0.8rem;margin:1rem 0;flex-wrap:wrap}
+select{background:#1a1a2e;border:1px solid rgba(232,228,221,0.1);border-radius:8px;color:#e8e4dd;padding:0.5rem 1rem;font-size:0.9rem;outline:none;cursor:pointer}
+select:focus{border-color:#c4797a}
+button{background:#c4797a;border:none;border-radius:10px;color:#fff;padding:0.7rem 2rem;font-size:1rem;cursor:pointer;transition:background 0.2s,transform 0.1s;font-weight:500}
+button:hover{background:#d4898a}
+button:active{transform:scale(0.97)}
+button:disabled{background:#555;cursor:wait}
+.result{margin-top:1.5rem;text-align:center}
+.result img{max-width:100%;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.4)}
+.result p{color:#9a9590;margin-top:0.8rem;font-size:0.9rem;line-height:1.6}
+.error{color:#e74c3c;margin-top:1rem}
+.loading{color:#d4a574;margin-top:1rem;animation:pulse 1.5s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-top:1.5rem}
+.gallery img{width:100%;border-radius:10px;cursor:pointer;transition:transform 0.2s}
+.gallery img:hover{transform:scale(1.03)}
+.save-btn{display:inline-block;margin-top:0.5rem;font-size:0.8rem;color:#d4a574;cursor:pointer;background:none;border:none;padding:0.3rem 0}
+.back{position:fixed;top:1rem;left:1rem;color:#9a9590;text-decoration:none;font-size:0.9rem}
+.back:hover{color:#e8e4dd}
+</style></head><body>
+<a href="/" class="back">&larr; 回首页</a>
+<div class="container">
+<h1>画画</h1>
+<textarea id="prompt" placeholder="描述你想画的内容……&#10;例如：一只橘猫趴在窗台上晒太阳，水彩风格"></textarea>
+<div class="options">
+<select id="style">
+<option value="">风格随意</option>
+<option value="watercolor">水彩</option>
+<option value="oil painting">油画</option>
+<option value="anime">动漫</option>
+<option value="pixel art">像素</option>
+<option value="photorealistic">写实</option>
+<option value="sketch">素描</option>
+<option value="chinese ink painting">水墨</option>
+</select>
+</div>
+<button id="gen" onclick="generate()">开始画</button>
+<div id="status"></div>
+<div id="result" class="result"></div>
+<div id="gallery" class="gallery"></div>
+</div>
+<script>
+const history = [];
+async function generate() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) return;
+  const style = document.getElementById('style').value;
+  const btn = document.getElementById('gen');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  btn.disabled = true;
+  btn.textContent = '画画中……';
+  status.innerHTML = '<p class="loading">正在生成 请稍等</p>';
+  result.innerHTML = '';
+  try {
+    const r = await fetch('/api/generate-image', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt, style })
+    });
+    const data = await r.json();
+    if (!data.ok) {
+      status.innerHTML = '<p class="error">' + (data.error || 'failed') + '</p>';
+      return;
+    }
+    status.innerHTML = '';
+    let html = '';
+    for (const img of data.images) {
+      const src = 'data:' + img.mime + ';base64,' + img.base64;
+      html += '<img src="' + src + '" alt="generated">';
+      history.unshift(src);
+    }
+    if (data.text) html += '<p>' + data.text + '</p>';
+    result.innerHTML = html;
+    updateGallery();
+  } catch(e) {
+    status.innerHTML = '<p class="error">' + e.message + '</p>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '开始画';
+  }
+}
+function updateGallery() {
+  const g = document.getElementById('gallery');
+  g.innerHTML = history.slice(0, 20).map(s => '<img src="' + s + '">').join('');
+}
+document.getElementById('prompt').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); }
+});
+</script></body></html>`);
+});
+
 app.post('/missyou/active', (req, res) => {
   const mins = Math.min(Math.max(Number((req.body && req.body.minutes) || 40), 1), 180);
   chatActiveUntil = Date.now() + mins * 60 * 1000;
