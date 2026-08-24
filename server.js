@@ -2149,13 +2149,15 @@ body{position:fixed;inset:0;width:100%;
 .think-body{margin-top:clamp(8px,1.2vw,12px)}
 .row.narration{justify-content:center;padding:2px 0}
 .row.narration .bubble{background:none;box-shadow:none;font-style:italic;color:var(--text-faint);font-size:0.85em;opacity:0.7;padding:2px 12px}
-.search-bubble{display:flex;align-items:center;gap:6px;
-  padding:10px 14px;border-radius:16px;
-  background:var(--surface);border:1px solid var(--divider);
-  font-size:clamp(13px,1.4vw,14px);color:var(--text-faint);
-  line-height:1.5;max-width:min(82vw,500px)}
-.search-bubble .search-icon{flex-shrink:0;font-size:16px}
-.search-bubble .search-query{color:var(--accent);font-weight:500}
+.row.search-row{justify-content:center;padding:6px 0}
+.search-bubble{display:inline-flex;align-items:center;gap:8px;
+  padding:8px 16px;border-radius:20px;
+  background:rgba(var(--accent-rgb,217,122,84),.08);
+  border:1px dashed rgba(var(--accent-rgb,217,122,84),.25);
+  font-size:clamp(12.5px,1.3vw,13.5px);color:var(--text-faint);
+  line-height:1.5;animation:msgIn .25s ease-in-out both}
+.search-bubble .search-icon{flex-shrink:0;font-size:14px;opacity:.7}
+.search-bubble .search-query{color:var(--accent);font-weight:600}
 .msg-del-btn{display:block;margin-top:6px;padding:2px 10px;
   border:none;border-radius:12px;
   background:rgba(220,60,60,.12);color:#d44;
@@ -2652,7 +2654,7 @@ function addMsg(role,text,time,noSave,imageUrl,images){
         row.className='row narration';
         row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span></div>\`;
       }else if(r.type==='search'){
-        row.className='row ai tail';
+        row.className='row search-row';
         row.innerHTML=renderSearchBubble(r.content);
       }else{
         row.className='row ai tail';
