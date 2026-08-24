@@ -2669,6 +2669,19 @@ function addMsg(role,text,time,noSave,imageUrl,images){
     scroll.appendChild(row);
   }
   scroll.scrollTop=scroll.scrollHeight;
+  setTimeout(function(){
+    scroll.querySelectorAll('.txt').forEach(function(el){
+      var text=el.textContent||'';
+      if(text.indexOf('[search:')===0&&text.lastIndexOf(']')===text.length-1){
+        var query=text.slice(8,-1);
+        var row=el.closest('.row');
+        if(row){
+          row.className='row search-row';
+          row.innerHTML=renderSearchBubble(query);
+        }
+      }
+    });
+  },0);
 }
 
 scroll.addEventListener('click',function(e){
