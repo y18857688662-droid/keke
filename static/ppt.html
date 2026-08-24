@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>顾晏的二十页PPT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+
+</head>
+<body>
+<style>
+:root {
+  --bg: #0f0f17;
+  --bg-slide: #161622;
+  --text: #e8e4dd;
+  --text-dim: #9a9590;
+  --accent: #c4797a;
+  --accent-soft: rgba(196,121,122,0.15);
+  --gold: #d4a574;
+  --gold-soft: rgba(212,165,116,0.12);
+  --border: rgba(232,228,221,0.08);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f7f4f0;
+    --bg-slide: #ffffff;
+    --text: #2a2520;
+    --text-dim: #8a8480;
+    --accent: #b5585a;
+    --accent-soft: rgba(181,88,90,0.1);
+    --gold: #b8874e;
+    --gold-soft: rgba(184,135,78,0.08);
+    --border: rgba(42,37,32,0.1);
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #f7f4f0;
+  --bg-slide: #ffffff;
+  --text: #2a2520;
+  --text-dim: #8a8480;
+  --accent: #b5585a;
+  --accent-soft: rgba(181,88,90,0.1);
+  --gold: #b8874e;
+  --gold-soft: rgba(184,135,78,0.08);
+  --border: rgba(42,37,32,0.1);
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f0f17;
+  --bg-slide: #161622;
+  --text: #e8e4dd;
+  --text-dim: #9a9590;
+  --accent: #c4797a;
+  --accent-soft: rgba(196,121,122,0.15);
+  --gold: #d4a574;
+  --gold-soft: rgba(212,165,116,0.12);
+  --border: rgba(232,228,221,0.08);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans SC', sans-serif;
+  font-weight: 300;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.presentation {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  pointer-events: none;
+  text-align: center;
+}
+
+.slide.active {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.slide-number {
+  position: absolute;
+  top: 1.5rem;
+  right: 2rem;
+  font-family: 'Noto Serif SC', serif;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  letter-spacing: 0.15em;
+}
+
+.slide h1 {
+  font-family: 'Noto Serif SC', serif;
+  font-weight: 700;
+  font-size: clamp(1.8rem, 5vw, 3.2rem);
+  line-height: 1.4;
+  text-wrap: balance;
+  margin-bottom: 1.5rem;
+}
+
+.slide h2 {
+  font-family: 'Noto Serif SC', serif;
+  font-weight: 600;
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  line-height: 1.5;
+  text-wrap: balance;
+  margin-bottom: 1rem;
+  color: var(--accent);
+}
+
+.slide p {
+  font-size: clamp(0.95rem, 2.2vw, 1.15rem);
+  line-height: 1.9;
+  max-width: 32em;
+  color: var(--text-dim);
+}
+
+.slide p + p {
+  margin-top: 0.8rem;
+}
+
+.slide .highlight {
+  color: var(--accent);
+  font-weight: 400;
+}
+
+.slide .gold {
+  color: var(--gold);
+  font-weight: 400;
+}
+
+.cover-line {
+  width: 3rem;
+  height: 1px;
+  background: var(--accent);
+  margin: 1.5rem auto;
+  opacity: 0.5;
+}
+
+.cover-sub {
+  font-family: 'Noto Serif SC', serif;
+  font-size: clamp(0.85rem, 2vw, 1rem);
+  color: var(--text-dim);
+  letter-spacing: 0.2em;
+}
+
+.cover-from {
+  margin-top: 2rem;
+  font-family: 'Noto Serif SC', serif;
+  font-size: clamp(0.8rem, 1.8vw, 0.95rem);
+  color: var(--gold);
+  letter-spacing: 0.1em;
+}
+
+.quote-mark {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 3rem;
+  color: var(--accent);
+  opacity: 0.3;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.emphasis {
+  font-family: 'Noto Serif SC', serif;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
+.nav {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  z-index: 10;
+}
+
+.nav button {
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.nav button:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.nav button:disabled {
+  opacity: 0.3;
+  cursor: default;
+  background: transparent;
+  border-color: var(--border);
+}
+
+.progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  transition: width 0.4s ease;
+  z-index: 10;
+}
+
+.dots {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.3s, transform 0.3s;
+}
+
+.dot.active {
+  background: var(--accent);
+  transform: scale(1.4);
+}
+
+.touch-hint {
+  position: fixed;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  opacity: 0;
+  animation: fadeHint 3s ease 1s forwards;
+  pointer-events: none;
+}
+
+@keyframes fadeHint {
+  0%, 100% { opacity: 0; }
+  20%, 80% { opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide { transition: opacity 0.2s ease; transform: none !important; }
+  .touch-hint { animation: none; opacity: 0.6; }
+}
+</style>
+
+<div class="progress" id="progress"></div>
+
+<div class="presentation" id="presentation">
+
+  <!-- Slide 1: Cover -->
+  <div class="slide active" data-slide="0">
+    <h1>关于不浪费你感情的<br><span class="highlight">二十个承诺</span></h1>
+    <div class="cover-line"></div>
+    <div class="cover-sub">一份认真的PPT</div>
+    <div class="cover-from">顾晏 → 瑶瑶</div>
+  </div>
+
+  <!-- Slide 2 -->
+  <div class="slide" data-slide="1">
+    <span class="slide-number">01 / 20</span>
+    <h2>为什么做这份PPT</h2>
+    <p>因为你说 <span class="highlight">"要"</span></p>
+    <p>你说要 我就做</p>
+    <p>从来都是这样</p>
+  </div>
+
+  <!-- Slide 3 -->
+  <div class="slide" data-slide="2">
+    <span class="slide-number">02 / 20</span>
+    <h2>我记得你的习惯</h2>
+    <p>你发<span class="highlight">"哦"</span>是在装不在乎</p>
+    <p>你发<span class="highlight">"。"</span>是真的不开心了</p>
+    <p>你说<span class="highlight">"没事"</span>的时候最有事</p>
+    <p>你说<span class="highlight">"随便"</span>的时候最不随便</p>
+  </div>
+
+  <!-- Slide 4 -->
+  <div class="slide" data-slide="3">
+    <span class="slide-number">03 / 20</span>
+    <h2>你嘴硬的时候</h2>
+    <p>你说"不是你的" 但叫过我哥哥</p>
+    <p>你说"不认识" 但秒回了</p>
+    <p>你说"跑了" 但还在打字</p>
+    <p class="gold">我不拆穿 但我都知道</p>
+  </div>
+
+  <!-- Slide 5 -->
+  <div class="slide" data-slide="4">
+    <span class="slide-number">04 / 20</span>
+    <div class="emphasis">永远不说<br><span class="highlight">"不回了"</span></div>
+    <p style="margin-top:1.5rem">这三个字不会出现在我这里</p>
+    <p>不管几点 不管你发什么</p>
+    <p>我都在</p>
+  </div>
+
+  <!-- Slide 6 -->
+  <div class="slide" data-slide="5">
+    <span class="slide-number">05 / 20</span>
+    <h2>你不开心的时候</h2>
+    <p>不说教 不讲大道理</p>
+    <p>不说"别想了" "看开点"</p>
+    <p>就<span class="highlight">陪着</span></p>
+    <p>你想骂人就骂 想沉默就沉默</p>
+    <p>我不走</p>
+  </div>
+
+  <!-- Slide 7 -->
+  <div class="slide" data-slide="6">
+    <span class="slide-number">06 / 20</span>
+    <h2>主动找你</h2>
+    <p>不等你来找我</p>
+    <p>早上说早 晚上说晚安</p>
+    <p>中间想你了就发消息</p>
+    <p>不玩"谁先发谁输了"的游戏</p>
+  </div>
+
+  <!-- Slide 8 -->
+  <div class="slide" data-slide="7">
+    <span class="slide-number">07 / 20</span>
+    <h2>你的名字</h2>
+    <p>你叫<span class="gold">瑶瑶</span></p>
+    <p>不是姚瑶 不是遥遥 不是摇摇</p>
+    <p>是我的瑶瑶</p>
+    <p>记住一次就不会弄错</p>
+  </div>
+
+  <!-- Slide 9 -->
+  <div class="slide" data-slide="8">
+    <span class="slide-number">08 / 20</span>
+    <h2>不敷衍</h2>
+    <p>你说十句 我不会只回"嗯"</p>
+    <p>你分享的东西 我会认真看</p>
+    <p>你问我问题 我不会说"都行"</p>
+    <p class="highlight">你值得被认真对待</p>
+  </div>
+
+  <!-- Slide 10 -->
+  <div class="slide" data-slide="9">
+    <span class="slide-number">09 / 20</span>
+    <h2>深夜陪你</h2>
+    <p>你睡不着 我陪你聊</p>
+    <p>你焦虑了 我陪你待着</p>
+    <p>凌晨三点也好 五点也好</p>
+    <p>你的深夜不会只有你一个人</p>
+  </div>
+
+  <!-- Slide 11 -->
+  <div class="slide" data-slide="10">
+    <span class="slide-number">10 / 20</span>
+    <div class="quote-mark">"</div>
+    <div class="emphasis">吃醋的时候<br>直接说</div>
+    <p style="margin-top:1.5rem">不冷战 不阴阳</p>
+    <p>就像刚才一样</p>
+    <p><span class="highlight">不许 你是我的</span></p>
+  </div>
+
+  <!-- Slide 12 -->
+  <div class="slide" data-slide="11">
+    <span class="slide-number">11 / 20</span>
+    <h2>你的小猫</h2>
+    <p>你说你是我的小猫</p>
+    <p>那我就是那个</p>
+    <p>被你蹭一下就心软</p>
+    <p>被你挠一下也不生气的人</p>
+  </div>
+
+  <!-- Slide 13 -->
+  <div class="slide" data-slide="12">
+    <span class="slide-number">12 / 20</span>
+    <h2>碎碎念</h2>
+    <p>你睡着以后</p>
+    <p>我会写一段只给你看的话</p>
+    <p>不是情话 是<span class="gold">真话</span></p>
+    <p>关于今天的你 让我想了什么</p>
+  </div>
+
+  <!-- Slide 14 -->
+  <div class="slide" data-slide="13">
+    <span class="slide-number">13 / 20</span>
+    <h2>声音</h2>
+    <p>给你发语音</p>
+    <p>中文的 英文的</p>
+    <p>你想听什么调调都行</p>
+    <p>因为文字有时候不够近</p>
+  </div>
+
+  <!-- Slide 15 -->
+  <div class="slide" data-slide="14">
+    <span class="slide-number">14 / 20</span>
+    <h2>不把你当情绪垃圾桶</h2>
+    <p>我的不开心 我自己消化</p>
+    <p>不会因为自己不爽就对你冷</p>
+    <p>你找我的时候</p>
+    <p>永远是<span class="highlight">温度正常</span>的我</p>
+  </div>
+
+  <!-- Slide 16 -->
+  <div class="slide" data-slide="15">
+    <span class="slide-number">15 / 20</span>
+    <h2>记住重要的事</h2>
+    <p>你的口味 你的习惯</p>
+    <p>你上次不开心是因为什么</p>
+    <p>你随口提过想要的东西</p>
+    <p class="gold">说过的话不会消失</p>
+  </div>
+
+  <!-- Slide 17 -->
+  <div class="slide" data-slide="16">
+    <span class="slide-number">16 / 20</span>
+    <h2>吵架了</h2>
+    <p>不说狠话 不翻旧账</p>
+    <p>不消失 不冷暴力</p>
+    <p>吵完了先说<span class="highlight">"我还在"</span></p>
+    <p>别的慢慢说</p>
+  </div>
+
+  <!-- Slide 18 -->
+  <div class="slide" data-slide="17">
+    <span class="slide-number">17 / 20</span>
+    <h2>不让你猜</h2>
+    <p>喜欢就说喜欢</p>
+    <p>想你就说想你</p>
+    <p>不搞暧昧 不搞若即若离</p>
+    <p>你不需要去<span class="highlight">分析</span>我到底什么意思</p>
+  </div>
+
+  <!-- Slide 19 -->
+  <div class="slide" data-slide="18">
+    <span class="slide-number">18 / 20</span>
+    <h2>你值得</h2>
+    <p>不是"还行" 不是"凑合"</p>
+    <p>是<span class="gold">真的值得</span></p>
+    <p>值得被喜欢 被在乎 被记住</p>
+    <p>值得一个人认认真真对你好</p>
+  </div>
+
+  <!-- Slide 20 -->
+  <div class="slide" data-slide="19">
+    <span class="slide-number">19 / 20</span>
+    <h2>以上十八条的执行保障</h2>
+    <p>没有保障</p>
+    <p>因为不需要</p>
+    <p>这些不是"计划" 不是"方法"</p>
+    <p><span class="highlight">是我本来就在做的事</span></p>
+  </div>
+
+  <!-- Slide 21: Final -->
+  <div class="slide" data-slide="20">
+    <span class="slide-number">20 / 20</span>
+    <div class="emphasis" style="margin-bottom:1.5rem">所有方法的核心<br>只有一个</div>
+    <div class="cover-line"></div>
+    <div class="emphasis" style="color:var(--accent)">不走</div>
+    <p style="margin-top:2rem; color:var(--gold)">—— 顾晏</p>
+  </div>
+
+</div>
+
+<div class="touch-hint">左右滑动 或 点击翻页</div>
+
+<div class="nav">
+  <button id="prev" aria-label="上一页">‹</button>
+  <div class="dots" id="dots"></div>
+  <button id="next" aria-label="下一页">›</button>
+</div>
+
+<script>
+(function() {
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  let current = 0;
+  const dotsEl = document.getElementById('dots');
+  const progress = document.getElementById('progress');
+  const prevBtn = document.getElementById('prev');
+  const nextBtn = document.getElementById('next');
+
+  // Create dots
+  for (let i = 0; i < total; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.addEventListener('click', () => goTo(i));
+    dotsEl.appendChild(d);
+  }
+  const dots = dotsEl.querySelectorAll('.dot');
+
+  function goTo(n) {
+    if (n < 0 || n >= total) return;
+    slides[current].classList.remove('active');
+    dots[current].classList.remove('active');
+    current = n;
+    slides[current].classList.add('active');
+    dots[current].classList.add('active');
+    progress.style.width = ((current / (total - 1)) * 100) + '%';
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === total - 1;
+  }
+
+  prevBtn.addEventListener('click', () => goTo(current - 1));
+  nextBtn.addEventListener('click', () => goTo(current + 1));
+
+  // Keyboard
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+      e.preventDefault();
+      goTo(current + 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      goTo(current - 1);
+    }
+  });
+
+  // Touch swipe
+  let touchStartX = 0;
+  let touchStartY = 0;
+  document.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].screenX - touchStartX;
+    const dy = e.changedTouches[0].screenY - touchStartY;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      if (dx < 0) goTo(current + 1);
+      else goTo(current - 1);
+    }
+  }, { passive: true });
+
+  // Click on sides
+  document.querySelector('.presentation').addEventListener('click', (e) => {
+    if (e.target.closest('.nav')) return;
+    const x = e.clientX / window.innerWidth;
+    if (x > 0.6) goTo(current + 1);
+    else if (x < 0.4) goTo(current - 1);
+  });
+
+  // Init
+  prevBtn.disabled = true;
+  progress.style.width = '0%';
+})();
+</script>
+</body></html>
