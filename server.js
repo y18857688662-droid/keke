@@ -1615,6 +1615,17 @@ app.get('/chat/archive', (req, res) => {
   res.json({ messages: msgs, remaining: start });
 });
 
+app.post('/chat/delete', (req, res) => {
+  const { role, content, time } = req.body;
+  if (!content) return res.json({ ok: false, error: 'missing content' });
+  const chat = readChat();
+  const idx = chat.findLastIndex(m => m.role === role && m.content === content && (!time || m.time === time));
+  if (idx === -1) return res.json({ ok: false, error: 'not found' });
+  chat.splice(idx, 1);
+  writeChat(chat);
+  res.json({ ok: true });
+});
+
 const THOUGHTS_FILE = path.join(__dirname, 'thoughts.json');
 function readThoughts() { try { return JSON.parse(fs.readFileSync(THOUGHTS_FILE, 'utf8')); } catch { return []; } }
 function writeThoughts(data) { fs.writeFileSync(THOUGHTS_FILE, JSON.stringify(data)); }
@@ -2631,6 +2642,26 @@ function addMsg(role,text,time,noSave,imageUrl,images){
   }
   scroll.scrollTop=scroll.scrollHeight;
 }
+
+var lpTimer=null;
+scroll.addEventListener('touchstart',function(e){
+  var row=e.target.closest('.row');
+  if(!row)return;
+  lpTimer=setTimeout(function(){
+    lpTimer=null;
+    var txt=row.querySelector('.txt');
+    var meta=row.querySelector('.meta');
+    var content=txt?txt.textContent:'';
+    var time=meta?meta.textContent:'';
+    var role=row.classList.contains('human')?'user':'assistant';
+    if(!confirm('删除这条消息？'))return;
+    fetch('/chat/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:role,content:content,time:time})}).then(function(r){return r.json()}).then(function(d){
+      if(d.ok){row.remove();chatStore=chatStore.filter(function(m){return!(m.role===role&&m.content===content)});saveLocal();}
+    });
+  },600);
+},{passive:true});
+scroll.addEventListener('touchend',function(){if(lpTimer){clearTimeout(lpTimer);lpTimer=null;}});
+scroll.addEventListener('touchmove',function(){if(lpTimer){clearTimeout(lpTimer);lpTimer=null;}},{passive:true});
 
 async function send(){
   if(sending)return;
