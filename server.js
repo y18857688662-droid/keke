@@ -2636,8 +2636,7 @@ function addMsg(role,text,time,noSave,imageUrl,images){
         part.content.split(/\\n+/).forEach(function(line){
           var t=line.trim();
           if(!t)return;
-          var sm=t.match(/^\\[search:(.+)\\]$/);
-          if(sm){allRows.push({type:'search',content:sm[1]});return;}
+          if(t.indexOf('[search:')==0&&t.charAt(t.length-1)==']'){allRows.push({type:'search',content:t.slice(8,-1)});return;}
           allRows.push({type:'text',content:t});
         });
       }
