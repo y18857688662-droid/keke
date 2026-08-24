@@ -2149,6 +2149,21 @@ body{position:fixed;inset:0;width:100%;
 .think-body{margin-top:clamp(8px,1.2vw,12px)}
 .row.narration{justify-content:center;padding:2px 0}
 .row.narration .bubble{background:none;box-shadow:none;font-style:italic;color:var(--text-faint);font-size:0.85em;opacity:0.7;padding:2px 12px}
+.search-card{display:block;margin-top:8px;padding:10px 12px;
+  background:var(--surface);border:1px solid var(--divider);
+  border-radius:12px;text-decoration:none;color:var(--text);
+  transition:background .15s ease}
+.search-card:active{background:var(--divider)}
+.search-card-title{font-size:14px;font-weight:600;color:var(--accent);
+  line-height:1.4;margin-bottom:4px;display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.search-card-snippet{font-size:12px;color:var(--text-faint);
+  line-height:1.5;display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.search-card-url{font-size:11px;color:var(--text-faint);opacity:.6;
+  margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-label{font-size:12px;color:var(--text-faint);opacity:.7;
+  margin-bottom:6px;display:flex;align-items:center;gap:4px}
 .msg-del-btn{display:block;margin-top:6px;padding:2px 10px;
   border:none;border-radius:12px;
   background:rgba(220,60,60,.12);color:#d44;
@@ -2549,6 +2564,24 @@ function hideTyping(){
   checkMemory();
 }
 
+function renderSearchCards(jsonStr){
+  try{
+    var d=JSON.parse(jsonStr);
+    var q=d.query||'';var rs=d.results||[];
+    var h='<div class="search-results"><div class="search-label">🔍 搜索了「'+esc(q)+'」</div>';
+    rs.forEach(function(r){
+      var domain='';try{domain=new URL(r.url).hostname;}catch(e){}
+      h+='<a class="search-card" href="'+esc(r.url)+'" target="_blank" rel="noopener">'
+        +'<div class="search-card-title">'+esc(r.title)+'</div>'
+        +'<div class="search-card-snippet">'+esc(r.snippet)+'</div>'
+        +'<div class="search-card-url">'+esc(domain)+'</div>'
+        +'</a>';
+    });
+    h+='</div>';
+    return h;
+  }catch(e){return '';}
+}
+
 function isImg(t){return t&&(t.startsWith('data:image/')||t.startsWith('/uploads/'))}
 function imgHtml(src,time){return \`<div class="bubble" style="padding:6px"><img class="chat-img" src="\${src}" onclick="viewImg(this.src)"><span class="meta">\${time||''}</span></div>\`}
 function viewImg(src){const d=document.createElement('div');d.className='chat-img-full';d.innerHTML=\`<img src="\${src}">\`;d.onclick=()=>d.remove();document.body.appendChild(d)}
@@ -2613,14 +2646,25 @@ function addMsg(role,text,time,noSave,imageUrl,images){
       </div>\`;
       scroll.appendChild(trow);
     }
-    const parts=splitActions(p.body);
+    var bodyText=p.body;
+    var searchBlocks=[];
+    bodyText=bodyText.replace(/\[web-search\]([\s\S]*?)\[\/web-search\]/g,function(_,json){
+      var idx=searchBlocks.length;
+      searchBlocks.push(json);
+      return '[SEARCH_BLOCK_'+idx+']';
+    });
+    const parts=splitActions(bodyText);
     var allRows=[];
     parts.forEach(function(part){
       if(part.type==='action'){
         allRows.push({type:'action',content:part.content});
       }else{
         part.content.split(/\\n+/).forEach(function(line){
-          var t=line.trim();if(t)allRows.push({type:'text',content:t});
+          var t=line.trim();
+          if(!t)return;
+          var sm=t.match(/^\[SEARCH_BLOCK_(\d+)\]$/);
+          if(sm){allRows.push({type:'search',content:searchBlocks[parseInt(sm[1])]});return;}
+          allRows.push({type:'text',content:t});
         });
       }
     });
@@ -2635,6 +2679,10 @@ function addMsg(role,text,time,noSave,imageUrl,images){
       if(r.type==='action'){
         row.className='row narration';
         row.innerHTML=\`<div class="bubble"><span class="txt">\${esc(r.content)}</span></div>\`;
+      }else if(r.type==='search'){
+        row.className='row ai tail';
+        var cards=renderSearchCards(r.content);
+        row.innerHTML='<div class="bubble" style="padding:8px 12px">'+cards+'</div>';
       }else{
         row.className='row ai tail';
         var meta=i===allRows.length-1?(time||''):'';
@@ -6403,6 +6451,30 @@ app.get('/api/search', async (req, res) => {
       return { id: s.id, name: s.name || '', artist: artists, album: album.name || '', cover };
     });
     res.json({ ok: true, songs });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/web-search', async (req, res) => {
+  const q = req.query.q;
+  if (!q) return res.json({ ok: false, error: 'missing q' });
+  try {
+    const r = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    });
+    const html = await r.text();
+    const results = [];
+    const regex = /<a rel="nofollow" class="result__a" href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+    let m;
+    while ((m = regex.exec(html)) !== null && results.length < 5) {
+      let url = m[1];
+      if (url.startsWith('//duckduckgo.com/l/?uddg=')) {
+        url = decodeURIComponent(url.replace('//duckduckgo.com/l/?uddg=','').split('&')[0]);
+      }
+      const title = m[2].replace(/<[^>]+>/g,'').trim();
+      const snippet = m[3].replace(/<[^>]+>/g,'').trim();
+      if (title && url) results.push({ title, url, snippet });
+    }
+    res.json({ ok: true, results });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
