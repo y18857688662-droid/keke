@@ -3549,6 +3549,7 @@ body {
     <div class="sidebar-nav">
       <div class="nav-item active" onclick="goPage('/')"><div class="icon">💬</div><span>聊天</span></div>
       <div class="nav-item" onclick="goPage('/summon')"><div class="icon">🔔</div><span>召唤铃</span></div>
+      <div class="nav-item" onclick="goPage('/moments')"><div class="icon">📸</div><span>朋友圈</span></div>
       <div class="nav-item" onclick="goPage('/diary')"><div class="icon">📖</div><span>心情日记</span></div>
       <div class="nav-item" onclick="openMemPanel()"><div class="icon">🧠</div><span>记忆库</span></div>
       <div class="nav-item" onclick="goPage('/thoughts')"><div class="icon">💭</div><span>顾晏的碎碎念</span></div>
