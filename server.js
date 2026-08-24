@@ -6847,7 +6847,7 @@ app.get('/moments/list', (req, res) => {
   res.json({ moments: readMoments().slice(-200).reverse() });
 });
 
-app.post('/moments/post', (req, res) => {
+app.post('/moments/post', async (req, res) => {
   const { author, text, image } = req.body;
   if (!text && !image) return res.status(400).json({ error: 'need text or image' });
   const now = new Date(Date.now() + 8 * 3600000);
@@ -6855,12 +6855,22 @@ app.post('/moments/post', (req, res) => {
   let imageUrl = '';
   if (image) {
     try {
-      const imgId = Date.now() + '_m_' + Math.random().toString(36).slice(2, 8);
-      const ext = image.includes('image/png') ? '.png' : '.jpg';
-      const imgFile = imgId + ext;
-      const b64 = image.includes(',') ? image.split(',')[1] : image;
-      fs.writeFileSync(path.join(UPLOADS_DIR, imgFile), Buffer.from(b64, 'base64'));
-      imageUrl = '/uploads/' + imgFile;
+      if (image.startsWith('http')) {
+        const imgResp = await fetch(image);
+        const buf = Buffer.from(await imgResp.arrayBuffer());
+        const ct = imgResp.headers.get('content-type') || '';
+        const ext = ct.includes('png') ? '.png' : '.jpg';
+        const imgFile = Date.now() + '_m_' + Math.random().toString(36).slice(2, 8) + ext;
+        fs.writeFileSync(path.join(UPLOADS_DIR, imgFile), buf);
+        imageUrl = '/uploads/' + imgFile;
+      } else {
+        const imgId = Date.now() + '_m_' + Math.random().toString(36).slice(2, 8);
+        const ext = image.includes('image/png') ? '.png' : '.jpg';
+        const imgFile = imgId + ext;
+        const b64 = image.includes(',') ? image.split(',')[1] : image;
+        fs.writeFileSync(path.join(UPLOADS_DIR, imgFile), Buffer.from(b64, 'base64'));
+        imageUrl = '/uploads/' + imgFile;
+      }
     } catch (e) { console.log('[moments] image save error:', e.message); }
   }
   const moments = readMoments();

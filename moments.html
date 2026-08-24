@@ -219,8 +219,9 @@ async function generateAiImg(){
   try{
     var r=await fetch('/api/generate-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt})});
     var d=await r.json();
-    if(d.ok&&d.image){
-      pendingImg=d.image;
+    var imgSrc=d.image||(d.images&&d.images[0]&&(d.images[0].url||d.images[0]));
+    if(d.ok&&imgSrc){
+      pendingImg=imgSrc;
       document.getElementById('previewImg').src=pendingImg;
       document.getElementById('imgPreview').style.display='block';
       closeAiGen();
