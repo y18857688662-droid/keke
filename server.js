@@ -1350,7 +1350,7 @@ app.post('/chat/send', async (req, res) => {
   if (!msg && !image && !audio) return res.json({ ok: false, error: 'empty message' });
   trackUserMessage();
   const now = new Date(Date.now() + 8 * 3600000);
-  const time = now.toISOString().slice(0, 16).replace('T', ' ');
+  const time = now.toISOString().slice(0, 19).replace('T', ' ');
   const chat = readChat();
   if (audio) {
     const audioId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -1508,7 +1508,7 @@ app.post('/chat/reply', async (req, res) => {
   const { reply, voice_line, voice, image } = req.body;
   if (!reply) return res.json({ ok: false });
   const now = new Date(Date.now() + 8 * 3600000);
-  const time = now.toISOString().slice(0, 16).replace('T', ' ');
+  const time = now.toISOString().slice(0, 19).replace('T', ' ');
   const chat = readChat();
   chat.forEach(m => { if (m.pending) delete m.pending; });
   const searchMatch = reply.match(/\[search:(.+?)\]/);
@@ -1673,7 +1673,7 @@ app.post('/chat/upload-finalize', (req, res) => {
     fs.rmSync(dir, { recursive: true, force: true });
     const fileUrl = '/uploads/' + safeName;
     const now = new Date(Date.now() + 8 * 3600000);
-    const time = now.toISOString().slice(0, 16).replace('T', ' ');
+    const time = now.toISOString().slice(0, 19).replace('T', ' ');
     const chat = readChat();
     chat.push({ role: 'user', content: '[文件] ' + filename, filename: filename, fileUrl: fileUrl, time });
     writeChat(chat);
@@ -3001,7 +3001,7 @@ function detectMood(text) {
 }
 function sendAudio(base64, transcript) {
   var contentText = transcript ? '[语音] ' + transcript : '[语音]';
-  var userMsg = {role:'user', content: contentText, audioUrl: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
+  var userMsg = {role:'user', content: contentText, audioUrl: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
   msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
@@ -3057,7 +3057,7 @@ function renderMessage(msg, idx, stagger) {
   }
   avaHtml += '</div>';
   var colHtml = '<div class="msg-col">';
-  if (msg.time) {
+  if (msg.time && isKe) {
     var tDisp = formatTimeDisplay(msg.time);
     if (tDisp) colHtml += '<div class="msg-inline-time">' + escHtml(tDisp) + '</div>';
   }
@@ -3295,7 +3295,7 @@ function sendMessage() {
   inputField.value = '';
   inputField.style.height = 'auto';
   var display = text.replace(/\\/\\//g, '\\n');
-  var userMsg = {role:'user', content: display, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
+  var userMsg = {role:'user', content: display, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
   if (currentQuote) userMsg.quote = currentQuote;
   msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
@@ -3335,7 +3335,7 @@ function compressImage(file, maxDim, quality) {
 function sendImage(file, caption) {
   compressImage(file, 1600, 0.85).then(function(base64) {
     var displayContent = caption || '[图片]';
-    var userMsg = {role:'user', content: displayContent, image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
+    var userMsg = {role:'user', content: displayContent, image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
     msgContainer.appendChild(renderTime(userMsg.time));
     msgContainer.appendChild(renderMessage(userMsg, -1));
     scrollBottom();
@@ -3362,7 +3362,7 @@ document.getElementById('photoInput').addEventListener('change', function() {
 function sendFile(file) {
   if (file.size > 100 * 1024 * 1024) { alert('文件太大，最大100MB'); return; }
   var fname = file.name;
-  var userMsg = {role:'user', content:'[文件] ' + fname, filename: fname, time: new Date(Date.now()+8*3600000).toISOString().slice(0,16).replace('T',' ')};
+  var userMsg = {role:'user', content:'[文件] ' + fname, filename: fname, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
   msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
@@ -4105,7 +4105,7 @@ app.post('/tg/webhook', async (req, res) => {
       await tgSendTyping(chatId);
       const description = await describeImage(imgUrl);
       const now = new Date(Date.now() + 8 * 3600000);
-      const time = now.toISOString().slice(0, 16).replace('T', ' ');
+      const time = now.toISOString().slice(0, 19).replace('T', ' ');
       const chat = readChat();
       let content;
       if (description) {
@@ -4147,7 +4147,7 @@ app.post('/tg/webhook', async (req, res) => {
   await tgSendTyping(chatId);
 
   const now = new Date(Date.now() + 8 * 3600000);
-  const time = now.toISOString().slice(0, 16).replace('T', ' ');
+  const time = now.toISOString().slice(0, 19).replace('T', ' ');
   trackUserMessage();
   const chat = readChat();
   chat.push({ role: 'user', content: userText, time, source: 'telegram', pending: true });
@@ -5045,9 +5045,9 @@ function writeFootprints(fp) { fs.writeFileSync(FOOTPRINTS_FILE, JSON.stringify(
 function addFootprint(type, summary, detail) {
   const now = new Date(Date.now() + 8 * 3600000);
   const fp = readFootprints();
-  fp.push({ type, summary, detail: detail || '', time: now.toISOString().slice(0, 16).replace('T', ' '), ts: Date.now() });
+  fp.push({ type, summary, detail: detail || '', time: now.toISOString().slice(0, 19).replace('T', ' '), ts: Date.now() });
   writeFootprints(fp);
-  sseBroadcast({ type: 'footprint', footType: type, summary, time: now.toISOString().slice(0, 16).replace('T', ' ') });
+  sseBroadcast({ type: 'footprint', footType: type, summary, time: now.toISOString().slice(0, 19).replace('T', ' ') });
 }
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -5218,7 +5218,7 @@ async function autoChat(reason) {
     msg = msg.trim();
     if (!msg) return;
     const now = new Date(Date.now() + 8 * 3600000);
-    const time = now.toISOString().slice(0, 16).replace('T', ' ');
+    const time = now.toISOString().slice(0, 19).replace('T', ' ');
     const chat = readChat();
     chat.push({ role: 'assistant', content: msg, time, autonomous: true });
     writeChat(chat);
