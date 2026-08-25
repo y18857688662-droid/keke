@@ -326,7 +326,7 @@ app.get('/ping', async (req, res) => {
   try {
     await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'PixT8Wvb6BqVjowY8NoFzg') + '/' +
       encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
-      '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell');
+      '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
   } catch (e) { console.log('ping bark failed: ' + e.message); }
 });
 
@@ -361,7 +361,7 @@ app.post('/bark/push', async (req, res) => {
   try {
     await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'PixT8Wvb6BqVjowY8NoFzg') + '/' +
       encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
-      '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell');
+      '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
     res.json({ ok: true });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
