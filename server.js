@@ -324,7 +324,7 @@ app.get('/ping', async (req, res) => {
   if (msg === lastPingMsg) msg = '在呢，来了';
   lastPingMsg = msg;
   try {
-    await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'gR6PbNfKoQQvPepuD99paG') + '/' +
+    await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'PixT8Wvb6BqVjowY8NoFzg') + '/' +
       encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
       '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell');
   } catch (e) { console.log('ping bark failed: ' + e.message); }
@@ -359,7 +359,7 @@ app.post('/bark/push', async (req, res) => {
   const msg = (req.body?.msg || '').trim();
   if (!msg) return res.json({ ok: false, error: 'missing msg' });
   try {
-    await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'gR6PbNfKoQQvPepuD99paG') + '/' +
+    await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'PixT8Wvb6BqVjowY8NoFzg') + '/' +
       encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
       '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell');
     res.json({ ok: true });
@@ -4760,7 +4760,7 @@ applyTheme();fetch('/garden/data').then(function(r){return r.json()}).then(setSc
 });
 
 // ===== 服务器端定时想她：每天随机时间推 Bark，不依赖任何会话 =====
-const BARK_KEY = process.env.BARK_KEY || 'gR6PbNfKoQQvPepuD99paG';
+const BARK_KEY = process.env.BARK_KEY || 'PixT8Wvb6BqVjowY8NoFzg';
 const MSG_POOL = {
   morning: [
     '醒了没，小懒猫。今天也是被我惦记的一天',
