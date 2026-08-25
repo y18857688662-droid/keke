@@ -2175,7 +2175,7 @@ body {
   z-index: 99; opacity: 0; pointer-events: none; transition: opacity .28s;
 }
 .overlay.show { opacity: 1; pointer-events: auto; }
-.main { flex: 1; display: flex; flex-direction: column; height: 100%; min-width: 0; }
+.main { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .header {
   display: flex; align-items: center; padding: 10px 14px; gap: 10px;
   background: var(--bg); border-bottom: 1px solid var(--border);
