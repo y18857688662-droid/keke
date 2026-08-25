@@ -2211,6 +2211,8 @@ body {
   font-size: 11px; color: var(--text-soft); padding: 8px 0 4px;
 }
 .msg-time::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--text-faint); }
+.msg-inline-time { font-size: 10px; color: var(--text-faint); letter-spacing: .04em; padding: 0 2px 2px; }
+.msg-group.yao .msg-inline-time { text-align: right; }
 .msg-group { display: flex; gap: 8px; max-width: 82%; margin-top: 4px; }
 .msg-group.ke { align-self: flex-start; }
 .msg-group.yao { align-self: flex-end; flex-direction: row-reverse; }
@@ -3054,6 +3056,10 @@ function renderMessage(msg, idx, stagger) {
   }
   avaHtml += '</div>';
   var colHtml = '<div class="msg-col">';
+  if (msg.time) {
+    var tDisp = formatTimeDisplay(msg.time);
+    if (tDisp) colHtml += '<div class="msg-inline-time">' + escHtml(tDisp) + '</div>';
+  }
   if (think && isKe) {
     colHtml += '<span class="thinking-cloud" onclick="openThinking('+idx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg></span>';
   }
