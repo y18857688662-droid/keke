@@ -3039,17 +3039,17 @@ function renderMessage(msg, idx, stagger) {
   var isKe = msg.role === 'assistant';
   var who = isKe ? 'ke' : 'yao';
   var content = msg.content || '';
-  var searchQ = msg.searchQuery || null;
-  var sI = content.indexOf('[search:');
-  if (sI >= 0) {
-    var sE = content.indexOf(']', sI + 8);
-    if (sE > sI) { if (!searchQ) searchQ = content.slice(sI + 8, sE); content = content.slice(0, sI) + content.slice(sE + 1); }
-  }
   var think = '';
   var thinkMatch = content.match(/<think>([\\s\\S]*?)<\\/think>/);
   if (thinkMatch) {
     think = thinkMatch[1].trim();
     content = content.replace(/<think>[\\s\\S]*?<\\/think>/g, '').trim();
+  }
+  var searchQ = msg.searchQuery || null;
+  var sI = content.indexOf('[search:');
+  if (sI >= 0) {
+    var sE = content.indexOf(']', sI + 8);
+    if (sE > sI) { if (!searchQ) searchQ = content.slice(sI + 8, sE); content = content.slice(0, sI) + content.slice(sE + 1); }
   }
   if (think) { thinkingStore[idx] = think; }
   var group = document.createElement('div');
@@ -3205,10 +3205,10 @@ function renderAll(messages) {
   msgContainer.appendChild(wrap);
   messages.forEach(function(msg, i) {
     var msgEl = renderMessage(msg, i);
+    if (msgEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(msgEl._searchQuery));
     if (msg.time && msg.role === 'assistant') {
       msgContainer.appendChild(renderTime(msg.time, msgEl._thinkIdx));
     }
-    if (msgEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(msgEl._searchQuery));
     msgContainer.appendChild(msgEl);
   });
   scrollBottom();
@@ -3245,10 +3245,10 @@ function loadArchive() {
     var lastTime = '';
     data.messages.forEach(function(msg, i) {
       var archMsgEl = renderMessage(msg, -(data.messages.length - i));
+      if (archMsgEl._searchQuery) msgContainer.insertBefore(renderSearchNarrator(archMsgEl._searchQuery), ref);
       if (msg.time && msg.role === 'assistant') {
         msgContainer.insertBefore(renderTime(msg.time, archMsgEl._thinkIdx), ref);
       }
-      if (archMsgEl._searchQuery) msgContainer.insertBefore(renderSearchNarrator(archMsgEl._searchQuery), ref);
       msgContainer.insertBefore(archMsgEl, ref);
     });
     msgContainer.scrollTop = scrollT + (msgContainer.scrollHeight - scrollH);
@@ -3434,8 +3434,8 @@ evtSource.onmessage = function(e) {
       pollKnown++;
       var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl, audioUrl: data.audioUrl, searchQuery: data.searchQuery};
       var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
-      msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
       if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
+      msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
       msgContainer.appendChild(replyEl);
       scrollBottom();
       petMood(detectMood(data.content));
@@ -3494,8 +3494,8 @@ setInterval(function() {
         var m = newMsgs[i];
         if (m.role === 'assistant') {
           var mEl = renderMessage(m, Object.keys(thinkingStore).length);
-          msgContainer.appendChild(renderTime(m.time, mEl._thinkIdx));
           if (mEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(mEl._searchQuery));
+          msgContainer.appendChild(renderTime(m.time, mEl._thinkIdx));
           msgContainer.appendChild(mEl);
           scrollBottom();
         }
@@ -3532,8 +3532,8 @@ document.addEventListener('visibilitychange', function() {
             pollKnown++;
             var replyMsg = {role:'assistant', content: data.content, time: data.time, searchQuery: data.searchQuery};
             var rEl = renderMessage(replyMsg, Object.keys(thinkingStore).length);
-            msgContainer.appendChild(renderTime(data.time, rEl._thinkIdx));
             if (rEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(rEl._searchQuery));
+            msgContainer.appendChild(renderTime(data.time, rEl._thinkIdx));
             msgContainer.appendChild(rEl);
             scrollBottom();
           }
