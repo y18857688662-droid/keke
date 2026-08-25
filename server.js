@@ -2745,12 +2745,10 @@ function renderMessage(msg, idx, stagger) {
   var who = isKe ? 'ke' : 'yao';
   var content = msg.content || '';
   var searchQ = msg.searchQuery || null;
-  if (!searchQ && isKe) {
-    var sI = content.indexOf('[search:');
-    if (sI >= 0) {
-      var sE = content.indexOf(']', sI + 8);
-      if (sE > sI) { searchQ = content.slice(sI + 8, sE); content = content.slice(0, sI) + content.slice(sE + 1); }
-    }
+  var sI = content.indexOf('[search:');
+  if (sI >= 0) {
+    var sE = content.indexOf(']', sI + 8);
+    if (sE > sI) { if (!searchQ) searchQ = content.slice(sI + 8, sE); content = content.slice(0, sI) + content.slice(sE + 1); }
   }
   var think = '';
   var thinkMatch = content.match(/<think>([\\s\\S]*?)<\\/think>/);
