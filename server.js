@@ -1702,6 +1702,7 @@ app.post('/thoughts/add', (req, res) => {
   const thoughts = readThoughts();
   thoughts.push({ text, mood: mood || '', date, time });
   writeThoughts(thoughts);
+  addFootprint('thought', text.slice(0, 60));
   res.json({ ok: true });
 });
 
