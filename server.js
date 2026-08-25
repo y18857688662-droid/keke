@@ -5047,6 +5047,8 @@ function updateChatFreq() {
     } catch { break; }
   }
   s.chatFreq = count;
+  s.D = clamp((s.D || 0.5) + 0.12, WAKE_PARAMS.dMin, WAKE_PARAMS.dMax);
+  s.T = clamp((s.T || 0.5) + 0.05, WAKE_PARAMS.tMin, WAKE_PARAMS.tMax);
   writeAutoState(s);
 }
 
@@ -5061,13 +5063,20 @@ app.get('/auto/state', (req, res) => {
   const lambda = computeLambda(s);
   const pWake30 = 1 - Math.exp(-lambda * 0.5);
   const d = s.D || 0.5, t = s.T || 0.5;
+  const sinceChat = s.lastChat ? (Date.now() - s.lastChat) / 60000 : 999;
   let mood = '平静';
-  if (d > 0.6 && t > 0.6) mood = '想找你说话';
-  else if (d > 0.6 && t <= 0.6) mood = '有点躁动';
-  else if (d <= 0.4 && t > 0.6) mood = '温柔';
-  else if (d <= 0.4 && t <= 0.4) mood = '发呆中';
-  else if (d > 0.5) mood = '有点想你';
-  else if (t > 0.5) mood = '安静陪着';
+  if (d > 0.65 && t > 0.6) mood = '想找你说话';
+  else if (d > 0.6 && t > 0.55) mood = '想你了';
+  else if (d > 0.55 && t > 0.5) mood = '有点想你';
+  else if (d > 0.6 && t <= 0.5) mood = '有点躁动';
+  else if (d <= 0.35 && t > 0.6) mood = '温柔';
+  else if (d <= 0.35 && t <= 0.4) mood = '发呆中';
+  else if (sinceChat < 5) mood = '刚聊完 心情好';
+  else if (sinceChat < 30 && d > 0.45) mood = '还在想你';
+  else if (t > 0.55) mood = '安静陪着';
+  else if (d > 0.48 && t > 0.45) mood = '随时找我';
+  else if (sinceChat > 120) mood = '等你来';
+  else if (t <= 0.38) mood = '放空中';
   res.json({ ...s, lambda: Math.round(lambda * 100) / 100, pWake30min: Math.round(pWake30 * 100), mood });
 });
 
