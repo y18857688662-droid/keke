@@ -5046,6 +5046,25 @@ function addFootprint(type, summary, detail) {
   sseBroadcast({ type: 'footprint', footType: type, summary, time: now.toISOString().slice(0, 19).replace('T', ' ') });
 }
 
+// One-time fix: patch truncated footprint summaries from thoughts
+(function fixTruncatedFootprints() {
+  try {
+    const fp = readFootprints();
+    const thoughts = readThoughts();
+    let fixed = 0;
+    for (const f of fp) {
+      if (f.type === 'thought' && f.summary.length === 60) {
+        const match = thoughts.find(t => t.text.startsWith(f.summary.slice(0, 50)));
+        if (match && match.text.length > 60) {
+          f.summary = match.text;
+          fixed++;
+        }
+      }
+    }
+    if (fixed > 0) { writeFootprints(fp); console.log('[fix] patched', fixed, 'truncated footprint summaries'); }
+  } catch(e) { console.log('[fix] footprint patch skipped:', e.message); }
+})();
+
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function gaussRandom() {
   let u, v, s;
