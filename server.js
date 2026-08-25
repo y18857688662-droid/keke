@@ -1286,6 +1286,26 @@ function writeChat(data) {
   fs.writeFileSync(CHAT_FILE, JSON.stringify(data));
 }
 
+function buildMsgContent(m) {
+  let c = m.content;
+  if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
+  const imgSources = [];
+  if (m.image) imgSources.push(m.image);
+  if (m.images && m.images.length) m.images.forEach(img => imgSources.push(img));
+  if (m.imageUrl && !m.image) {
+    try { const fp = path.join(__dirname, m.imageUrl); if (fs.existsSync(fp)) { const ext = m.imageUrl.endsWith('.png') ? 'image/png' : 'image/jpeg'; imgSources.push('data:' + ext + ';base64,' + fs.readFileSync(fp).toString('base64')); } } catch(e) {}
+  }
+  if (m.imageUrls && m.imageUrls.length && !m.images) {
+    m.imageUrls.forEach(u => { try { const fp = path.join(__dirname, u); if (fs.existsSync(fp)) { const ext = u.endsWith('.png') ? 'image/png' : 'image/jpeg'; imgSources.push('data:' + ext + ';base64,' + fs.readFileSync(fp).toString('base64')); } } catch(e) {} });
+  }
+  if (imgSources.length > 0) {
+    const parts = imgSources.map(img => { const b64 = img.includes(',') ? img.split(',')[1] : img; const mt = img.includes('image/png') ? 'image/png' : 'image/jpeg'; return { type: 'image', source: { type: 'base64', media_type: mt, data: b64 } }; });
+    parts.push({ type: 'text', text: c || '[图片]' });
+    return parts;
+  }
+  return c;
+}
+
 app.get('/sw.js', (req, res) => { res.set('Content-Type', 'application/javascript'); res.sendFile(path.join(__dirname, 'sw.js')); });
 app.get('/manifest.json', (req, res) => { res.set('Content-Type', 'application/manifest+json'); res.sendFile(path.join(__dirname, 'manifest.json')); });
 app.get('/icon.svg', (req, res) => { res.set('Content-Type', 'image/svg+xml'); res.send(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" rx="10" fill="#F5F0EA"/><ellipse cx="24" cy="20" rx="15" ry="13" fill="#E8A090"/><path d="M9 20Q9 8 24 7Q39 8 39 20" fill="#4A4A4A"/><circle cx="26" cy="19" r="4" fill="#fff"/><circle cx="27" cy="19" r="2.2" fill="#333"/><circle cx="28" cy="17.8" r=".8" fill="#fff"/><path d="M13 30Q10 38 14 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M20 32Q19 40 22 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M28 32Q29 40 26 42" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M35 30Q38 38 34 40" stroke="#E8A090" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg>`); });
@@ -1417,11 +1437,7 @@ app.post('/chat/send', async (req, res) => {
         body: JSON.stringify({
           model: CLAUDE_MODEL,
           system: sysPrompt,
-          messages: recent.map(m => {
-            let c = m.content;
-            if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
-            return { role: m.role, content: c };
-          }),
+          messages: recent.map(m => ({ role: m.role, content: buildMsgContent(m) })),
           max_tokens: 800,
           temperature: 0.85
         })
@@ -1431,11 +1447,7 @@ app.post('/chat/send', async (req, res) => {
     } else {
       const apiMessages = [
         { role: 'system', content: sysPrompt },
-        ...recent.map(m => {
-          let c = m.content;
-          if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
-          return { role: m.role, content: c };
-        })
+        ...recent.map(m => ({ role: m.role, content: buildMsgContent(m) }))
       ];
       const r = await fetch(getApiUrl(), {
         method: 'POST',
@@ -1626,6 +1638,50 @@ app.post('/chat/delete', (req, res) => {
   chat.splice(idx, 1);
   writeChat(chat);
   res.json({ ok: true });
+});
+
+const CHUNK_DIR = path.join(__dirname, 'chunks');
+if (!fs.existsSync(CHUNK_DIR)) fs.mkdirSync(CHUNK_DIR, { recursive: true });
+
+app.post('/chat/upload-chunk', express.raw({ type: 'application/octet-stream', limit: '1mb' }), (req, res) => {
+  const uploadId = req.headers['x-upload-id'];
+  const chunkIndex = req.headers['x-chunk-index'];
+  if (!uploadId || chunkIndex === undefined) return res.json({ ok: false, error: 'missing headers' });
+  const dir = path.join(CHUNK_DIR, uploadId);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, chunkIndex), req.body);
+  res.json({ ok: true });
+});
+
+app.post('/chat/upload-finalize', (req, res) => {
+  const { uploadId, filename, totalChunks } = req.body;
+  if (!uploadId || !filename) return res.json({ ok: false, error: 'missing params' });
+  const dir = path.join(CHUNK_DIR, uploadId);
+  if (!fs.existsSync(dir)) return res.json({ ok: false, error: 'upload not found' });
+  try {
+    const buffers = [];
+    for (let i = 0; i < (totalChunks || 1); i++) {
+      const cp = path.join(dir, String(i));
+      if (!fs.existsSync(cp)) return res.json({ ok: false, error: 'missing chunk ' + i });
+      buffers.push(fs.readFileSync(cp));
+    }
+    const combined = Buffer.concat(buffers);
+    const ext = path.extname(filename) || '';
+    const safeName = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6) + ext;
+    const filePath = path.join(UPLOADS_DIR, safeName);
+    fs.writeFileSync(filePath, combined);
+    fs.rmSync(dir, { recursive: true, force: true });
+    const fileUrl = '/uploads/' + safeName;
+    const now = new Date(Date.now() + 8 * 3600000);
+    const time = now.toISOString().slice(0, 16).replace('T', ' ');
+    const chat = readChat();
+    chat.push({ role: 'user', content: '[文件] ' + filename, filename: filename, fileUrl: fileUrl, time });
+    writeChat(chat);
+    sseBroadcast({ type: 'message', role: 'user', content: '[文件] ' + filename, filename: filename, fileUrl: fileUrl, time });
+    res.json({ ok: true, fileUrl });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 const THOUGHTS_FILE = path.join(__dirname, 'thoughts.json');
@@ -3763,11 +3819,7 @@ app.post('/tg/webhook', async (req, res) => {
         body: JSON.stringify({
           model: CLAUDE_MODEL,
           system: sysPrompt,
-          messages: recent.map(m => {
-            let c = m.content;
-            if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
-            return { role: m.role, content: c };
-          }),
+          messages: recent.map(m => ({ role: m.role, content: buildMsgContent(m) })),
           max_tokens: 800,
           temperature: 0.85
         })
@@ -3777,11 +3829,7 @@ app.post('/tg/webhook', async (req, res) => {
     } else {
       const apiMessages = [
         { role: 'system', content: sysPrompt },
-        ...recent.map(m => {
-          let c = m.content;
-          if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
-          return { role: m.role, content: c };
-        })
+        ...recent.map(m => ({ role: m.role, content: buildMsgContent(m) }))
       ];
       const r = await fetch(getApiUrl(), {
         method: 'POST',
