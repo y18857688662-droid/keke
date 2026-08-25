@@ -2061,7 +2061,7 @@ app.get('/', (req, res) => {
 @charset "UTF-8";
 :root {
   --bg: #E8EDE4; --surface: #FEFCF8;
-  --bubble-ke: #F0EDE6; --bubble-yao: #F0EDE6;
+  --bubble-ke: #F0EDE6; --bubble-yao: #F4F7F1;
   --text: #2C3029; --text-mid: #5A6358;
   --text-soft: #8A918A; --text-faint: #B0B8AE;
   --border: #D6DDD2; --accent: #7B8F6B;
