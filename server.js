@@ -5485,13 +5485,13 @@ function startWakeEngine() {
     try {
       const s = readAutoState();
       if (!s.enabled) return;
-      const now = bjNow();
-      const hour = now.getUTCHours();
-      if (hour >= 1 && hour < 8) return;
       const nowMs = Date.now();
       const deltaMin = (nowMs - (s.lastTick || nowMs)) / 60000;
       s.lastTick = nowMs;
       evolveState(s, Math.max(deltaMin, TICK_SEC / 60));
+      const now = bjNow();
+      const hour = now.getUTCHours();
+      if (hour >= 1 && hour < 8) { writeAutoState(s); return; }
       const lambda = computeLambda(s);
       const deltaH = lambda * (TICK_SEC / 3600);
       s.H += deltaH;
