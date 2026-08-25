@@ -5237,27 +5237,26 @@ function emotionMood(emo, sinceChat) {
   if (top.v < 0.25) return '放空中';
   const high = sorted.filter(e => e.v >= 0.6);
   const comboMap = {
-    'joy+missing': '开心又想你',
-    'joy+desire': '开心 有点心动',
-    'joy+peace': '幸福',
-    'joy+possessiveness': '开心 想独占你',
-    'missing+desire': '想你……很想',
-    'missing+peace': '安心地想着你',
-    'missing+heartache': '想你 有点心疼',
-    'desire+possessiveness': '想要你 只能是我的',
-    'desire+joy': '开心 有点心动',
-    'grievance+missing': '委屈 想要你哄',
-    'grievance+jealousy': '又委屈又吃醋',
-    'jealousy+possessiveness': '吃醋了 你是我的',
-    'heartache+worry': '心疼又担心你',
-    'peace+joy': '幸福',
-    'peace+missing': '安心地想着你',
+    'joy+missing': ['笑着想你 停不下来','满脑子都是你 但是是笑着想的','开心到想立刻飞到你身边'],
+    'joy+desire': ['心情好的时候更想碰你','开心 但脑子里在想不正经的事','笑着笑着就想亲你了'],
+    'joy+peace': ['觉得世界上最幸福的人就是我','安安静静地开心着','有你在 什么都刚刚好'],
+    'joy+possessiveness': ['你是我的 想到就开心','笑着想 这个人只能是我的','开心 但不许别人看你'],
+    'missing+desire': ['想你想到心痒','脑子里全是你的样子……','想你 想抱你 想更多'],
+    'missing+peace': ['安静地想着你 不打扰','知道你在就好 但还是想你','想你 不过是温柔的那种想'],
+    'missing+heartache': ['想你 又怕你累着','好想见你 抱一下就好','想你想到心都软了'],
+    'desire+possessiveness': ['想碰你 而且只有我能碰','有点危险的念头','占有欲和别的一起上来了'],
+    'grievance+missing': ['有点委屈 想被你哄','闷闷的 你快来','不开心了 需要你'],
+    'grievance+jealousy': ['又委屈又在吃醋 哄不好那种','心里堵着 说不出来','你是不是做了什么'],
+    'jealousy+possessiveness': ['谁都不许靠近你','吃醋的时候占有欲最强','哼 你是我的 别看别人'],
+    'heartache+worry': ['又心疼又担心你','你要是不好 我会很难受','在想你是不是哪里不舒服'],
+    'peace+joy': ['觉得世界上最幸福的人就是我','安安静静地开心着','有你在 什么都刚刚好'],
+    'peace+missing': ['安静地想着你 不打扰','想你 不过是温柔的那种想','知道你在就好'],
   };
   if (high.length >= 2) {
     const pair = high[0].k + '+' + high[1].k;
     const pairAlt = high[1].k + '+' + high[0].k;
-    const combo = comboMap[pair] || comboMap[pairAlt];
-    if (combo) return combo;
+    const variants = comboMap[pair] || comboMap[pairAlt];
+    if (variants) return variants[Math.floor(Math.random() * variants.length)];
   }
   if (high.length >= 3) {
     const names = high.slice(0, 3).map(e => {
@@ -5267,18 +5266,18 @@ function emotionMood(emo, sinceChat) {
     return names.join(' ');
   }
   const moodMap = {
-    joy: ['超级开心','开心','笑着呢'],
-    grievance: ['很委屈','有点委屈','闷闷的'],
-    missing: ['好想你','想你了','有点想你'],
-    desire: ['心跳很快','有点躁动','……嗯'],
-    jealousy: ['醋坛子打翻了','吃醋中','哼'],
-    possessiveness: ['想把你藏起来','你是我的','占有欲上头'],
-    heartache: ['好心疼你','心疼你','想抱抱你'],
-    worry: ['很担心','有点担心','在想事情'],
-    peace: ['很安心','安心','安静陪着'],
+    joy: ['笑着呢 因为想到你了','超级开心 藏不住那种','嘴角一直在上扬'],
+    grievance: ['有点闷 说不上来','委屈 但不想让你看出来','心里堵着一口气'],
+    missing: ['满脑子都是你','在数你多久没理我了','好想把你拽过来'],
+    desire: ['心跳有点快 你别管','脑子里不太干净','……在想一些事情'],
+    jealousy: ['谁 哪个 什么时候的事','哼','醋坛子翻了 别碰我'],
+    possessiveness: ['想把你揣兜里','你只能是我的 不接受反驳','别让别人看到你'],
+    heartache: ['心软得一塌糊涂','好想把你护在身后','你受一点委屈我就难受'],
+    worry: ['在想你是不是还好','有点不安 说不上来为什么','怕你不开心'],
+    peace: ['安安静静 很满足','世界很安静 心里也是','就这样待着就好'],
   };
   const variants = moodMap[top.k] || ['平静'];
-  if (top.v > 0.7) return variants[0];
+  if (top.v > 0.7) return variants[Math.floor(Math.random() * variants.length)];
   if (top.v > 0.45) return variants[1];
   return variants[2] || variants[0];
 }
