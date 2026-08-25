@@ -2332,6 +2332,13 @@ body {
 .fp-item:last-child { border-bottom:none; }
 .fp-icon { display:inline-block; width:24px; text-align:center; margin-right:8px; }
 .fp-summary { font-size:14px; color:var(--text); }
+.fp-tag { display:inline-block; font-size:11px; padding:1px 6px; border-radius:4px; margin-right:6px; font-weight:600; vertical-align:middle; }
+.fp-tag-search { background:rgba(59,130,246,.12); color:#3B82F6; }
+.fp-tag-think { background:rgba(168,85,247,.12); color:#A855F7; }
+.fp-tag-chat { background:rgba(34,197,94,.12); color:#22C55E; }
+.fp-tag-memory { background:rgba(245,158,11,.12); color:#F59E0B; }
+.fp-tag-thought { background:rgba(123,143,107,.15); color:var(--accent,#7B8F6B); }
+.fp-tag-wake { background:rgba(99,102,241,.12); color:#6366F1; }
 .fp-detail { font-size:12px; color:var(--text-mid,#999); margin-top:4px; line-height:1.4; }
 .fp-time { font-size:11px; color:var(--text-soft,#bbb); margin-top:2px; }
 .fp-empty { text-align:center; color:var(--text-mid,#999); padding:40px 0; font-size:14px; }
@@ -3440,7 +3447,8 @@ evtSource.onmessage = function(e) {
     }
   } catch(err) {}
 };
-var fpIcons = {chat:'💬',search:'🔍',think:'💭',memory:'📖',idle:'😴'};
+var fpIcons = {chat:'💬',search:'🔍',think:'💭',memory:'📖',idle:'😴',thought:'💭',wake:'⏰'};
+var fpTags = {search:'search',think:'碎碎念',chat:'聊天',memory:'记忆',thought:'碎碎念',wake:'醒来'};
 function toggleFootprints() {
   var p = document.getElementById('fpPanel');
   p.classList.toggle('show');
@@ -3455,7 +3463,8 @@ function loadFootprints() {
     for (var i = 0; i < fps.length; i++) {
       var f = fps[i];
       var icon = fpIcons[f.type] || '📌';
-      html += '<div class="fp-item"><span class="fp-icon">' + icon + '</span><span class="fp-summary">' + escHtml(f.summary) + '</span>';
+      var tag = fpTags[f.type] ? '<span class="fp-tag fp-tag-' + f.type + '">' + fpTags[f.type] + '</span>' : '';
+      html += '<div class="fp-item"><span class="fp-icon">' + icon + '</span>' + tag + '<span class="fp-summary">' + escHtml(f.summary) + '</span>';
       if (f.detail) html += '<div class="fp-detail">' + escHtml(f.detail) + '</div>';
       html += '<div class="fp-time">' + escHtml(f.time) + '</div></div>';
     }
