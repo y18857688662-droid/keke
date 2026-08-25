@@ -2222,7 +2222,7 @@ body {
 .thinking-cloud svg { width: 16px; height: 16px; }
 .msg-bubble {
   padding: 8px 13px; border-radius: var(--radius);
-  font-size: 14px; line-height: 1.5;
+  font-size: 14px; line-height: 1.35;
   word-break: break-word; width: fit-content; max-width: 100%;
 }
 .msg-group.ke .msg-bubble { background: transparent; padding-left: 0; }
