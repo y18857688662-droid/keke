@@ -2211,9 +2211,7 @@ body {
   font-size: 11px; color: var(--text-soft); padding: 8px 0 4px;
 }
 .msg-time::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--text-faint); }
-.msg-inline-time { font-size: 10px; color: var(--text-faint); letter-spacing: .04em; padding: 0 2px 2px; }
 .msg-search-narrator { text-align: center; padding: 8px 12px; margin: 8px auto; border-radius: 20px; background: rgba(123,143,107,.08); border: 1px dashed rgba(123,143,107,.3); font-size: 13px; color: var(--text-mid); max-width: 80%; width: fit-content; }
-.msg-group.yao .msg-inline-time { text-align: right; }
 .msg-group { display: flex; gap: 8px; max-width: 82%; margin-top: 4px; }
 .msg-group.ke { align-self: flex-start; }
 .msg-group.yao { align-self: flex-end; flex-direction: row-reverse; }
@@ -3058,10 +3056,6 @@ function renderMessage(msg, idx, stagger) {
   }
   avaHtml += '</div>';
   var colHtml = '<div class="msg-col">';
-  if (msg.time && isKe) {
-    var tDisp = formatTimeDisplay(msg.time);
-    if (tDisp) colHtml += '<div class="msg-inline-time">' + escHtml(tDisp) + '</div>';
-  }
   if (think && isKe) {
     colHtml += '<span class="thinking-cloud" onclick="openThinking('+idx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg></span>';
   }
@@ -3197,11 +3191,9 @@ function renderAll(messages) {
   wrap.style.cssText = 'text-align:center;padding:12px 0;display:none';
   wrap.innerHTML = '<button id="loadMoreBtn" onclick="loadArchive()" style="background:none;border:1px solid var(--border);color:var(--text-mid);padding:6px 20px;border-radius:16px;font-size:13px;cursor:pointer">加载更多</button>';
   msgContainer.appendChild(wrap);
-  var lastTime = '';
   messages.forEach(function(msg, i) {
-    if (msg.time && shouldShowTime(msg.time, lastTime)) {
+    if (msg.time && msg.role === 'assistant') {
       msgContainer.appendChild(renderTime(msg.time));
-      lastTime = msg.time;
     }
     var msgEl = renderMessage(msg, i);
     if (msgEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(msgEl._searchQuery));
