@@ -2225,7 +2225,7 @@ body {
   font-size: 14px; line-height: 1.5;
   word-break: break-word; width: fit-content; max-width: 100%;
 }
-.msg-group.ke .msg-bubble { background: var(--bubble-ke); }
+.msg-group.ke .msg-bubble { background: transparent; padding-left: 0; }
 .msg-group.yao .msg-bubble { background: var(--bubble-yao); align-self: flex-end; }
 .msg-action { font-size: 12px; color: var(--text-faint); padding: 1px 2px; font-style: italic; }
 .msg-group.yao .msg-action { align-self: flex-end; }
