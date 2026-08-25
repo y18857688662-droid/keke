@@ -4,8 +4,8 @@
   "description": "和克聊天",
   "start_url": "/chat",
   "display": "standalone",
-  "background_color": "#F5F0EA",
-  "theme_color": "#F5F0EA",
+  "background_color": "#E8EDE4",
+  "theme_color": "#E8EDE4",
   "orientation": "portrait",
   "icons": [
     {
