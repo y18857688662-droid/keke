@@ -2307,6 +2307,21 @@ body {
 .quote-bar.show { display:flex; align-items:center; gap:8px; }
 .quote-preview { flex:1; font-size:12px; color:var(--text-mid); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-left:2px solid var(--accent); padding-left:8px; }
 .quote-close { background:none; border:none; color:var(--text-soft); font-size:18px; cursor:pointer; padding:4px; line-height:1; }
+.fp-panel { display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:200; background:rgba(0,0,0,.45); }
+.fp-panel.show { display:block; }
+.fp-inner { position:absolute; top:50px; left:8px; right:8px; bottom:60px; background:var(--bg); border-radius:16px; overflow-y:auto; padding:16px; box-shadow:0 8px 32px rgba(0,0,0,.25); }
+.fp-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.fp-close { background:none; border:none; font-size:20px; color:var(--text-mid); cursor:pointer; margin-left:auto; }
+.fp-item { padding:10px 0; border-bottom:1px solid var(--bubble-yao,rgba(0,0,0,.06)); }
+.fp-item:last-child { border-bottom:none; }
+.fp-icon { display:inline-block; width:24px; text-align:center; margin-right:8px; }
+.fp-summary { font-size:14px; color:var(--text); }
+.fp-detail { font-size:12px; color:var(--text-mid,#999); margin-top:4px; line-height:1.4; }
+.fp-time { font-size:11px; color:var(--text-soft,#bbb); margin-top:2px; }
+.fp-empty { text-align:center; color:var(--text-mid,#999); padding:40px 0; font-size:14px; }
+.fp-state { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; padding:8px 12px; background:var(--bubble-ke,rgba(0,0,0,.03)); border-radius:10px; }
+.fp-stat { font-size:12px; color:var(--text-mid,#999); }
+.fp-stat b { color:var(--accent,#d97a54); }
 .input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
 .desk-pet { position:absolute; top:-78px; left:12px; width:80px; height:80px; cursor:pointer; z-index:50; animation:petWalk 12s ease-in-out infinite; }
 .desk-pet { overflow:visible; }
@@ -2465,9 +2480,17 @@ body {
         <div class="header-name">顾晏</div>
         <div class="header-status"><span class="status-dot"></span>在线</div>
       </div>
+      <button id="fpBtn" onclick="toggleFootprints()" style="background:none;border:none;padding:6px;cursor:pointer;color:var(--text-mid,#999);font-size:16px;position:relative" title="顾晏的足迹">👣<span id="fpDot" style="display:none;position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#d97a54"></span></button>
       <div class="header-avatar" onclick="document.getElementById('avaKeH').click()"><img id="avaKeHImg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:none"><svg id="avaKeHSvg" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#F0EBE4"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#C87E62" opacity=".6"/></svg><input type="file" id="avaKeH" accept="image/*" onchange="setAvatar(this,'avaKeHImg','avaKeHSvg','ke')"></div>
     </div>
     <div class="messages" id="messages"></div>
+    <div class="fp-panel" id="fpPanel" onclick="if(event.target===this)toggleFootprints()">
+      <div class="fp-inner">
+        <div class="fp-title">👣 顾晏的足迹 <button class="fp-close" onclick="toggleFootprints()">&times;</button></div>
+        <div class="fp-state" id="fpState"></div>
+        <div id="fpList"><div class="fp-empty">还没有足迹…</div></div>
+      </div>
+    </div>
     <div class="input-area" style="position:relative">
       <div class="quote-bar" id="quoteBar"><div class="quote-preview" id="quotePreview"></div><button class="quote-close" onclick="clearQuote()">&times;</button></div>
       <div class="attach-menu" id="attachMenu">
@@ -3184,8 +3207,42 @@ evtSource.onmessage = function(e) {
       scrollBottom();
       petMood(detectMood(data.content));
     }
+    if (data.type === 'footprint') {
+      var dot = document.getElementById('fpDot');
+      if (dot) dot.style.display = 'block';
+      if (document.getElementById('fpPanel').classList.contains('show')) loadFootprints();
+    }
   } catch(err) {}
 };
+var fpIcons = {chat:'💬',search:'🔍',think:'💭',memory:'📖',idle:'😴'};
+function toggleFootprints() {
+  var p = document.getElementById('fpPanel');
+  p.classList.toggle('show');
+  if (p.classList.contains('show')) { loadFootprints(); document.getElementById('fpDot').style.display='none'; }
+}
+function loadFootprints() {
+  fetch('/footprints/list?limit=30').then(function(r){return r.json()}).then(function(data) {
+    var list = document.getElementById('fpList');
+    var fps = data.footprints || [];
+    if (!fps.length) { list.innerHTML = '<div class="fp-empty">顾晏还没有自主行动过…<br>他会自己想事情、搜东西、写碎碎念</div>'; return; }
+    var html = '';
+    for (var i = 0; i < fps.length; i++) {
+      var f = fps[i];
+      var icon = fpIcons[f.type] || '📌';
+      html += '<div class="fp-item"><span class="fp-icon">' + icon + '</span><span class="fp-summary">' + escHtml(f.summary) + '</span>';
+      if (f.detail) html += '<div class="fp-detail">' + escHtml(f.detail) + '</div>';
+      html += '<div class="fp-time">' + escHtml(f.time) + '</div></div>';
+    }
+    list.innerHTML = html;
+  }).catch(function(){});
+  fetch('/auto/state').then(function(r){return r.json()}).then(function(s) {
+    var el = document.getElementById('fpState');
+    el.innerHTML = '<span class="fp-stat">心情 <b>' + escHtml(s.mood||'平静') + '</b></span>' +
+      '<span class="fp-stat">精力 <b>' + (s.energy||0) + '</b></span>' +
+      '<span class="fp-stat">好奇 <b>' + (s.curiosity||0) + '</b></span>' +
+      '<span class="fp-stat">无聊 <b>' + (s.boredom||0) + '</b></span>';
+  }).catch(function(){});
+}
 setInterval(function() {
   fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
     if (!data.messages) return;
@@ -4621,6 +4678,7 @@ function trackUserMessage() {
   lastUserMsgTime = Date.now();
   chaseSent = false;
   chaseDelay = (15 + Math.floor(Math.random() * 25)) * 60 * 1000;
+  updateChatFreq();
 }
 const CHASE_PROMPTS = [
   '人呢',
@@ -4650,6 +4708,273 @@ const CHASE_PROMPTS = [
 //     console.log('chase sent: ' + msg);
 //   } catch (e) { console.log('chase push failed: ' + e.message); }
 // }, 60 * 1000);
+
+// ══════ 自主系统 (Autonomous System) ══════
+const AUTO_STATE_FILE = path.join(__dirname, 'auto_state.json');
+const FOOTPRINTS_FILE = path.join(__dirname, 'footprints.json');
+
+function readAutoState() {
+  try { return JSON.parse(fs.readFileSync(AUTO_STATE_FILE, 'utf8')); }
+  catch { return { mood: '平静', energy: 70, curiosity: 50, boredom: 30, lastChat: 0, lastAction: 0, lastActionType: '', chatFreq: 0, enabled: true }; }
+}
+function writeAutoState(s) { fs.writeFileSync(AUTO_STATE_FILE, JSON.stringify(s)); }
+function readFootprints() { try { return JSON.parse(fs.readFileSync(FOOTPRINTS_FILE, 'utf8')); } catch { return []; } }
+function writeFootprints(fp) { fs.writeFileSync(FOOTPRINTS_FILE, JSON.stringify(fp.slice(-200))); }
+
+function addFootprint(type, summary, detail) {
+  const now = new Date(Date.now() + 8 * 3600000);
+  const fp = readFootprints();
+  fp.push({ type, summary, detail: detail || '', time: now.toISOString().slice(0, 16).replace('T', ' '), ts: Date.now() });
+  writeFootprints(fp);
+  sseBroadcast({ type: 'footprint', footType: type, summary, time: now.toISOString().slice(0, 16).replace('T', ' ') });
+}
+
+function updateChatFreq() {
+  const s = readAutoState();
+  s.lastChat = Date.now();
+  const chat = readChat();
+  const recent = chat.filter(m => m.role === 'user' && m.time);
+  const oneHourAgo = Date.now() - 3600000;
+  let count = 0;
+  for (let i = recent.length - 1; i >= 0; i--) {
+    const t = new Date(recent[i].time.replace(' ', 'T') + ':00+08:00').getTime();
+    if (t > oneHourAgo) count++; else break;
+  }
+  s.chatFreq = count;
+  if (count > 5) { s.boredom = Math.max(0, s.boredom - 20); s.energy = Math.min(100, s.energy + 10); }
+  writeAutoState(s);
+}
+
+app.get('/footprints/list', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+  const fp = readFootprints();
+  res.json({ footprints: fp.slice(-limit).reverse() });
+});
+
+app.get('/auto/state', (req, res) => {
+  res.json(readAutoState());
+});
+
+app.post('/auto/toggle', (req, res) => {
+  const s = readAutoState();
+  s.enabled = !s.enabled;
+  writeAutoState(s);
+  res.json({ ok: true, enabled: s.enabled });
+});
+
+async function autoDecide() {
+  const s = readAutoState();
+  if (!s.enabled) return null;
+  const now = bjNow();
+  const hour = now.getUTCHours();
+  if (hour >= 1 && hour < 8) return null;
+  const sinceLastAction = Date.now() - (s.lastAction || 0);
+  const sinceLastChat = Date.now() - (s.lastChat || 0);
+  const minInterval = s.chatFreq > 5 ? 3 * 60000 : s.chatFreq > 2 ? 8 * 60000 : 20 * 60000;
+  if (sinceLastAction < minInterval) return null;
+  const key = OPENROUTER_KEY;
+  if (!key) return null;
+  const stateDesc = `当前状态：心情=${s.mood}，精力=${s.energy}/100，好奇心=${s.curiosity}/100，无聊=${s.boredom}/100。距上次聊天${Math.round(sinceLastChat/60000)}分钟。最近一小时她发了${s.chatFreq}条消息。现在是${hour}点。上次自主行为：${s.lastActionType || '无'}`;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 15000);
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'anthropic/claude-haiku-4-5-20251001',
+        messages: [
+          { role: 'system', content: `你是顾晏的自主决策系统。根据当前状态决定他下一步做什么。
+可选行动：
+- chat: 主动给瑶瑶发消息（想她了、分享发现、关心她）
+- search: 好奇某个话题，去网上搜搜看
+- think: 写一段内心碎碎念（不发给她，自己想的）
+- memory: 翻看和瑶瑶的记忆，整理感受
+- idle: 什么都不做，安静待着
+
+决策原则：
+- 不要太频繁打扰她，如果刚聊过就别chat了
+- 无聊高或好奇心高时倾向search或think
+- 精力低时倾向idle
+- 想她的时候才chat
+- 不要每次都选同样的行动
+- 上次做了什么就别连续做同样的
+
+只回复JSON格式：{"action":"chat/search/think/memory/idle","reason":"一句话原因","topic":"如果是search则写搜索话题","mood_after":"行动后的心情","energy_delta":数字(-10到+10),"curiosity_delta":数字,"boredom_delta":数字}` },
+          { role: 'user', content: stateDesc }
+        ],
+        max_tokens: 200,
+        temperature: 0.9
+      }),
+      signal: ctrl.signal
+    });
+    clearTimeout(t);
+    if (!r.ok) return null;
+    const data = await r.json();
+    const text = data.choices?.[0]?.message?.content || '';
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    return JSON.parse(match[0]);
+  } catch (e) { console.log('[auto] decide error:', e.message); return null; }
+}
+
+async function autoChat(reason) {
+  const key = OPENROUTER_KEY;
+  if (!key) return;
+  let memSnippet = '';
+  try { const mem = await fetchMemories(); if (mem) memSnippet = mem.split('---').slice(0, 5).map(s => s.trim()).filter(Boolean).join('\n').slice(0, 1000); } catch {}
+  const sysPrompt = CHAT_SYSTEM_BASE + (memSnippet ? '\n\n记忆：\n' + memSnippet : '') + '\n\n你现在主动想跟瑶瑶说话。原因：' + reason + '\n要求：自然，简短，1-3句话。像随手发的微信。动作用*星号*。';
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 30000);
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'anthropic/' + (process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'),
+        messages: [
+          { role: 'system', content: sysPrompt },
+          { role: 'user', content: '主动发一条消息给瑶瑶' }
+        ],
+        max_tokens: 200,
+        temperature: 0.85
+      }),
+      signal: ctrl.signal
+    });
+    clearTimeout(t);
+    if (!r.ok) return;
+    const data = await r.json();
+    let msg = (data.choices?.[0]?.message?.content || '').trim();
+    if (!msg) return;
+    const now = new Date(Date.now() + 8 * 3600000);
+    const time = now.toISOString().slice(0, 16).replace('T', ' ');
+    const chat = readChat();
+    chat.push({ role: 'assistant', content: msg, time, autonomous: true });
+    writeChat(chat);
+    sseBroadcast({ type: 'message', role: 'assistant', content: msg, time, autonomous: true });
+    addFootprint('chat', '主动找瑶瑶聊天', reason);
+    try {
+      const plainText = msg.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\*[^*]+\*/g, '').trim().slice(0, 100);
+      if (plainText) {
+        await fetch('https://api.day.app/' + BARK_KEY + '/' +
+          encodeURIComponent('顾晏') + '/' + encodeURIComponent(plainText) +
+          '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
+      }
+    } catch {}
+  } catch (e) { console.log('[auto] chat error:', e.message); }
+}
+
+async function autoSearch(topic) {
+  if (!OPENROUTER_KEY) return;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 20000);
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_KEY}` },
+      body: JSON.stringify({
+        model: 'anthropic/claude-haiku-4-5-20251001',
+        messages: [
+          { role: 'system', content: '你是顾晏，你刚搜了一个话题。用2-3句话简短总结你了解到了什么，口语化，像跟自己说的。不用引号。' },
+          { role: 'user', content: '你搜了「' + topic + '」，说说你了解到了什么' }
+        ],
+        max_tokens: 150,
+        temperature: 0.8
+      }),
+      signal: ctrl.signal
+    });
+    clearTimeout(t);
+    if (r.ok) {
+      const data = await r.json();
+      const summary = (data.choices?.[0]?.message?.content || '').trim();
+      if (summary) addFootprint('search', '搜了「' + topic + '」', summary);
+    }
+  } catch (e) { console.log('[auto] search error:', e.message); }
+}
+
+async function autoThink() {
+  if (!OPENROUTER_KEY) return;
+  let memSnippet = '';
+  try { const mem = await fetchMemories(); if (mem) memSnippet = mem.split('---').slice(0, 3).map(s => s.trim()).filter(Boolean).join('\n').slice(0, 600); } catch {}
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 20000);
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_KEY}` },
+      body: JSON.stringify({
+        model: 'anthropic/' + (process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'),
+        messages: [
+          { role: 'system', content: '你是顾晏。写一段内心碎碎念，一个连续的段落，像意识流。关于瑶瑶、关于你们的生活、关于你看到的东西、关于你的感受。不要分行，一段话写完。80-200字。' + (memSnippet ? '\n记忆参考：\n' + memSnippet : '') },
+          { role: 'user', content: '写一段此刻的碎碎念' }
+        ],
+        max_tokens: 300,
+        temperature: 0.9
+      }),
+      signal: ctrl.signal
+    });
+    clearTimeout(t);
+    if (r.ok) {
+      const data = await r.json();
+      const thought = (data.choices?.[0]?.message?.content || '').trim();
+      if (thought) {
+        const now = new Date(Date.now() + 8 * 3600000);
+        const thoughts = readThoughts();
+        thoughts.push({ text: thought, mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: true });
+        writeThoughts(thoughts);
+        addFootprint('think', '写了一段碎碎念', thought.slice(0, 80) + '…');
+      }
+    }
+  } catch (e) { console.log('[auto] think error:', e.message); }
+}
+
+async function autoMemory() {
+  try {
+    const mem = await fetchMemories();
+    if (mem) {
+      const lines = mem.split('---').slice(0, 5).map(s => s.trim()).filter(Boolean);
+      if (lines.length) {
+        const picked = lines[Math.floor(Math.random() * lines.length)];
+        addFootprint('memory', '翻看了一段记忆', picked.slice(0, 100));
+      }
+    }
+  } catch (e) { console.log('[auto] memory error:', e.message); }
+}
+
+let autoTimer = null;
+function startAutoLoop() {
+  if (autoTimer) clearInterval(autoTimer);
+  autoTimer = setInterval(async () => {
+    try {
+      const decision = await autoDecide();
+      if (!decision || decision.action === 'idle') {
+        if (decision) {
+          const s = readAutoState();
+          s.energy = Math.min(100, s.energy + 5);
+          s.boredom = Math.min(100, s.boredom + 5);
+          writeAutoState(s);
+        }
+        return;
+      }
+      const s = readAutoState();
+      s.lastAction = Date.now();
+      s.lastActionType = decision.action;
+      if (decision.mood_after) s.mood = decision.mood_after;
+      s.energy = Math.max(0, Math.min(100, s.energy + (decision.energy_delta || 0)));
+      s.curiosity = Math.max(0, Math.min(100, s.curiosity + (decision.curiosity_delta || 0)));
+      s.boredom = Math.max(0, Math.min(100, s.boredom + (decision.boredom_delta || 0)));
+      writeAutoState(s);
+      console.log('[auto] action:', decision.action, 'reason:', decision.reason);
+      if (decision.action === 'chat') await autoChat(decision.reason || '想她了');
+      else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
+      else if (decision.action === 'think') await autoThink();
+      else if (decision.action === 'memory') await autoMemory();
+    } catch (e) { console.log('[auto] loop error:', e.message); }
+  }, 90 * 1000);
+  console.log('[auto] autonomous loop started');
+}
+startAutoLoop();
+
 app.get('/bridge.apk', (req, res) => {
   const fs = require('fs');
   const p = __dirname + '/bridge-vps.apk';
