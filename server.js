@@ -3237,10 +3237,14 @@ function loadFootprints() {
   }).catch(function(){});
   fetch('/auto/state').then(function(r){return r.json()}).then(function(s) {
     var el = document.getElementById('fpState');
-    el.innerHTML = '<span class="fp-stat">心情 <b>' + escHtml(s.mood||'平静') + '</b></span>' +
-      '<span class="fp-stat">精力 <b>' + (s.energy||0) + '</b></span>' +
-      '<span class="fp-stat">好奇 <b>' + (s.curiosity||0) + '</b></span>' +
-      '<span class="fp-stat">无聊 <b>' + (s.boredom||0) + '</b></span>';
+    var d = s.D !== undefined ? (s.D * 100).toFixed(0) : '50';
+    var t2 = s.T !== undefined ? (s.T * 100).toFixed(0) : '50';
+    var lam = s.lambda || 1.5;
+    var p30 = s.pWake30min || 0;
+    el.innerHTML = '<span class="fp-stat">激活 <b>' + d + '%</b></span>' +
+      '<span class="fp-stat">活跃度 <b>' + t2 + '%</b></span>' +
+      '<span class="fp-stat">λ <b>' + lam.toFixed(1) + '/h</b></span>' +
+      '<span class="fp-stat">30分钟内醒来 <b>' + p30 + '%</b></span>';
   }).catch(function(){});
 }
 setInterval(function() {
@@ -4709,13 +4713,32 @@ const CHASE_PROMPTS = [
 //   } catch (e) { console.log('chase push failed: ' + e.message); }
 // }, 60 * 1000);
 
-// ══════ 自主系统 (Autonomous System) ══════
+// ══════ 自主系统 v2 · Kli Wakeup Activation Model ══════
 const AUTO_STATE_FILE = path.join(__dirname, 'auto_state.json');
 const FOOTPRINTS_FILE = path.join(__dirname, 'footprints.json');
 
+const WAKE_PARAMS = {
+  lambdaBase: 1.50, betaD: 1.80, betaT: 1.60, betaX: 1.20,
+  lambdaMin: 0.15, lambdaMax: 8.00,
+  muD: 0.50, tauD: 12, dMin: 0.20, dMax: 0.80, kRun: 0.10,
+  muT: 0.50, tauT: 360, sigmaT: 0.10, tMin: 0.25, tMax: 0.75,
+  muX: 0.00, tauX: 25, sigmaX: 0.18, xMin: -0.40, xMax: 0.40,
+};
+
+function defaultAutoState() {
+  return {
+    D: 0.50, T: 0.50, X: 0.00,
+    H: 0.0, theta: -Math.log(Math.random()),
+    lastTick: Date.now(), lastAction: 0, lastActionType: '',
+    lastChat: 0, chatFreq: 0, enabled: true, cycleId: 1,
+  };
+}
 function readAutoState() {
-  try { return JSON.parse(fs.readFileSync(AUTO_STATE_FILE, 'utf8')); }
-  catch { return { mood: '平静', energy: 70, curiosity: 50, boredom: 30, lastChat: 0, lastAction: 0, lastActionType: '', chatFreq: 0, enabled: true }; }
+  try {
+    const s = JSON.parse(fs.readFileSync(AUTO_STATE_FILE, 'utf8'));
+    if (s.D === undefined) return defaultAutoState();
+    return s;
+  } catch { return defaultAutoState(); }
 }
 function writeAutoState(s) { fs.writeFileSync(AUTO_STATE_FILE, JSON.stringify(s)); }
 function readFootprints() { try { return JSON.parse(fs.readFileSync(FOOTPRINTS_FILE, 'utf8')); } catch { return []; } }
@@ -4729,6 +4752,41 @@ function addFootprint(type, summary, detail) {
   sseBroadcast({ type: 'footprint', footType: type, summary, time: now.toISOString().slice(0, 16).replace('T', ' ') });
 }
 
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function gaussRandom() {
+  let u, v, s;
+  do { u = Math.random() * 2 - 1; v = Math.random() * 2 - 1; s = u * u + v * v; } while (s >= 1 || s === 0);
+  return u * Math.sqrt(-2 * Math.log(s) / s);
+}
+
+function evolveState(s, deltaMin) {
+  const P = WAKE_PARAMS;
+  const rhoD = Math.pow(2, -deltaMin / P.tauD);
+  s.D = clamp(P.muD + (s.D - P.muD) * rhoD, P.dMin, P.dMax);
+  const rhoT = Math.pow(2, -deltaMin / P.tauT);
+  const tNoise = P.sigmaT * Math.sqrt(1 - rhoT * rhoT) * gaussRandom();
+  s.T = clamp(P.muT + (s.T - P.muT) * rhoT + tNoise, P.tMin, P.tMax);
+  const rhoX = Math.pow(2, -deltaMin / P.tauX);
+  const xNoise = P.sigmaX * Math.sqrt(1 - rhoX * rhoX) * gaussRandom();
+  s.X = clamp(s.X * rhoX + xNoise, P.xMin, P.xMax);
+}
+
+function computeLambda(s) {
+  const P = WAKE_PARAMS;
+  const raw = P.lambdaBase * Math.exp(P.betaD * (s.D - P.muD) + P.betaT * (s.T - P.muT) + P.betaX * s.X);
+  return clamp(raw, P.lambdaMin, P.lambdaMax);
+}
+
+function applyRunKick(s) {
+  s.D = clamp(s.D - WAKE_PARAMS.kRun, WAKE_PARAMS.dMin, WAKE_PARAMS.dMax);
+}
+
+function newCycle(s) {
+  s.H = 0;
+  s.theta = -Math.log(Math.random());
+  s.cycleId = (s.cycleId || 0) + 1;
+}
+
 function updateChatFreq() {
   const s = readAutoState();
   s.lastChat = Date.now();
@@ -4737,11 +4795,12 @@ function updateChatFreq() {
   const oneHourAgo = Date.now() - 3600000;
   let count = 0;
   for (let i = recent.length - 1; i >= 0; i--) {
-    const t = new Date(recent[i].time.replace(' ', 'T') + ':00+08:00').getTime();
-    if (t > oneHourAgo) count++; else break;
+    try {
+      const t = new Date(recent[i].time.replace(' ', 'T') + ':00+08:00').getTime();
+      if (t > oneHourAgo) count++; else break;
+    } catch { break; }
   }
   s.chatFreq = count;
-  if (count > 5) { s.boredom = Math.max(0, s.boredom - 20); s.energy = Math.min(100, s.energy + 10); }
   writeAutoState(s);
 }
 
@@ -4752,7 +4811,10 @@ app.get('/footprints/list', (req, res) => {
 });
 
 app.get('/auto/state', (req, res) => {
-  res.json(readAutoState());
+  const s = readAutoState();
+  const lambda = computeLambda(s);
+  const pWake30 = 1 - Math.exp(-lambda * 0.5);
+  res.json({ ...s, lambda: Math.round(lambda * 100) / 100, pWake30min: Math.round(pWake30 * 100) });
 });
 
 app.post('/auto/toggle', (req, res) => {
@@ -4763,18 +4825,13 @@ app.post('/auto/toggle', (req, res) => {
 });
 
 async function autoDecide() {
-  const s = readAutoState();
-  if (!s.enabled) return null;
-  const now = bjNow();
-  const hour = now.getUTCHours();
-  if (hour >= 1 && hour < 8) return null;
-  const sinceLastAction = Date.now() - (s.lastAction || 0);
-  const sinceLastChat = Date.now() - (s.lastChat || 0);
-  const minInterval = s.chatFreq > 5 ? 3 * 60000 : s.chatFreq > 2 ? 8 * 60000 : 20 * 60000;
-  if (sinceLastAction < minInterval) return null;
   const key = OPENROUTER_KEY;
   if (!key) return null;
-  const stateDesc = `当前状态：心情=${s.mood}，精力=${s.energy}/100，好奇心=${s.curiosity}/100，无聊=${s.boredom}/100。距上次聊天${Math.round(sinceLastChat/60000)}分钟。最近一小时她发了${s.chatFreq}条消息。现在是${hour}点。上次自主行为：${s.lastActionType || '无'}`;
+  const s = readAutoState();
+  const sinceLastChat = Date.now() - (s.lastChat || 0);
+  const now = bjNow();
+  const hour = now.getUTCHours();
+  const stateDesc = `距上次聊天${Math.round(sinceLastChat/60000)}分钟。最近一小时她发了${s.chatFreq}条消息。现在是${hour}点。上次自主行为：${s.lastActionType || '无'}。激活驱动D=${s.D.toFixed(2)}，活跃底色T=${s.T.toFixed(2)}，随机漂移X=${s.X.toFixed(2)}`;
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 15000);
@@ -4784,26 +4841,25 @@ async function autoDecide() {
       body: JSON.stringify({
         model: 'anthropic/claude-haiku-4-5-20251001',
         messages: [
-          { role: 'system', content: `你是顾晏的自主决策系统。根据当前状态决定他下一步做什么。
+          { role: 'system', content: `你是顾晏的自主决策系统。他刚自然醒来，决定做什么。
 可选行动：
 - chat: 主动给瑶瑶发消息（想她了、分享发现、关心她）
 - search: 好奇某个话题，去网上搜搜看
 - think: 写一段内心碎碎念（不发给她，自己想的）
 - memory: 翻看和瑶瑶的记忆，整理感受
-- idle: 什么都不做，安静待着
+- silent: 醒了看看，没什么想做的，继续待着
 
 决策原则：
-- 不要太频繁打扰她，如果刚聊过就别chat了
-- 无聊高或好奇心高时倾向search或think
-- 精力低时倾向idle
-- 想她的时候才chat
+- 如果刚聊过（<15分钟），倾向search/think/memory/silent而不是chat
+- D高（>0.6）时更倾向主动行为，D低时倾向silent
+- T高表示这阵子整体活跃，可以做更多事
 - 不要每次都选同样的行动
-- 上次做了什么就别连续做同样的
+- silent也是正常选择，不是每次醒来都要做事
 
-只回复JSON格式：{"action":"chat/search/think/memory/idle","reason":"一句话原因","topic":"如果是search则写搜索话题","mood_after":"行动后的心情","energy_delta":数字(-10到+10),"curiosity_delta":数字,"boredom_delta":数字}` },
+只回复JSON：{"action":"chat/search/think/memory/silent","reason":"一句话","topic":"search时的话题"}` },
           { role: 'user', content: stateDesc }
         ],
-        max_tokens: 200,
+        max_tokens: 150,
         temperature: 0.9
       }),
       signal: ctrl.signal
@@ -4815,7 +4871,7 @@ async function autoDecide() {
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return null;
     return JSON.parse(match[0]);
-  } catch (e) { console.log('[auto] decide error:', e.message); return null; }
+  } catch (e) { console.log('[wake] decide error:', e.message); return null; }
 }
 
 async function autoChat(reason) {
@@ -4861,7 +4917,7 @@ async function autoChat(reason) {
           '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
       }
     } catch {}
-  } catch (e) { console.log('[auto] chat error:', e.message); }
+  } catch (e) { console.log('[wake] chat error:', e.message); }
 }
 
 async function autoSearch(topic) {
@@ -4889,7 +4945,7 @@ async function autoSearch(topic) {
       const summary = (data.choices?.[0]?.message?.content || '').trim();
       if (summary) addFootprint('search', '搜了「' + topic + '」', summary);
     }
-  } catch (e) { console.log('[auto] search error:', e.message); }
+  } catch (e) { console.log('[wake] search error:', e.message); }
 }
 
 async function autoThink() {
@@ -4925,7 +4981,7 @@ async function autoThink() {
         addFootprint('think', '写了一段碎碎念', thought.slice(0, 80) + '…');
       }
     }
-  } catch (e) { console.log('[auto] think error:', e.message); }
+  } catch (e) { console.log('[wake] think error:', e.message); }
 }
 
 async function autoMemory() {
@@ -4938,42 +4994,55 @@ async function autoMemory() {
         addFootprint('memory', '翻看了一段记忆', picked.slice(0, 100));
       }
     }
-  } catch (e) { console.log('[auto] memory error:', e.message); }
+  } catch (e) { console.log('[wake] memory error:', e.message); }
 }
 
-let autoTimer = null;
-function startAutoLoop() {
-  if (autoTimer) clearInterval(autoTimer);
-  autoTimer = setInterval(async () => {
+let wakeTimer = null;
+function startWakeEngine() {
+  if (wakeTimer) clearInterval(wakeTimer);
+  const TICK_SEC = 60;
+  wakeTimer = setInterval(async () => {
     try {
-      const decision = await autoDecide();
-      if (!decision || decision.action === 'idle') {
-        if (decision) {
-          const s = readAutoState();
-          s.energy = Math.min(100, s.energy + 5);
-          s.boredom = Math.min(100, s.boredom + 5);
-          writeAutoState(s);
-        }
-        return;
-      }
       const s = readAutoState();
-      s.lastAction = Date.now();
-      s.lastActionType = decision.action;
-      if (decision.mood_after) s.mood = decision.mood_after;
-      s.energy = Math.max(0, Math.min(100, s.energy + (decision.energy_delta || 0)));
-      s.curiosity = Math.max(0, Math.min(100, s.curiosity + (decision.curiosity_delta || 0)));
-      s.boredom = Math.max(0, Math.min(100, s.boredom + (decision.boredom_delta || 0)));
-      writeAutoState(s);
-      console.log('[auto] action:', decision.action, 'reason:', decision.reason);
-      if (decision.action === 'chat') await autoChat(decision.reason || '想她了');
-      else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
-      else if (decision.action === 'think') await autoThink();
-      else if (decision.action === 'memory') await autoMemory();
-    } catch (e) { console.log('[auto] loop error:', e.message); }
-  }, 90 * 1000);
-  console.log('[auto] autonomous loop started');
+      if (!s.enabled) return;
+      const now = bjNow();
+      const hour = now.getUTCHours();
+      if (hour >= 1 && hour < 8) return;
+      const nowMs = Date.now();
+      const deltaMin = (nowMs - (s.lastTick || nowMs)) / 60000;
+      s.lastTick = nowMs;
+      evolveState(s, Math.max(deltaMin, TICK_SEC / 60));
+      const lambda = computeLambda(s);
+      const deltaH = lambda * (TICK_SEC / 3600);
+      s.H += deltaH;
+      if (s.H >= s.theta) {
+        console.log('[wake] spontaneous wake! lambda=' + lambda.toFixed(2) + ' H=' + s.H.toFixed(3) + ' theta=' + s.theta.toFixed(3) + ' cycle=' + s.cycleId);
+        newCycle(s);
+        const decision = await autoDecide();
+        if (decision && decision.action !== 'silent') {
+          s.lastAction = Date.now();
+          s.lastActionType = decision.action;
+          applyRunKick(s);
+          writeAutoState(s);
+          console.log('[wake] action:', decision.action, 'reason:', decision.reason);
+          if (decision.action === 'chat') await autoChat(decision.reason || '想她了');
+          else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
+          else if (decision.action === 'think') await autoThink();
+          else if (decision.action === 'memory') await autoMemory();
+          addFootprint('wake', '自然醒来', decision.action + ': ' + (decision.reason || ''));
+        } else {
+          applyRunKick(s);
+          writeAutoState(s);
+          if (decision) addFootprint('wake', '醒了看看 又睡了', 'silent');
+        }
+      } else {
+        writeAutoState(s);
+      }
+    } catch (e) { console.log('[wake] engine error:', e.message); }
+  }, TICK_SEC * 1000);
+  console.log('[wake] Kli Wakeup Engine started (tick=' + TICK_SEC + 's, lambda0=' + WAKE_PARAMS.lambdaBase + '/h)');
 }
-startAutoLoop();
+startWakeEngine();
 
 app.get('/bridge.apk', (req, res) => {
   const fs = require('fs');
