@@ -2212,7 +2212,7 @@ body {
 }
 .msg-time::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--text-faint); }
 .msg-search-narrator { text-align: center; padding: 8px 12px; margin: 8px auto; border-radius: 20px; background: rgba(123,143,107,.08); border: 1px dashed rgba(123,143,107,.3); font-size: 13px; color: var(--text-mid); max-width: 80%; width: fit-content; }
-.msg-group { display: flex; gap: 8px; max-width: 82%; margin-top: 4px; }
+.msg-group { display: flex; gap: 8px; max-width: 82%; margin-top: 10px; }
 .msg-group.ke { align-self: flex-start; }
 .msg-group.yao { align-self: flex-end; flex-direction: row-reverse; }
 .msg-avatar { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
@@ -3001,7 +3001,6 @@ function detectMood(text) {
 function sendAudio(base64, transcript) {
   var contentText = transcript ? '[语音] ' + transcript : '[语音]';
   var userMsg = {role:'user', content: contentText, audioUrl: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
-  msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
   fetch('/chat/send', {
@@ -3232,11 +3231,12 @@ function loadArchive() {
     var ref = wrap ? wrap.nextSibling : msgContainer.firstChild;
     var lastTime = '';
     data.messages.forEach(function(msg, i) {
-      if (msg.time && shouldShowTime(msg.time, lastTime)) {
+      if (msg.time && msg.role === 'assistant') {
         msgContainer.insertBefore(renderTime(msg.time), ref);
-        lastTime = msg.time;
       }
-      msgContainer.insertBefore(renderMessage(msg, -(data.messages.length - i)), ref);
+      var archMsgEl = renderMessage(msg, -(data.messages.length - i));
+      if (archMsgEl._searchQuery) msgContainer.insertBefore(renderSearchNarrator(archMsgEl._searchQuery), ref);
+      msgContainer.insertBefore(archMsgEl, ref);
     });
     msgContainer.scrollTop = scrollT + (msgContainer.scrollHeight - scrollH);
     if (archiveRemaining <= 0) {
@@ -3290,7 +3290,6 @@ function sendMessage() {
   var display = text.replace(/\\/\\//g, '\\n');
   var userMsg = {role:'user', content: display, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
   if (currentQuote) userMsg.quote = currentQuote;
-  msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
   var body = {message: text};
@@ -3329,7 +3328,6 @@ function sendImage(file, caption) {
   compressImage(file, 1600, 0.85).then(function(base64) {
     var displayContent = caption || '[图片]';
     var userMsg = {role:'user', content: displayContent, image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
-    msgContainer.appendChild(renderTime(userMsg.time));
     msgContainer.appendChild(renderMessage(userMsg, -1));
     scrollBottom();
     fetch('/chat/send', {
@@ -3356,7 +3354,6 @@ function sendFile(file) {
   if (file.size > 100 * 1024 * 1024) { alert('文件太大，最大100MB'); return; }
   var fname = file.name;
   var userMsg = {role:'user', content:'[文件] ' + fname, filename: fname, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
-  msgContainer.appendChild(renderTime(userMsg.time));
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
   var chunkSize = 512 * 1024;
