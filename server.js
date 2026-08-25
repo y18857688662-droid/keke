@@ -2544,11 +2544,13 @@ body {
 }
 .dash-item:active { background: var(--accent-soft); }
 .dash-item .di-icon { font-size: 22px; line-height: 1; }
+.app.chat-active .tab-bar { display: none; }
+.app.chat-active .input-area { padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
 @media (prefers-reduced-motion: reduce) { * { transition-duration: 0s !important; } }
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app chat-active">
   <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
@@ -2562,7 +2564,9 @@ body {
       <div class="sidebar-since" id="sinceDate"></div>
     </div>
     <div class="sidebar-nav">
+      <div class="nav-item" onclick="toggleSidebar();switchTab('home')"><div class="icon">🏠</div><span>首页</span></div>
       <div class="nav-item active" onclick="goPage('/')"><div class="icon">💬</div><span>聊天</span></div>
+      <div class="nav-item" onclick="toggleSidebar();switchTab('dash')"><div class="icon">📋</div><span>更多</span></div>
       <div class="nav-item" onclick="goPage('/summon')"><div class="icon">🔔</div><span>召唤铃</span></div>
       <div class="nav-item" onclick="goPage('/moments')"><div class="icon">📸</div><span>朋友圈</span></div>
       <div class="nav-item" onclick="goPage('/diary')"><div class="icon">📖</div><span>心情日记</span></div>
@@ -3652,6 +3656,7 @@ function switchTab(tab) {
   var hv = document.getElementById('homeView');
   var cv = document.querySelector('.main');
   var dv = document.getElementById('dashView');
+  var app = document.querySelector('.app');
   var tabs = document.querySelectorAll('.tab-item');
   hv.style.display = 'none';
   cv.style.display = 'none';
@@ -3660,14 +3665,17 @@ function switchTab(tab) {
   if (tab === 'home') {
     hv.style.display = 'flex';
     tabs[0].classList.add('active');
+    app.classList.remove('chat-active');
     loadHomeData();
   } else if (tab === 'chat') {
     cv.style.display = 'flex';
     tabs[1].classList.add('active');
+    app.classList.add('chat-active');
     scrollBottom();
   } else {
     dv.style.display = 'flex';
     tabs[2].classList.add('active');
+    app.classList.remove('chat-active');
     var dd = document.getElementById('dashDays');
     if (dd) dd.textContent = '在一起 ' + days + ' 天';
     var keD = localStorage.getItem('avatar_ke');
