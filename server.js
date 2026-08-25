@@ -2546,6 +2546,15 @@ body {
 .dash-item .di-icon { font-size: 22px; line-height: 1; }
 .app.chat-active .tab-bar { display: none; }
 .app.chat-active .input-area { padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+.home-arrow {
+  width: 28px; height: 28px; border: none; background: none;
+  cursor: pointer; color: var(--text-soft); display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+  border-radius: 8px; padding: 0; -webkit-tap-highlight-color: transparent;
+  transition: color .15s;
+}
+.home-arrow:active { color: var(--accent); }
+.home-arrow svg { width: 16px; height: 16px; }
 @media (prefers-reduced-motion: reduce) { * { transition-duration: 0s !important; } }
 </style>
 </head>
@@ -2564,9 +2573,7 @@ body {
       <div class="sidebar-since" id="sinceDate"></div>
     </div>
     <div class="sidebar-nav">
-      <div class="nav-item" onclick="toggleSidebar();switchTab('home')"><div class="icon">🏠</div><span>首页</span></div>
       <div class="nav-item active" onclick="goPage('/')"><div class="icon">💬</div><span>聊天</span></div>
-      <div class="nav-item" onclick="toggleSidebar();switchTab('dash')"><div class="icon">📋</div><span>更多</span></div>
       <div class="nav-item" onclick="goPage('/summon')"><div class="icon">🔔</div><span>召唤铃</span></div>
       <div class="nav-item" onclick="goPage('/moments')"><div class="icon">📸</div><span>朋友圈</span></div>
       <div class="nav-item" onclick="goPage('/diary')"><div class="icon">📖</div><span>心情日记</span></div>
@@ -2607,6 +2614,9 @@ body {
   </div>
   <div class="main">
     <div class="header">
+      <button class="home-arrow" onclick="switchTab('home')" aria-label="首页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
       <button class="menu-btn" onclick="toggleSidebar()" aria-label="菜单">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="16" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>
