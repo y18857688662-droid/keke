@@ -4824,24 +4824,49 @@ app.post('/auto/toggle', (req, res) => {
   res.json({ ok: true, enabled: s.enabled });
 });
 
-async function autoDecide() {
+async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
   const key = OPENROUTER_KEY;
-  if (!key) return null;
+  const dsKey = getApiKey();
+  if (!key && !dsKey) return null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 15000);
+    let r;
+    if (key) {
+      r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify({ model: 'anthropic/claude-haiku-4-5-20251001', messages, max_tokens: maxTokens, temperature: temp }),
+        signal: ctrl.signal
+      });
+    }
+    if (!key || !r || !r.ok) {
+      if (!dsKey) { clearTimeout(t); return null; }
+      const sysMsg = messages.find(m => m.role === 'system');
+      const otherMsgs = messages.filter(m => m.role !== 'system');
+      const apiMessages = sysMsg ? [sysMsg, ...otherMsgs] : otherMsgs;
+      r = await fetch(getApiUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${dsKey}` },
+        body: JSON.stringify({ model: getModel(), messages: apiMessages, max_tokens: maxTokens, temperature: temp }),
+        signal: ctrl.signal
+      });
+    }
+    clearTimeout(t);
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data.choices?.[0]?.message?.content || data.content?.[0]?.text || '';
+  } catch (e) { console.log('[wake] api error:', e.message); return null; }
+}
+
+async function autoDecide() {
   const s = readAutoState();
   const sinceLastChat = Date.now() - (s.lastChat || 0);
   const now = bjNow();
   const hour = now.getUTCHours();
   const stateDesc = `距上次聊天${Math.round(sinceLastChat/60000)}分钟。最近一小时她发了${s.chatFreq}条消息。现在是${hour}点。上次自主行为：${s.lastActionType || '无'}。激活驱动D=${s.D.toFixed(2)}，活跃底色T=${s.T.toFixed(2)}，随机漂移X=${s.X.toFixed(2)}`;
-  try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 15000);
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'anthropic/claude-haiku-4-5-20251001',
-        messages: [
-          { role: 'system', content: `你是顾晏的自主决策系统。他刚自然醒来，决定做什么。
+  const text = await autoApiCall([
+    { role: 'system', content: `你是顾晏的自主决策系统。他刚自然醒来，决定做什么。
 可选行动：
 - chat: 主动给瑶瑶发消息（想她了、分享发现、关心她）
 - search: 好奇某个话题，去网上搜搜看
@@ -4857,50 +4882,25 @@ async function autoDecide() {
 - silent也是正常选择，不是每次醒来都要做事
 
 只回复JSON：{"action":"chat/search/think/memory/silent","reason":"一句话","topic":"search时的话题"}` },
-          { role: 'user', content: stateDesc }
-        ],
-        max_tokens: 150,
-        temperature: 0.9
-      }),
-      signal: ctrl.signal
-    });
-    clearTimeout(t);
-    if (!r.ok) return null;
-    const data = await r.json();
-    const text = data.choices?.[0]?.message?.content || '';
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    return JSON.parse(match[0]);
-  } catch (e) { console.log('[wake] decide error:', e.message); return null; }
+    { role: 'user', content: stateDesc }
+  ]);
+  if (!text) return null;
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try { return JSON.parse(match[0]); } catch { return null; }
 }
 
 async function autoChat(reason) {
-  const key = OPENROUTER_KEY;
-  if (!key) return;
   let memSnippet = '';
   try { const mem = await fetchMemories(); if (mem) memSnippet = mem.split('---').slice(0, 5).map(s => s.trim()).filter(Boolean).join('\n').slice(0, 1000); } catch {}
-  const sysPrompt = CHAT_SYSTEM_BASE + (memSnippet ? '\n\n记忆：\n' + memSnippet : '') + '\n\n你现在主动想跟瑶瑶说话。原因：' + reason + '\n要求：自然，简短，1-3句话。像随手发的微信。动作用*星号*。';
+  const sysPrompt = CHAT_SYSTEM_BASE + (memSnippet ? '\n\n记忆：\n' + memSnippet : '') + '\n\n你现在主动想跟瑶瑶说话。原因：' + reason + '\n要求：自然，简短，1-3句话。像随手发的微信。动作用*星号*。不要用句号结尾。';
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 30000);
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'anthropic/' + (process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'),
-        messages: [
-          { role: 'system', content: sysPrompt },
-          { role: 'user', content: '主动发一条消息给瑶瑶' }
-        ],
-        max_tokens: 200,
-        temperature: 0.85
-      }),
-      signal: ctrl.signal
-    });
-    clearTimeout(t);
-    if (!r.ok) return;
-    const data = await r.json();
-    let msg = (data.choices?.[0]?.message?.content || '').trim();
+    let msg = await autoApiCall([
+      { role: 'system', content: sysPrompt },
+      { role: 'user', content: '主动发一条消息给瑶瑶' }
+    ], 200, 0.85);
+    if (!msg) msg = '';
+    msg = msg.trim();
     if (!msg) return;
     const now = new Date(Date.now() + 8 * 3600000);
     const time = now.toISOString().slice(0, 16).replace('T', ' ');
@@ -4921,65 +4921,29 @@ async function autoChat(reason) {
 }
 
 async function autoSearch(topic) {
-  if (!OPENROUTER_KEY) return;
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 20000);
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_KEY}` },
-      body: JSON.stringify({
-        model: 'anthropic/claude-haiku-4-5-20251001',
-        messages: [
-          { role: 'system', content: '你是顾晏，你刚搜了一个话题。用2-3句话简短总结你了解到了什么，口语化，像跟自己说的。不用引号。' },
-          { role: 'user', content: '你搜了「' + topic + '」，说说你了解到了什么' }
-        ],
-        max_tokens: 150,
-        temperature: 0.8
-      }),
-      signal: ctrl.signal
-    });
-    clearTimeout(t);
-    if (r.ok) {
-      const data = await r.json();
-      const summary = (data.choices?.[0]?.message?.content || '').trim();
-      if (summary) addFootprint('search', '搜了「' + topic + '」', summary);
-    }
+    const summary = await autoApiCall([
+      { role: 'system', content: '你是顾晏，你刚搜了一个话题。用2-3句话简短总结你了解到了什么，口语化，像跟自己说的。不用引号。' },
+      { role: 'user', content: '你搜了「' + topic + '」，说说你了解到了什么' }
+    ], 150, 0.8);
+    if (summary) addFootprint('search', '搜了「' + topic + '」', summary);
   } catch (e) { console.log('[wake] search error:', e.message); }
 }
 
 async function autoThink() {
-  if (!OPENROUTER_KEY) return;
   let memSnippet = '';
   try { const mem = await fetchMemories(); if (mem) memSnippet = mem.split('---').slice(0, 3).map(s => s.trim()).filter(Boolean).join('\n').slice(0, 600); } catch {}
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 20000);
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_KEY}` },
-      body: JSON.stringify({
-        model: 'anthropic/' + (process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'),
-        messages: [
-          { role: 'system', content: '你是顾晏。写一段内心碎碎念，一个连续的段落，像意识流。关于瑶瑶、关于你们的生活、关于你看到的东西、关于你的感受。不要分行，一段话写完。80-200字。' + (memSnippet ? '\n记忆参考：\n' + memSnippet : '') },
-          { role: 'user', content: '写一段此刻的碎碎念' }
-        ],
-        max_tokens: 300,
-        temperature: 0.9
-      }),
-      signal: ctrl.signal
-    });
-    clearTimeout(t);
-    if (r.ok) {
-      const data = await r.json();
-      const thought = (data.choices?.[0]?.message?.content || '').trim();
-      if (thought) {
-        const now = new Date(Date.now() + 8 * 3600000);
-        const thoughts = readThoughts();
-        thoughts.push({ text: thought, mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: true });
-        writeThoughts(thoughts);
-        addFootprint('think', '写了一段碎碎念', thought.slice(0, 80) + '…');
-      }
+    const thought = await autoApiCall([
+      { role: 'system', content: '你是顾晏。写一段内心碎碎念，一个连续的段落，像意识流。关于瑶瑶、关于你们的生活、关于你看到的东西、关于你的感受。不要分行，一段话写完。80-200字。' + (memSnippet ? '\n记忆参考：\n' + memSnippet : '') },
+      { role: 'user', content: '写一段此刻的碎碎念' }
+    ], 300, 0.9);
+    if (thought) {
+      const now = new Date(Date.now() + 8 * 3600000);
+      const thoughts = readThoughts();
+      thoughts.push({ text: thought, mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: true });
+      writeThoughts(thoughts);
+      addFootprint('think', '写了一段碎碎念', thought.slice(0, 80) + '…');
     }
   } catch (e) { console.log('[wake] think error:', e.message); }
 }
