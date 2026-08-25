@@ -2212,6 +2212,7 @@ body {
 }
 .msg-time::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--text-faint); }
 .msg-inline-time { font-size: 10px; color: var(--text-faint); letter-spacing: .04em; padding: 0 2px 2px; }
+.msg-search-narrator { text-align: center; padding: 8px 12px; margin: 8px auto; border-radius: 20px; background: rgba(123,143,107,.08); border: 1px dashed rgba(123,143,107,.3); font-size: 13px; color: var(--text-mid); max-width: 80%; width: fit-content; }
 .msg-group.yao .msg-inline-time { text-align: right; }
 .msg-group { display: flex; gap: 8px; max-width: 82%; margin-top: 4px; }
 .msg-group.ke { align-self: flex-start; }
@@ -3064,7 +3065,7 @@ function renderMessage(msg, idx, stagger) {
     colHtml += '<span class="thinking-cloud" onclick="openThinking('+idx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg></span>';
   }
   if (searchQ) {
-    colHtml += '<div style="text-align:center;padding:8px 12px;margin:4px 0;border-radius:20px;background:rgba(123,143,107,.1);border:1px dashed rgba(123,143,107,.35);font-size:13px;color:var(--text-mid,#888);display:inline-block"><span style="margin-right:6px">🔍</span>去网上看了看「<span style="color:var(--accent,#7B8F6B);font-weight:600">' + escHtml(searchQ) + '</span>」</div>';
+    group._searchQuery = searchQ;
   }
   if (msg.quote) {
     var qt = msg.quote.content || msg.quote.text || '';
@@ -3161,6 +3162,12 @@ function formatTimeDisplay(t) {
   }
   return t;
 }
+function renderSearchNarrator(q) {
+  var el = document.createElement('div');
+  el.className = 'msg-search-narrator';
+  el.innerHTML = '<span style="margin-right:6px">🔍</span>去网上看了看「<span style="color:var(--accent);font-weight:600">' + escHtml(q) + '</span>」';
+  return el;
+}
 function renderTime(t) {
   var el = document.createElement('div');
   el.className = 'msg-time';
@@ -3195,7 +3202,9 @@ function renderAll(messages) {
       msgContainer.appendChild(renderTime(msg.time));
       lastTime = msg.time;
     }
-    msgContainer.appendChild(renderMessage(msg, i));
+    var msgEl = renderMessage(msg, i);
+    if (msgEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(msgEl._searchQuery));
+    msgContainer.appendChild(msgEl);
   });
   scrollBottom();
   checkArchive();
@@ -3422,7 +3431,9 @@ evtSource.onmessage = function(e) {
       pollKnown++;
       var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl, audioUrl: data.audioUrl, searchQuery: data.searchQuery};
       msgContainer.appendChild(renderTime(data.time));
-      msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length, true));
+      var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
+      if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
+      msgContainer.appendChild(replyEl);
       scrollBottom();
       petMood(detectMood(data.content));
     }
@@ -3478,7 +3489,9 @@ setInterval(function() {
         var m = newMsgs[i];
         if (m.role === 'assistant') {
           msgContainer.appendChild(renderTime(m.time));
-          msgContainer.appendChild(renderMessage(m, Object.keys(thinkingStore).length));
+          var mEl = renderMessage(m, Object.keys(thinkingStore).length);
+          if (mEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(mEl._searchQuery));
+          msgContainer.appendChild(mEl);
           scrollBottom();
         }
       }
@@ -3514,7 +3527,9 @@ document.addEventListener('visibilitychange', function() {
             pollKnown++;
             var replyMsg = {role:'assistant', content: data.content, time: data.time, searchQuery: data.searchQuery};
             msgContainer.appendChild(renderTime(data.time));
-            msgContainer.appendChild(renderMessage(replyMsg, Object.keys(thinkingStore).length));
+            var rEl = renderMessage(replyMsg, Object.keys(thinkingStore).length);
+            if (rEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(rEl._searchQuery));
+            msgContainer.appendChild(rEl);
             scrollBottom();
           }
         } catch(err) {}
