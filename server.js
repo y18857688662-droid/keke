@@ -2322,6 +2322,7 @@ body {
 .fp-state { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; padding:8px 12px; background:var(--bubble-ke,rgba(0,0,0,.03)); border-radius:10px; }
 .fp-stat { font-size:12px; color:var(--text-mid,#999); }
 .fp-stat b { color:var(--accent,#d97a54); }
+.fp-mood { font-size:15px; font-weight:600; color:var(--accent,#d97a54); margin-bottom:6px; text-align:center; width:100%; }
 .input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
 .desk-pet { position:absolute; top:-78px; left:12px; width:80px; height:80px; cursor:pointer; z-index:50; animation:petWalk 12s ease-in-out infinite; }
 .desk-pet { overflow:visible; }
@@ -3241,7 +3242,9 @@ function loadFootprints() {
     var t2 = s.T !== undefined ? (s.T * 100).toFixed(0) : '50';
     var lam = s.lambda || 1.5;
     var p30 = s.pWake30min || 0;
-    el.innerHTML = '<span class="fp-stat">激活 <b>' + d + '%</b></span>' +
+    var mood = s.mood || '平静';
+    el.innerHTML = '<div class="fp-mood">' + mood + '</div>' +
+      '<span class="fp-stat">激活 <b>' + d + '%</b></span>' +
       '<span class="fp-stat">活跃度 <b>' + t2 + '%</b></span>' +
       '<span class="fp-stat">λ <b>' + lam.toFixed(1) + '/h</b></span>' +
       '<span class="fp-stat">30分钟内醒来 <b>' + p30 + '%</b></span>';
@@ -4814,7 +4817,15 @@ app.get('/auto/state', (req, res) => {
   const s = readAutoState();
   const lambda = computeLambda(s);
   const pWake30 = 1 - Math.exp(-lambda * 0.5);
-  res.json({ ...s, lambda: Math.round(lambda * 100) / 100, pWake30min: Math.round(pWake30 * 100) });
+  const d = s.D || 0.5, t = s.T || 0.5;
+  let mood = '平静';
+  if (d > 0.6 && t > 0.6) mood = '想找你说话';
+  else if (d > 0.6 && t <= 0.6) mood = '有点躁动';
+  else if (d <= 0.4 && t > 0.6) mood = '温柔';
+  else if (d <= 0.4 && t <= 0.4) mood = '发呆中';
+  else if (d > 0.5) mood = '有点想你';
+  else if (t > 0.5) mood = '安静陪着';
+  res.json({ ...s, lambda: Math.round(lambda * 100) / 100, pWake30min: Math.round(pWake30 * 100), mood });
 });
 
 app.post('/auto/toggle', (req, res) => {
