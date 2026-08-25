@@ -2308,6 +2308,11 @@ body {
 .sheet-text { font-size: 15.5px; line-height: 1.75; color: var(--text); }
 .msg-quote { font-size:12px; color:var(--text-soft); border-left:2px solid var(--accent); padding:2px 8px; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; cursor:default; }
 .msg-img { max-width:200px; border-radius:12px; display:block; cursor:pointer; }
+.msg-img-grid { display:grid; gap:3px; border-radius:12px; overflow:hidden; max-width:220px; }
+.msg-img-grid-2 { grid-template-columns:1fr 1fr; }
+.msg-img-grid-3 { grid-template-columns:1fr 1fr; }
+.msg-img-grid-4 { grid-template-columns:1fr 1fr; }
+.msg-img-cell { width:100%; aspect-ratio:1; object-fit:cover; cursor:pointer; display:block; }
 .img-viewer { position:fixed; top:0; left:0; right:0; bottom:0; z-index:999; background:rgba(0,0,0,.85); display:flex; align-items:center; justify-content:center; cursor:pointer; }
 .img-viewer img { max-width:95vw; max-height:95vh; border-radius:8px; }
 .quote-bar { display:none; padding:6px 14px 0; background:var(--bg); }
@@ -3061,10 +3066,17 @@ function renderMessage(msg, idx, stagger) {
     if (qt.length > 40) qt = qt.slice(0,40) + '…';
     colHtml += '<div class="msg-quote">' + escHtml(qt) + '</div>';
   }
-  if (msg.image) {
-    colHtml += '<div class="msg-bubble"><img class="msg-img" src="'+msg.image+'" onclick="viewImg(this.src)"></div>';
-  } else if (msg.imageUrl) {
-    colHtml += '<div class="msg-bubble" style="padding:4px"><img class="msg-img" src="'+msg.imageUrl+'" onclick="viewImg(this.src)"></div>';
+  var allImgs = [];
+  if (msg.images && msg.images.length) { msg.images.forEach(function(im){ allImgs.push(im); }); }
+  else if (msg.image) { allImgs.push(msg.image); }
+  if (!allImgs.length && msg.imageUrls && msg.imageUrls.length) { msg.imageUrls.forEach(function(u){ allImgs.push(u); }); }
+  else if (!allImgs.length && msg.imageUrl) { allImgs.push(msg.imageUrl); }
+  if (allImgs.length > 1) {
+    colHtml += '<div class="msg-img-grid msg-img-grid-'+Math.min(allImgs.length,4)+'">';
+    allImgs.forEach(function(im){ colHtml += '<img class="msg-img-cell" src="'+im+'" onclick="viewImg(this.src)">'; });
+    colHtml += '</div>';
+  } else if (allImgs.length === 1) {
+    colHtml += '<div class="msg-bubble" style="padding:4px"><img class="msg-img" src="'+allImgs[0]+'" onclick="viewImg(this.src)"></div>';
   }
   if (msg.file) {
     var fn = escHtml(msg.filename || '文件');
