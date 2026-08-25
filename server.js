@@ -5024,8 +5024,8 @@ const AUTO_STATE_FILE = path.join(__dirname, 'auto_state.json');
 const FOOTPRINTS_FILE = path.join(__dirname, 'footprints.json');
 
 const WAKE_PARAMS = {
-  lambdaBase: 1.50, betaD: 1.80, betaT: 1.60, betaX: 1.20,
-  lambdaMin: 0.15, lambdaMax: 8.00,
+  lambdaBase: 2.80, betaD: 2.00, betaT: 1.80, betaX: 1.40,
+  lambdaMin: 0.20, lambdaMax: 10.00,
   muD: 0.50, tauD: 12, dMin: 0.20, dMax: 0.80, kRun: 0.10,
   muT: 0.50, tauT: 360, sigmaT: 0.10, tMin: 0.25, tMax: 0.75,
   muX: 0.00, tauX: 25, sigmaX: 0.18, xMin: -0.40, xMax: 0.40,
