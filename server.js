@@ -3056,7 +3056,7 @@ function renderMessage(msg, idx, stagger) {
   avaHtml += '</div>';
   var colHtml = '<div class="msg-col">';
   if (think && isKe) {
-    colHtml += '<span class="thinking-cloud" onclick="openThinking('+idx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg></span>';
+    group._thinkIdx = idx;
   }
   if (searchQ) {
     group._searchQuery = searchQ;
@@ -3162,10 +3162,14 @@ function renderSearchNarrator(q) {
   el.innerHTML = '<span style="margin-right:6px">🔍</span>去网上看了看「<span style="color:var(--accent);font-weight:600">' + escHtml(q) + '</span>」';
   return el;
 }
-function renderTime(t) {
+function renderTime(t, thinkIdx) {
   var el = document.createElement('div');
   el.className = 'msg-time';
-  el.textContent = formatTimeDisplay(t);
+  var html = formatTimeDisplay(t);
+  if (thinkIdx !== undefined && thinkIdx !== null) {
+    html += ' <span class="thinking-cloud" onclick="openThinking('+thinkIdx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg></span>';
+  }
+  el.innerHTML = html;
   return el;
 }
 
@@ -3191,10 +3195,10 @@ function renderAll(messages) {
   wrap.innerHTML = '<button id="loadMoreBtn" onclick="loadArchive()" style="background:none;border:1px solid var(--border);color:var(--text-mid);padding:6px 20px;border-radius:16px;font-size:13px;cursor:pointer">加载更多</button>';
   msgContainer.appendChild(wrap);
   messages.forEach(function(msg, i) {
-    if (msg.time && msg.role === 'assistant') {
-      msgContainer.appendChild(renderTime(msg.time));
-    }
     var msgEl = renderMessage(msg, i);
+    if (msg.time && msg.role === 'assistant') {
+      msgContainer.appendChild(renderTime(msg.time, msgEl._thinkIdx));
+    }
     if (msgEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(msgEl._searchQuery));
     msgContainer.appendChild(msgEl);
   });
@@ -3231,10 +3235,10 @@ function loadArchive() {
     var ref = wrap ? wrap.nextSibling : msgContainer.firstChild;
     var lastTime = '';
     data.messages.forEach(function(msg, i) {
-      if (msg.time && msg.role === 'assistant') {
-        msgContainer.insertBefore(renderTime(msg.time), ref);
-      }
       var archMsgEl = renderMessage(msg, -(data.messages.length - i));
+      if (msg.time && msg.role === 'assistant') {
+        msgContainer.insertBefore(renderTime(msg.time, archMsgEl._thinkIdx), ref);
+      }
       if (archMsgEl._searchQuery) msgContainer.insertBefore(renderSearchNarrator(archMsgEl._searchQuery), ref);
       msgContainer.insertBefore(archMsgEl, ref);
     });
@@ -3420,8 +3424,8 @@ evtSource.onmessage = function(e) {
       lastMsgCount++;
       pollKnown++;
       var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl, audioUrl: data.audioUrl, searchQuery: data.searchQuery};
-      msgContainer.appendChild(renderTime(data.time));
       var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
+      msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
       if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
       msgContainer.appendChild(replyEl);
       scrollBottom();
@@ -3478,8 +3482,8 @@ setInterval(function() {
       for (var i = 0; i < newMsgs.length; i++) {
         var m = newMsgs[i];
         if (m.role === 'assistant') {
-          msgContainer.appendChild(renderTime(m.time));
           var mEl = renderMessage(m, Object.keys(thinkingStore).length);
+          msgContainer.appendChild(renderTime(m.time, mEl._thinkIdx));
           if (mEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(mEl._searchQuery));
           msgContainer.appendChild(mEl);
           scrollBottom();
@@ -3516,8 +3520,8 @@ document.addEventListener('visibilitychange', function() {
             lastMsgCount++;
             pollKnown++;
             var replyMsg = {role:'assistant', content: data.content, time: data.time, searchQuery: data.searchQuery};
-            msgContainer.appendChild(renderTime(data.time));
             var rEl = renderMessage(replyMsg, Object.keys(thinkingStore).length);
+            msgContainer.appendChild(renderTime(data.time, rEl._thinkIdx));
             if (rEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(rEl._searchQuery));
             msgContainer.appendChild(rEl);
             scrollBottom();
