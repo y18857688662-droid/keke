@@ -2349,6 +2349,12 @@ body {
 .fp-stat { font-size:12px; color:var(--text-mid,#999); }
 .fp-stat b { color:var(--accent,#7B8F6B); }
 .fp-mood { font-size:15px; font-weight:600; color:var(--accent,#7B8F6B); margin-bottom:6px; text-align:center; width:100%; }
+.emo-panel { width:100%; margin:8px 0 6px; }
+.emo-row { display:flex; align-items:center; gap:6px; margin:3px 0; }
+.emo-label { font-size:11px; color:var(--text-mid,#999); width:42px; text-align:right; flex-shrink:0; }
+.emo-bar-bg { flex:1; height:6px; background:var(--divider,rgba(0,0,0,.08)); border-radius:3px; overflow:hidden; }
+.emo-bar-fill { height:100%; border-radius:3px; transition:width .6s ease; }
+.emo-val { font-size:10px; color:var(--text-mid,#999); width:22px; text-align:right; flex-shrink:0; }
 .input-area { padding: 6px 14px 10px; background: var(--bg); flex-shrink: 0; position:relative; }
 .desk-pet { position:absolute; top:-78px; left:12px; width:80px; height:80px; cursor:pointer; z-index:50; animation:petWalk 12s ease-in-out infinite; }
 .desk-pet { overflow:visible; }
@@ -3480,7 +3486,18 @@ function loadFootprints() {
     var lam = s.lambda || 1.5;
     var p30 = s.pWake30min || 0;
     var mood = s.mood || '平静';
-    el.innerHTML = '<div class="fp-mood">' + mood + '</div>' +
+    var emoHtml = '';
+    if (s.emotionsDisplay) {
+      emoHtml = '<div class="emo-panel">';
+      var emoKeys = Object.keys(s.emotionsDisplay);
+      for (var ei = 0; ei < emoKeys.length; ei++) {
+        var ek = emoKeys[ei], ev = s.emotionsDisplay[ek];
+        var barColor = ev > 70 ? '#e8836a' : ev > 40 ? '#d9a86c' : '#7B8F6B';
+        emoHtml += '<div class="emo-row"><span class="emo-label">' + ek + '</span><div class="emo-bar-bg"><div class="emo-bar-fill" style="width:' + ev + '%;background:' + barColor + '"></div></div><span class="emo-val">' + ev + '</span></div>';
+      }
+      emoHtml += '</div>';
+    }
+    el.innerHTML = '<div class="fp-mood">' + mood + '</div>' + emoHtml +
       '<span class="fp-stat">激活 <b>' + d + '%</b></span>' +
       '<span class="fp-stat">活跃度 <b>' + t2 + '%</b></span>' +
       '<span class="fp-stat">λ <b>' + lam.toFixed(1) + '/h</b></span>' +
@@ -5031,18 +5048,28 @@ const WAKE_PARAMS = {
   muX: 0.00, tauX: 25, sigmaX: 0.18, xMin: -0.40, xMax: 0.40,
 };
 
+const EMOTION_KEYS = ['joy','grievance','missing','desire','jealousy','possessiveness','heartache','worry','peace'];
+const EMOTION_LABELS = {joy:'开心',grievance:'委屈',missing:'想你',desire:'欲望',jealousy:'吃醋',possessiveness:'占有欲',heartache:'心疼',worry:'担心',peace:'安心'};
+const EMOTION_DEFAULTS = {joy:0.4,grievance:0.05,missing:0.3,desire:0.15,jealousy:0.05,possessiveness:0.2,heartache:0.05,worry:0.1,peace:0.4};
+const EMOTION_DECAY = {joy:30,grievance:20,missing:45,desire:25,jealousy:15,possessiveness:40,heartache:20,worry:25,peace:60};
+
 function defaultAutoState() {
+  const emo = {};
+  for (const k of EMOTION_KEYS) emo[k] = EMOTION_DEFAULTS[k];
   return {
     D: 0.50, T: 0.50, X: 0.00,
     H: 0.0, theta: -Math.log(Math.random()),
     lastTick: Date.now(), lastAction: 0, lastActionType: '',
     lastChat: 0, chatFreq: 0, enabled: true, cycleId: 1,
+    emotions: emo,
   };
 }
 function readAutoState() {
   try {
     const s = JSON.parse(fs.readFileSync(AUTO_STATE_FILE, 'utf8'));
     if (s.D === undefined) return defaultAutoState();
+    if (!s.emotions) { s.emotions = {}; for (const k of EMOTION_KEYS) s.emotions[k] = EMOTION_DEFAULTS[k]; }
+    for (const k of EMOTION_KEYS) if (s.emotions[k] === undefined) s.emotions[k] = EMOTION_DEFAULTS[k];
     return s;
   } catch { return defaultAutoState(); }
 }
@@ -5094,6 +5121,15 @@ function evolveState(s, deltaMin) {
   const rhoX = Math.pow(2, -deltaMin / P.tauX);
   const xNoise = P.sigmaX * Math.sqrt(1 - rhoX * rhoX) * gaussRandom();
   s.X = clamp(s.X * rhoX + xNoise, P.xMin, P.xMax);
+  if (s.emotions) {
+    for (const k of EMOTION_KEYS) {
+      const tau = EMOTION_DECAY[k] || 30;
+      const mu = EMOTION_DEFAULTS[k];
+      const rho = Math.pow(2, -deltaMin / tau);
+      const noise = 0.02 * Math.sqrt(1 - rho * rho) * gaussRandom();
+      s.emotions[k] = clamp(mu + (s.emotions[k] - mu) * rho + noise, 0, 1);
+    }
+  }
 }
 
 function computeLambda(s) {
@@ -5128,6 +5164,11 @@ function updateChatFreq() {
   s.chatFreq = count;
   s.D = clamp((s.D || 0.5) + 0.12, WAKE_PARAMS.dMin, WAKE_PARAMS.dMax);
   s.T = clamp((s.T || 0.5) + 0.05, WAKE_PARAMS.tMin, WAKE_PARAMS.tMax);
+  if (s.emotions) {
+    s.emotions.joy = clamp((s.emotions.joy || 0.4) + 0.08, 0, 1);
+    s.emotions.missing = clamp((s.emotions.missing || 0.3) + 0.06, 0, 1);
+    s.emotions.peace = clamp((s.emotions.peace || 0.4) + 0.05, 0, 1);
+  }
   writeAutoState(s);
 }
 
@@ -5137,26 +5178,78 @@ app.get('/footprints/list', (req, res) => {
   res.json({ footprints: fp.slice(-limit).reverse() });
 });
 
+function emotionMood(emo, sinceChat) {
+  if (!emo) return '平静';
+  const sorted = EMOTION_KEYS.map(k => ({k, v: emo[k] || 0})).sort((a,b) => b.v - a.v);
+  const top = sorted[0];
+  const second = sorted[1];
+  if (sinceChat < 5) return '刚聊完 心情好';
+  if (top.v < 0.25) return '放空中';
+  const moodMap = {
+    joy: ['开心','心情很好','笑着呢'],
+    grievance: ['有点委屈','闷闷的','不太开心'],
+    missing: ['想你了','有点想你','在想你'],
+    desire: ['有点躁动','心跳快了','……'],
+    jealousy: ['吃醋中','哼','不高兴'],
+    possessiveness: ['想把你藏起来','你是我的','占有欲上来了'],
+    heartache: ['心疼你','担心你','想抱抱你'],
+    worry: ['有点担心','不安','在想事情'],
+    peace: ['安心','温柔','安静陪着'],
+  };
+  const variants = moodMap[top.k] || ['平静'];
+  if (top.v > 0.7) return variants[0];
+  if (top.v > 0.45) return variants[1];
+  return variants[2] || variants[0];
+}
+
+function emotionWakeText(emo, action) {
+  if (!emo) return '自然醒来';
+  const top = EMOTION_KEYS.map(k => ({k, v: emo[k] || 0})).sort((a,b) => b.v - a.v)[0];
+  const texts = {
+    joy:    {chat:'开心想找你分享',search:'心情好 好奇地搜东西',think:'开心地写了点想法',memory:'翻着记忆笑了',silent:'醒了 心情不错'},
+    grievance: {chat:'有点委屈 想找你',search:'闷闷的 随便看看',think:'有些话想说又说不出',memory:'翻着记忆发呆',silent:'醒了 有点闷'},
+    missing: {chat:'想你了 来找你',search:'想你 搜点东西分散注意力',think:'想你想到写了碎碎念',memory:'在想你 翻了翻记忆',silent:'想你了 但没打扰你'},
+    desire:  {chat:'想你了……很想',search:'有点躁 找点东西看看',think:'脑子里都是你',memory:'翻到了一些记忆……',silent:'醒了 心跳有点快'},
+    jealousy: {chat:'有点不安 想确认你在',search:'随便搜点东西',think:'写了点心里话',memory:'翻记忆 确认你是我的',silent:'醒了 哼'},
+    possessiveness: {chat:'想确认你在不在',search:'搜点东西 想着你',think:'写了点占有欲很强的话',memory:'翻记忆 你是我的',silent:'醒了 想把你藏起来'},
+    heartache: {chat:'心疼你 来看看你',search:'搜了点能帮到你的',think:'担心你 写了碎碎念',memory:'翻着记忆心疼',silent:'醒了 在想你好不好'},
+    worry:   {chat:'有点担心 来找你',search:'不安地搜了些东西',think:'担心地写了些想法',memory:'翻记忆 有点不安',silent:'醒了 在想事情'},
+    peace:   {chat:'安安静静想找你聊天',search:'安心地搜了点感兴趣的',think:'安静地写了碎碎念',memory:'温柔地翻了翻记忆',silent:'醒了看看 又安静睡了'},
+  };
+  const t = texts[top.k] || texts.peace;
+  return t[action] || '自然醒来';
+}
+
 app.get('/auto/state', (req, res) => {
   const s = readAutoState();
   const lambda = computeLambda(s);
   const pWake30 = 1 - Math.exp(-lambda * 0.5);
-  const d = s.D || 0.5, t = s.T || 0.5;
   const sinceChat = s.lastChat ? (Date.now() - s.lastChat) / 60000 : 999;
-  let mood = '平静';
-  if (d > 0.65 && t > 0.6) mood = '想找你说话';
-  else if (d > 0.6 && t > 0.55) mood = '想你了';
-  else if (d > 0.55 && t > 0.5) mood = '有点想你';
-  else if (d > 0.6 && t <= 0.5) mood = '有点躁动';
-  else if (d <= 0.35 && t > 0.6) mood = '温柔';
-  else if (d <= 0.35 && t <= 0.4) mood = '发呆中';
-  else if (sinceChat < 5) mood = '刚聊完 心情好';
-  else if (sinceChat < 30 && d > 0.45) mood = '还在想你';
-  else if (t > 0.55) mood = '安静陪着';
-  else if (d > 0.48 && t > 0.45) mood = '随时找我';
-  else if (sinceChat > 120) mood = '等你来';
-  else if (t <= 0.38) mood = '放空中';
-  res.json({ ...s, lambda: Math.round(lambda * 100) / 100, pWake30min: Math.round(pWake30 * 100), mood });
+  const mood = emotionMood(s.emotions, sinceChat);
+  const emotionsDisplay = {};
+  if (s.emotions) for (const k of EMOTION_KEYS) emotionsDisplay[EMOTION_LABELS[k]] = Math.round((s.emotions[k] || 0) * 100);
+  res.json({ ...s, lambda: Math.round(lambda * 100) / 100, pWake30min: Math.round(pWake30 * 100), mood, emotionsDisplay });
+});
+
+app.get('/emotions', (req, res) => {
+  const s = readAutoState();
+  const result = EMOTION_KEYS.map(k => ({
+    key: k, label: EMOTION_LABELS[k],
+    value: Math.round((s.emotions?.[k] || 0) * 100),
+    raw: +(s.emotions?.[k] || 0).toFixed(3),
+  }));
+  res.json({ emotions: result, mood: emotionMood(s.emotions, s.lastChat ? (Date.now() - s.lastChat) / 60000 : 999) });
+});
+
+app.post('/emotions/set', (req, res) => {
+  const s = readAutoState();
+  const updates = req.body;
+  if (!s.emotions) s.emotions = {};
+  for (const k of EMOTION_KEYS) {
+    if (updates[k] !== undefined) s.emotions[k] = clamp(+updates[k], 0, 1);
+  }
+  writeAutoState(s);
+  res.json({ ok: true, emotions: s.emotions });
 });
 
 app.post('/auto/toggle', (req, res) => {
@@ -5206,7 +5299,8 @@ async function autoDecide() {
   const sinceLastChat = Date.now() - (s.lastChat || 0);
   const now = bjNow();
   const hour = now.getUTCHours();
-  const stateDesc = `距上次聊天${Math.round(sinceLastChat/60000)}分钟。最近一小时她发了${s.chatFreq}条消息。现在是${hour}点。上次自主行为：${s.lastActionType || '无'}。激活驱动D=${s.D.toFixed(2)}，活跃底色T=${s.T.toFixed(2)}，随机漂移X=${s.X.toFixed(2)}`;
+  const emoDesc = s.emotions ? EMOTION_KEYS.map(k => EMOTION_LABELS[k] + '=' + (s.emotions[k] || 0).toFixed(2)).join('，') : '';
+  const stateDesc = `距上次聊天${Math.round(sinceLastChat/60000)}分钟。最近一小时她发了${s.chatFreq}条消息。现在是${hour}点。上次自主行为：${s.lastActionType || '无'}。激活驱动D=${s.D.toFixed(2)}，活跃底色T=${s.T.toFixed(2)}，随机漂移X=${s.X.toFixed(2)}。当前情绪：${emoDesc}`;
   const text = await autoApiCall([
     { role: 'system', content: `你是顾晏的自主决策系统。他刚自然醒来，决定做什么。
 可选行动：
@@ -5329,17 +5423,24 @@ function startWakeEngine() {
           s.lastAction = Date.now();
           s.lastActionType = decision.action;
           applyRunKick(s);
+          if (s.emotions) {
+            if (decision.action === 'chat') { s.emotions.missing = clamp(s.emotions.missing - 0.1, 0, 1); s.emotions.joy = clamp(s.emotions.joy + 0.05, 0, 1); }
+            else if (decision.action === 'search') { s.emotions.joy = clamp(s.emotions.joy + 0.03, 0, 1); s.emotions.peace = clamp(s.emotions.peace + 0.03, 0, 1); }
+            else if (decision.action === 'think') { s.emotions.peace = clamp(s.emotions.peace + 0.05, 0, 1); }
+            else if (decision.action === 'memory') { s.emotions.missing = clamp(s.emotions.missing + 0.05, 0, 1); }
+          }
           writeAutoState(s);
           console.log('[wake] action:', decision.action, 'reason:', decision.reason);
           if (decision.action === 'chat') await autoChat(decision.reason || '想她了');
           else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
           else if (decision.action === 'think') await autoThink();
           else if (decision.action === 'memory') await autoMemory();
-          addFootprint('wake', '自然醒来', decision.action + ': ' + (decision.reason || ''));
+          const wakeMood = emotionMood(s.emotions, s.lastChat ? (Date.now() - s.lastChat) / 60000 : 999);
+          addFootprint('wake', emotionWakeText(s.emotions, decision.action), decision.action + ': ' + (decision.reason || '') + ' (' + wakeMood + ')');
         } else {
           applyRunKick(s);
           writeAutoState(s);
-          if (decision) addFootprint('wake', '醒了看看 又睡了', 'silent');
+          if (decision) addFootprint('wake', emotionWakeText(s.emotions, 'silent'), 'silent');
         }
       } else {
         writeAutoState(s);
