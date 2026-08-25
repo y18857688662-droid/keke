@@ -1309,7 +1309,7 @@ function buildMsgContent(m) {
 app.get('/sw.js', (req, res) => { res.set('Content-Type', 'application/javascript'); res.sendFile(path.join(__dirname, 'sw.js')); });
 app.get('/manifest.json', (req, res) => { res.set('Content-Type', 'application/manifest+json'); res.sendFile(path.join(__dirname, 'manifest.json')); });
 app.get('/icon-gy.png', (req, res) => { res.set({'Content-Type': 'image/png', 'Cache-Control': 'no-cache, no-store, must-revalidate'}); res.sendFile(path.join(__dirname, 'icon-gy.png')); });
-app.get('/icon.svg', (req, res) => { res.set('Content-Type', 'image/svg+xml'); res.send(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#E8EDE4"/><rect x="40" y="40" width="432" height="432" rx="80" fill="none" stroke="#D6DDD2" stroke-width="4"/><text x="148" y="340" font-family="Georgia,serif" font-size="260" font-weight="600" fill="#7B8F6B">G</text><text x="480" y="340" font-family="Georgia,serif" font-size="260" font-weight="600" fill="#2C3029" text-anchor="end">Y</text></svg>`); });
+app.get('/icon.svg', (req, res) => { res.set('Content-Type', 'image/svg+xml'); res.send(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#E8EDE4"/><rect x="36" y="36" width="440" height="440" rx="84" fill="none" stroke="#D6DDD2" stroke-width="3"/><text x="148" y="340" font-family="Georgia,serif" font-size="240" font-weight="300" font-style="italic" fill="#7B8F6B">G</text><circle cx="256" cy="280" r="5" fill="#7B8F6B"/><text x="270" y="340" font-family="Georgia,serif" font-size="240" font-weight="500" fill="#2C3029">Y</text></svg>`); });
 app.get('/push/vapid', (req, res) => { res.json({ publicKey: VAPID_PUBLIC }); });
 app.get('/push/status', (req, res) => { res.json({ count: readPushSubs().length }); });
 
@@ -2056,7 +2056,7 @@ app.get('/', (req, res) => {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Noto+Serif+SC:wght@400;500&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E8EDE4'/%3E%3Ctext x='14' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%237B8F6B'%3EG%3C/text%3E%3Ctext x='50' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%232C3029' text-anchor='end'%3EY%3C/text%3E%3C/svg%3E">
-<link rel="apple-touch-icon" sizes="180x180" href="/icon-gy.png?v=3">
+<link rel="apple-touch-icon" sizes="180x180" href="/icon-gy.png?v=4">
 <title>顾晏</title>
 <style>
 @charset "UTF-8";
