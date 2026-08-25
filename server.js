@@ -2323,7 +2323,7 @@ body {
 .fp-stat { font-size:12px; color:var(--text-mid,#999); }
 .fp-stat b { color:var(--accent,#d97a54); }
 .fp-mood { font-size:15px; font-weight:600; color:var(--accent,#d97a54); margin-bottom:6px; text-align:center; width:100%; }
-.input-area { padding: 6px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); flex-shrink: 0; position:relative; }
+.input-area { padding: 6px 14px 10px; background: var(--bg); flex-shrink: 0; position:relative; }
 .desk-pet { position:absolute; top:-78px; left:12px; width:80px; height:80px; cursor:pointer; z-index:50; animation:petWalk 12s ease-in-out infinite; }
 .desk-pet { overflow:visible; }
 .pet-clawd { width:80px; height:80px; object-fit:contain; image-rendering:pixelated; pointer-events:none; transition:filter .5s, opacity .4s; }
@@ -2435,6 +2435,115 @@ body {
 .mem-ctx-session{font-weight:600;color:var(--text);margin-bottom:4px}
 .mem-ctx-state{color:var(--text-mid);white-space:pre-wrap;word-break:break-word}
 .mem-ctx-ts{color:var(--text-soft);font-size:11px;margin-top:4px}
+/* Tab Bar */
+.tab-bar {
+  display: flex; align-items: center; justify-content: space-around;
+  background: var(--bg); border-top: 1px solid var(--border);
+  padding: 4px 0 calc(4px + env(safe-area-inset-bottom, 0px));
+  flex-shrink: 0; z-index: 10; position: relative;
+}
+.tab-item {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 20px; cursor: pointer; border: none; background: none;
+  color: var(--text-soft); font-size: 10px; font-family: var(--font);
+  transition: color .2s; -webkit-tap-highlight-color: transparent;
+}
+.tab-item.active { color: var(--accent); }
+.tab-item .tab-icon { font-size: 20px; line-height: 1; }
+.tab-item .tab-label { font-weight: 500; letter-spacing: .03em; }
+/* Home View */
+.home-view {
+  flex: 1; display: none; flex-direction: column; overflow-y: auto;
+  -webkit-overflow-scrolling: touch; background: var(--bg);
+}
+.home-scroll { padding: 0 20px 20px; }
+.home-top { padding: 48px 0 20px; text-align: center; }
+.home-greeting {
+  font-size: 24px; font-weight: 700; color: var(--text);
+  letter-spacing: -.01em; line-height: 1.3;
+}
+.home-date {
+  font-size: 13px; color: var(--text-soft); margin-top: 6px;
+  letter-spacing: .06em;
+}
+.home-card {
+  background: var(--surface); border-radius: 20px;
+  padding: 24px; text-align: center;
+  border: 1px solid var(--border);
+}
+.home-card-ava {
+  width: 64px; height: 64px; border-radius: 50%;
+  overflow: hidden; margin: 0 auto 12px;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.home-card-ava img, .home-card-ava svg { width: 100%; height: 100%; display: block; object-fit: cover; }
+.home-card-name { font-size: 18px; font-weight: 600; color: var(--text); }
+.home-card-mood {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 8px; padding: 4px 14px; border-radius: 20px;
+  background: var(--accent-soft); font-size: 13px; color: var(--accent); font-weight: 500;
+}
+.home-card-state {
+  font-size: 14px; color: var(--text-mid); margin-top: 12px; line-height: 1.5;
+}
+.home-section {
+  margin-top: 16px; background: var(--surface); border-radius: 16px;
+  padding: 16px 18px; border: 1px solid var(--border);
+}
+.home-section-title {
+  font-size: 13px; font-weight: 600; color: var(--text-soft);
+  letter-spacing: .04em; margin-bottom: 8px;
+}
+.home-thought-text {
+  font-size: 14px; line-height: 1.65; color: var(--text-mid);
+}
+.home-actions { display: flex; gap: 10px; margin-top: 16px; }
+.home-action-btn {
+  flex: 1; padding: 14px; border: none; border-radius: 14px;
+  font-size: 14px; font-family: var(--font); font-weight: 500;
+  cursor: pointer; transition: opacity .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.home-action-btn:active { opacity: .7; }
+.home-action-btn.primary { background: var(--accent); color: #fff; }
+.home-action-btn.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+/* Dashboard View */
+.dash-view {
+  flex: 1; display: none; flex-direction: column; overflow-y: auto;
+  -webkit-overflow-scrolling: touch; background: var(--bg);
+}
+.dash-scroll { padding: 0 16px 20px; }
+.dash-header {
+  padding: 44px 4px 16px; font-size: 22px; font-weight: 700;
+  color: var(--text); letter-spacing: -.01em;
+}
+.dash-couple {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface); border-radius: 16px; padding: 16px 18px;
+  border: 1px solid var(--border); margin-bottom: 16px;
+}
+.dash-couple-avas { display: flex; }
+.dash-couple-ava {
+  width: 40px; height: 40px; border-radius: 50%; overflow: hidden;
+  border: 2px solid var(--bg);
+}
+.dash-couple-ava:last-child { margin-left: -8px; }
+.dash-couple-ava img, .dash-couple-ava svg { width: 100%; height: 100%; object-fit: cover; }
+.dash-couple-info { flex: 1; }
+.dash-couple-name { font-size: 15px; font-weight: 600; color: var(--text); }
+.dash-couple-days { font-size: 12px; color: var(--text-soft); margin-top: 2px; }
+.dash-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+}
+.dash-item {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 16px 4px; border-radius: 14px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border);
+  font-size: 11px; color: var(--text-mid); font-family: var(--font);
+  transition: background .15s; -webkit-tap-highlight-color: transparent;
+}
+.dash-item:active { background: var(--accent-soft); }
+.dash-item .di-icon { font-size: 22px; line-height: 1; }
 @media (prefers-reduced-motion: reduce) { * { transition-duration: 0s !important; } }
 </style>
 </head>
@@ -2469,6 +2578,28 @@ body {
       <div class="nav-item" onclick="goPage('/setup')"><div class="icon">⚙️</div><span>设置</span></div>
     </div>
     <div class="sidebar-footer"><button id="pushBtn" class="push-btn" onclick="setupPush()">开启消息通知</button><div style="margin-top:6px">顾晏和瑶瑶的小窝</div></div>
+  </div>
+  <div class="home-view" id="homeView">
+    <div class="home-scroll">
+      <div class="home-top">
+        <div class="home-greeting" id="homeGreeting">晚上好，瑶瑶</div>
+        <div class="home-date" id="homeDate"></div>
+      </div>
+      <div class="home-card">
+        <div class="home-card-ava" id="homeAva"><svg viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="26" fill="#F0EBE4"/><path d="M26 14c-4 0-7 3-8 6s0 8 3 11c-4 1-7 4-8 7h26c-1-3-4-6-8-7 3-3 4-7 3-11s-4-6-8-6z" fill="#C87E62" opacity=".55"/></svg></div>
+        <div class="home-card-name">顾晏</div>
+        <div class="home-card-mood" id="homeMood"><span class="status-dot"></span>在线</div>
+        <div class="home-card-state" id="homeState">……</div>
+      </div>
+      <div class="home-section">
+        <div class="home-section-title">💭 今日碎碎念</div>
+        <div class="home-thought-text" id="homeThought">还没有碎碎念…</div>
+      </div>
+      <div class="home-actions">
+        <button class="home-action-btn primary" onclick="switchTab('chat')">💬 找他聊天</button>
+        <button class="home-action-btn secondary" onclick="goPage('/thoughts')">💭 看碎碎念</button>
+      </div>
+    </div>
   </div>
   <div class="main">
     <div class="header">
@@ -2519,6 +2650,41 @@ body {
         </div>
       </div>
     </div>
+  </div>
+  <div class="dash-view" id="dashView">
+    <div class="dash-scroll">
+      <div class="dash-header">更多</div>
+      <div class="dash-couple" id="dashCouple">
+        <div class="dash-couple-avas">
+          <div class="dash-couple-ava" id="dashAvaYao"><svg viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="26" fill="#E8D5F0"/><path d="M26 14c-4 0-7 3-8 6s0 8 3 11c-4 1-7 4-8 7h26c-1-3-4-6-8-7 3-3 4-7 3-11s-4-6-8-6z" fill="#B08CC2" opacity=".5"/></svg></div>
+          <div class="dash-couple-ava" id="dashAvaKe"><svg viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="26" fill="#F0EBE4"/><path d="M26 14c-4 0-7 3-8 6s0 8 3 11c-4 1-7 4-8 7h26c-1-3-4-6-8-7 3-3 4-7 3-11s-4-6-8-6z" fill="#C87E62" opacity=".55"/></svg></div>
+        </div>
+        <div class="dash-couple-info">
+          <div class="dash-couple-name">顾晏 & 瑶瑶</div>
+          <div class="dash-couple-days" id="dashDays"></div>
+        </div>
+      </div>
+      <div class="dash-grid">
+        <div class="dash-item" onclick="goPage('/summon')"><span class="di-icon">🔔</span>召唤铃</div>
+        <div class="dash-item" onclick="goPage('/moments')"><span class="di-icon">📸</span>朋友圈</div>
+        <div class="dash-item" onclick="goPage('/diary')"><span class="di-icon">📖</span>心情日记</div>
+        <div class="dash-item" onclick="openMemPanel()"><span class="di-icon">🧠</span>记忆库</div>
+        <div class="dash-item" onclick="goPage('/thoughts')"><span class="di-icon">💭</span>碎碎念</div>
+        <div class="dash-item" onclick="goPage('/garden')"><span class="di-icon">🌿</span>小院子</div>
+        <div class="dash-item" onclick="goPage('/period')"><span class="di-icon">🌙</span>经期</div>
+        <div class="dash-item" onclick="goPage('/bookmarks')"><span class="di-icon">📑</span>收藏</div>
+        <div class="dash-item" onclick="goPage('/music/player')"><span class="di-icon">🎵</span>音乐</div>
+        <div class="dash-item" onclick="goPage('/voice')"><span class="di-icon">🎙</span>声音</div>
+        <div class="dash-item" onclick="goPage('/screen')"><span class="di-icon">🖥</span>屏幕共享</div>
+        <div class="dash-item" onclick="goPage('/apps')"><span class="di-icon">📱</span>使用记录</div>
+        <div class="dash-item" onclick="goPage('/setup')"><span class="di-icon">⚙️</span>设置</div>
+      </div>
+    </div>
+  </div>
+  <div class="tab-bar" id="tabBar">
+    <button class="tab-item" onclick="switchTab('home')"><span class="tab-icon">🏠</span><span class="tab-label">首页</span></button>
+    <button class="tab-item active" onclick="switchTab('chat')"><span class="tab-icon">💬</span><span class="tab-label">聊天</span></button>
+    <button class="tab-item" onclick="switchTab('dash')"><span class="tab-icon">📋</span><span class="tab-label">更多</span></button>
   </div>
   <div class="sheet-overlay" id="sheetOverlay" onclick="closeThinking()"></div>
   <div class="sheet" id="sheet">
@@ -2579,7 +2745,8 @@ function toggleSidebar() {
   document.getElementById('overlay').classList.toggle('show');
 }
 function goPage(url) {
-  toggleSidebar();
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open')) toggleSidebar();
   if (url !== '/') window.location.href = url;
 }
 function toggleAttach() {
@@ -3380,7 +3547,8 @@ var memCache=[];var memCurrentTab='all';
 async function openMemPanel(){
   document.getElementById('memPanel').classList.add('open');
   document.getElementById('memOverlay').classList.add('open');
-  toggleSidebar();
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open')) toggleSidebar();
   memCurrentTab='all';
   document.querySelectorAll('.mem-tab').forEach(function(t){t.classList.remove('active')});
   document.getElementById('memTabAll').classList.add('active');
@@ -3480,6 +3648,63 @@ async function saveMemory(){
   btn.disabled=false;btn.textContent='保存';
 }
 
+function switchTab(tab) {
+  var hv = document.getElementById('homeView');
+  var cv = document.querySelector('.main');
+  var dv = document.getElementById('dashView');
+  var tabs = document.querySelectorAll('.tab-item');
+  hv.style.display = 'none';
+  cv.style.display = 'none';
+  dv.style.display = 'none';
+  tabs.forEach(function(t){ t.classList.remove('active'); });
+  if (tab === 'home') {
+    hv.style.display = 'flex';
+    tabs[0].classList.add('active');
+    loadHomeData();
+  } else if (tab === 'chat') {
+    cv.style.display = 'flex';
+    tabs[1].classList.add('active');
+    scrollBottom();
+  } else {
+    dv.style.display = 'flex';
+    tabs[2].classList.add('active');
+    var dd = document.getElementById('dashDays');
+    if (dd) dd.textContent = '在一起 ' + days + ' 天';
+    var keD = localStorage.getItem('avatar_ke');
+    var yaoD = localStorage.getItem('avatar_yao');
+    var dAK = document.getElementById('dashAvaKe');
+    var dAY = document.getElementById('dashAvaYao');
+    if (keD && dAK) dAK.innerHTML = '<img src="' + keD + '" style="width:100%;height:100%;object-fit:cover">';
+    if (yaoD && dAY) dAY.innerHTML = '<img src="' + yaoD + '" style="width:100%;height:100%;object-fit:cover">';
+  }
+}
+function loadHomeData() {
+  var h = new Date(Date.now() + 8*3600000).getUTCHours();
+  var g = h < 6 ? '夜深了' : h < 11 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
+  var ge = document.getElementById('homeGreeting');
+  if (ge) ge.textContent = g + '，瑶瑶';
+  var now2 = new Date(Date.now() + 8*3600000);
+  var wd = ['周日','周一','周二','周三','周四','周五','周六'];
+  var de = document.getElementById('homeDate');
+  if (de) de.textContent = (now2.getUTCMonth()+1) + '月' + now2.getUTCDate() + '日 ' + wd[now2.getUTCDay()];
+  var keD = localStorage.getItem('avatar_ke');
+  var ha = document.getElementById('homeAva');
+  if (keD && ha) ha.innerHTML = '<img src="' + keD + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+  fetch('/auto/state').then(function(r){return r.json()}).then(function(s) {
+    var mood = s.mood || '平静';
+    var st = document.getElementById('homeState');
+    if (st) st.textContent = mood;
+  }).catch(function(){});
+  fetch('/thoughts/list').then(function(r){return r.json()}).then(function(d) {
+    var items = d.thoughts || d.items || [];
+    if (items.length > 0) {
+      var last = items[items.length - 1];
+      var t = last.text || last.content || '';
+      var ht = document.getElementById('homeThought');
+      if (ht && t) ht.textContent = t.length > 120 ? t.slice(0, 120) + '...' : t;
+    }
+  }).catch(function(){});
+}
 loadHistory();
 </script>
 </body>
