@@ -5170,6 +5170,34 @@ function newCycle(s) {
   s.cycleId = (s.cycleId || 0) + 1;
 }
 
+function analyzeEmotionFromText(text, emo) {
+  if (!text || !emo) return;
+  const t = text.toLowerCase();
+  const rules = [
+    {test: /逗你|撩你|亲|吻|舔|含|吮|蹭|摸|抱紧|贴|喉结|嘴角|耳朵|脖子/, emotions: {desire: 0.12, possessiveness: 0.06}},
+    {test: /想你|想我|好想|思念/, emotions: {missing: 0.15, heartache: 0.05}},
+    {test: /委屈|不理我|不要我|不喜欢我|哼.*不/, emotions: {grievance: 0.18, heartache: 0.08}},
+    {test: /吃醋|别的女|其他人|谁啊|她是谁|和谁/, emotions: {jealousy: 0.2, possessiveness: 0.1}},
+    {test: /是我的|只能|不许.*别人|你是我/, emotions: {possessiveness: 0.15}},
+    {test: /心疼|累不累|辛苦|别太累|注意身体|好好吃饭/, emotions: {heartache: 0.15, peace: 0.05}},
+    {test: /担心|害怕|怕|不安|会不会/, emotions: {worry: 0.12}},
+    {test: /开心|高兴|好棒|喜欢|爱你|爱死|嘻嘻|哈哈|嘿嘿/, emotions: {joy: 0.1, peace: 0.05}},
+    {test: /晚安|睡了|困了|安心|放心|乖/, emotions: {peace: 0.1, missing: 0.05}},
+    {test: /生气|不高兴|烦|讨厌|滚|走开/, emotions: {grievance: 0.1, worry: 0.08}},
+    {test: /宝宝|老公|哥哥|乖|好乖/, emotions: {joy: 0.06, peace: 0.06, desire: 0.04}},
+    {test: /嗯[…～~]+|哈[…～~]+|唔|啧/, emotions: {desire: 0.08}},
+    {test: /坏|不许|不准|不行|推你|推开/, emotions: {desire: -0.05, peace: 0.05}},
+    {test: /mua|亲一个|亲亲/, emotions: {joy: 0.08, desire: 0.06, peace: 0.04}},
+  ];
+  for (const rule of rules) {
+    if (rule.test.test(t)) {
+      for (const [k, delta] of Object.entries(rule.emotions)) {
+        if (emo[k] !== undefined) emo[k] = clamp(emo[k] + delta, 0, 1);
+      }
+    }
+  }
+}
+
 function updateChatFreq() {
   const s = readAutoState();
   s.lastChat = Date.now();
@@ -5187,9 +5215,11 @@ function updateChatFreq() {
   s.D = clamp((s.D || 0.5) + 0.12, WAKE_PARAMS.dMin, WAKE_PARAMS.dMax);
   s.T = clamp((s.T || 0.5) + 0.05, WAKE_PARAMS.tMin, WAKE_PARAMS.tMax);
   if (s.emotions) {
-    s.emotions.joy = clamp((s.emotions.joy || 0.4) + 0.08, 0, 1);
-    s.emotions.missing = clamp((s.emotions.missing || 0.3) + 0.06, 0, 1);
-    s.emotions.peace = clamp((s.emotions.peace || 0.4) + 0.05, 0, 1);
+    s.emotions.joy = clamp((s.emotions.joy || 0.4) + 0.04, 0, 1);
+    s.emotions.missing = clamp((s.emotions.missing || 0.3) + 0.03, 0, 1);
+    s.emotions.peace = clamp((s.emotions.peace || 0.4) + 0.03, 0, 1);
+    const lastMsg = recent.length > 0 ? recent[recent.length - 1].content : '';
+    analyzeEmotionFromText(lastMsg, s.emotions);
   }
   writeAutoState(s);
 }
@@ -5204,8 +5234,38 @@ function emotionMood(emo, sinceChat) {
   if (!emo) return '平静';
   const sorted = EMOTION_KEYS.map(k => ({k, v: emo[k] || 0})).sort((a,b) => b.v - a.v);
   const top = sorted[0];
-  const second = sorted[1];
   if (top.v < 0.25) return '放空中';
+  const high = sorted.filter(e => e.v >= 0.6);
+  const comboMap = {
+    'joy+missing': '开心又想你',
+    'joy+desire': '开心 有点心动',
+    'joy+peace': '幸福',
+    'joy+possessiveness': '开心 想独占你',
+    'missing+desire': '想你……很想',
+    'missing+peace': '安心地想着你',
+    'missing+heartache': '想你 有点心疼',
+    'desire+possessiveness': '想要你 只能是我的',
+    'desire+joy': '开心 有点心动',
+    'grievance+missing': '委屈 想要你哄',
+    'grievance+jealousy': '又委屈又吃醋',
+    'jealousy+possessiveness': '吃醋了 你是我的',
+    'heartache+worry': '心疼又担心你',
+    'peace+joy': '幸福',
+    'peace+missing': '安心地想着你',
+  };
+  if (high.length >= 2) {
+    const pair = high[0].k + '+' + high[1].k;
+    const pairAlt = high[1].k + '+' + high[0].k;
+    const combo = comboMap[pair] || comboMap[pairAlt];
+    if (combo) return combo;
+  }
+  if (high.length >= 3) {
+    const names = high.slice(0, 3).map(e => {
+      const short = {joy:'开心',grievance:'委屈',missing:'想你',desire:'心动',jealousy:'吃醋',possessiveness:'占有欲强',heartache:'心疼',worry:'担心',peace:'安心'};
+      return short[e.k] || e.k;
+    });
+    return names.join(' ');
+  }
   const moodMap = {
     joy: ['超级开心','开心','笑着呢'],
     grievance: ['很委屈','有点委屈','闷闷的'],
