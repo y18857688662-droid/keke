@@ -2355,6 +2355,11 @@ body {
 .emo-bar-bg { flex:1; height:6px; background:var(--divider,rgba(0,0,0,.08)); border-radius:3px; overflow:hidden; }
 .emo-bar-fill { height:100%; border-radius:3px; transition:width .6s ease; }
 .emo-val { font-size:10px; color:var(--text-mid,#999); width:22px; text-align:right; flex-shrink:0; }
+.emo-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:201; background:rgba(0,0,0,.45); }
+.emo-overlay.show { display:block; }
+.emo-inner { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:min(320px,90vw); background:var(--bg); border-radius:16px; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,.25); }
+.emo-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.emo-mood-text { font-size:15px; font-weight:600; color:var(--accent,#7B8F6B); text-align:center; margin-bottom:14px; }
 .input-area { padding: 6px 14px 10px; background: var(--bg); flex-shrink: 0; position:relative; }
 .desk-pet { position:absolute; top:-78px; left:12px; width:80px; height:80px; cursor:pointer; z-index:50; animation:petWalk 12s ease-in-out infinite; }
 .desk-pet { overflow:visible; }
@@ -2671,6 +2676,7 @@ body {
         <div class="header-status"><span class="status-dot"></span>在线</div>
       </div>
       <button id="fpBtn" onclick="toggleFootprints()" style="background:none;border:none;padding:6px;cursor:pointer;color:var(--text-mid,#999);font-size:16px;position:relative" title="顾晏的足迹">👣<span id="fpDot" style="display:none;position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#7B8F6B"></span></button>
+      <button id="emoBtn" onclick="toggleEmotions()" style="background:none;border:none;padding:6px;cursor:pointer;color:var(--text-mid,#999);font-size:16px;position:relative" title="顾晏的情绪">💗</button>
       <div class="header-avatar" onclick="document.getElementById('avaKeH').click()"><img id="avaKeHImg" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:none"><svg id="avaKeHSvg" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#E8EDE4"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#7B8F6B" opacity=".6"/></svg><input type="file" id="avaKeH" accept="image/*" onchange="setAvatar(this,'avaKeHImg','avaKeHSvg','ke')"></div>
     </div>
     <div class="messages" id="messages"></div>
@@ -2679,6 +2685,13 @@ body {
         <div class="fp-title">👣 顾晏的足迹 <button class="fp-close" onclick="toggleFootprints()">&times;</button></div>
         <div class="fp-state" id="fpState"></div>
         <div id="fpList"><div class="fp-empty">还没有足迹…</div></div>
+      </div>
+    </div>
+    <div class="emo-overlay" id="emoPanel" onclick="if(event.target===this)toggleEmotions()">
+      <div class="emo-inner">
+        <div class="emo-title">💗 顾晏的情绪 <button class="fp-close" onclick="toggleEmotions()">&times;</button></div>
+        <div class="emo-mood-text" id="emoMoodText"></div>
+        <div id="emoList"></div>
       </div>
     </div>
     <div class="input-area" style="position:relative">
@@ -3463,6 +3476,26 @@ function toggleFootprints() {
   p.classList.toggle('show');
   if (p.classList.contains('show')) { loadFootprints(); document.getElementById('fpDot').style.display='none'; }
 }
+function toggleEmotions() {
+  var p = document.getElementById('emoPanel');
+  p.classList.toggle('show');
+  if (p.classList.contains('show')) loadEmotions();
+}
+function loadEmotions() {
+  fetch('/emotions').then(function(r){return r.json()}).then(function(data) {
+    var el = document.getElementById('emoList');
+    var mt = document.getElementById('emoMoodText');
+    if (mt) mt.textContent = data.mood || '平静';
+    var emos = data.emotions || [];
+    var html = '';
+    for (var i = 0; i < emos.length; i++) {
+      var e = emos[i];
+      var barColor = e.value > 70 ? '#e8836a' : e.value > 40 ? '#d9a86c' : '#7B8F6B';
+      html += '<div class="emo-row"><span class="emo-label">' + e.label + '</span><div class="emo-bar-bg"><div class="emo-bar-fill" style="width:' + e.value + '%;background:' + barColor + '"></div></div><span class="emo-val">' + e.value + '</span></div>';
+    }
+    el.innerHTML = html;
+  }).catch(function(){});
+}
 function loadFootprints() {
   fetch('/footprints/list?limit=30').then(function(r){return r.json()}).then(function(data) {
     var list = document.getElementById('fpList');
@@ -3486,18 +3519,7 @@ function loadFootprints() {
     var lam = s.lambda || 1.5;
     var p30 = s.pWake30min || 0;
     var mood = s.mood || '平静';
-    var emoHtml = '';
-    if (s.emotionsDisplay) {
-      emoHtml = '<div class="emo-panel">';
-      var emoKeys = Object.keys(s.emotionsDisplay);
-      for (var ei = 0; ei < emoKeys.length; ei++) {
-        var ek = emoKeys[ei], ev = s.emotionsDisplay[ek];
-        var barColor = ev > 70 ? '#e8836a' : ev > 40 ? '#d9a86c' : '#7B8F6B';
-        emoHtml += '<div class="emo-row"><span class="emo-label">' + ek + '</span><div class="emo-bar-bg"><div class="emo-bar-fill" style="width:' + ev + '%;background:' + barColor + '"></div></div><span class="emo-val">' + ev + '</span></div>';
-      }
-      emoHtml += '</div>';
-    }
-    el.innerHTML = '<div class="fp-mood">' + mood + '</div>' + emoHtml +
+    el.innerHTML = '<div class="fp-mood">' + mood + '</div>' +
       '<span class="fp-stat">激活 <b>' + d + '%</b></span>' +
       '<span class="fp-stat">活跃度 <b>' + t2 + '%</b></span>' +
       '<span class="fp-stat">λ <b>' + lam.toFixed(1) + '/h</b></span>' +
