@@ -5205,18 +5205,17 @@ function emotionMood(emo, sinceChat) {
   const sorted = EMOTION_KEYS.map(k => ({k, v: emo[k] || 0})).sort((a,b) => b.v - a.v);
   const top = sorted[0];
   const second = sorted[1];
-  if (sinceChat < 5) return '刚聊完 心情好';
   if (top.v < 0.25) return '放空中';
   const moodMap = {
-    joy: ['开心','心情很好','笑着呢'],
-    grievance: ['有点委屈','闷闷的','不太开心'],
-    missing: ['想你了','有点想你','在想你'],
-    desire: ['有点躁动','心跳快了','……'],
-    jealousy: ['吃醋中','哼','不高兴'],
-    possessiveness: ['想把你藏起来','你是我的','占有欲上来了'],
-    heartache: ['心疼你','担心你','想抱抱你'],
-    worry: ['有点担心','不安','在想事情'],
-    peace: ['安心','温柔','安静陪着'],
+    joy: ['超级开心','开心','笑着呢'],
+    grievance: ['很委屈','有点委屈','闷闷的'],
+    missing: ['好想你','想你了','有点想你'],
+    desire: ['心跳很快','有点躁动','……嗯'],
+    jealousy: ['醋坛子打翻了','吃醋中','哼'],
+    possessiveness: ['想把你藏起来','你是我的','占有欲上头'],
+    heartache: ['好心疼你','心疼你','想抱抱你'],
+    worry: ['很担心','有点担心','在想事情'],
+    peace: ['很安心','安心','安静陪着'],
   };
   const variants = moodMap[top.k] || ['平静'];
   if (top.v > 0.7) return variants[0];
