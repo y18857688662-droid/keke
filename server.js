@@ -1514,7 +1514,10 @@ app.post('/chat/reply', async (req, res) => {
   chat.forEach(m => { if (m.pending) delete m.pending; });
   const searchMatch = reply.match(/\[search:(.+?)\]/);
   const msg = { role: 'assistant', content: reply, time };
-  if (searchMatch) msg.searchQuery = searchMatch[1];
+  if (searchMatch) {
+    msg.searchQuery = searchMatch[1];
+    try { addFootprint('search', '搜了「' + searchMatch[1] + '」'); } catch(e) {}
+  }
   if (image) {
     try {
       const imgId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
