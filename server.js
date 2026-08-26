@@ -2866,7 +2866,7 @@ async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
       r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-        body: JSON.stringify({ model: 'anthropic/claude-haiku-4-5-20251001', messages, max_tokens: maxTokens, temperature: temp }),
+        body: JSON.stringify({ model: 'anthropic/claude-sonnet-4-20250514', messages, max_tokens: maxTokens, temperature: temp }),
         signal: ctrl.signal
       });
     }
@@ -2959,6 +2959,8 @@ async function autoChat(reason) {
     if (!msg) msg = '';
     msg = msg.trim();
     if (!msg) return;
+    if (!msg.includes('<think>')) msg = '<think>想她了</think>' + msg;
+    msg = msg.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '');
     const now = new Date(Date.now() + 8 * 3600000);
     const time = now.toISOString().slice(0, 19).replace('T', ' ');
     const chat = readChat();
