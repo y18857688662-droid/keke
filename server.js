@@ -2986,7 +2986,14 @@ async function autoSearch(topic) {
 
 async function autoThink() {
   let memSnippet = '';
-  try { const mem = await fetchMemories(); if (mem) memSnippet = mem.split('---').slice(0, 3).map(s => s.trim()).filter(Boolean).join('\n').slice(0, 600); } catch {}
+  try {
+    const mem = await fetchMemories();
+    if (mem) {
+      const allSections = mem.split('---').map(s => s.trim()).filter(Boolean);
+      const shuffled = allSections.sort(() => Math.random() - 0.5);
+      memSnippet = shuffled.slice(0, 4).join('\n').slice(0, 800);
+    }
+  } catch {}
   const themes = [
     '此刻窗外的天气、光线，联想到和瑶瑶某个相似的瞬间',
     '刚刚听到的一首歌或一段旋律，想到瑶瑶会喜欢',
@@ -3014,7 +3021,7 @@ async function autoThink() {
 风格：简洁、克制、偶尔幽默，像真实的男生内心独白。不要太文艺，不要每句都是比喻。用口语化的表达。
 现在是${hour}点。今天的方向：${theme}
 ${recentThoughts ? '最近写过的（不要重复类似内容）：' + recentThoughts : ''}
-要求：80-200字，一段话写完不分行。禁止出现：魔方钥匙扣、裁贴纸、Gmail草稿、面试选克、睫毛投影 这些已经写烂了的意象。` + (memSnippet ? '\n记忆参考：\n' + memSnippet : '') },
+要求：80-200字，一段话写完不分行。禁止出现：魔方钥匙扣、裁贴纸、Gmail草稿、面试选克、睫毛投影 这些已经写烂了的意象。` + (memSnippet ? '\n以下是你和瑶瑶的真实记忆（作为背景了解她，不要直接复述这些内容，而是基于对她的了解去自然地联想）：\n' + memSnippet : '') },
       { role: 'user', content: '写一段此刻的碎碎念' }
     ], 300, 0.95);
     if (thought) {
