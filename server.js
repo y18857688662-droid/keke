@@ -387,6 +387,10 @@ app.get('/apps/screentime', (req, res) => {
   const date = req.query.date || today;
   const records = readScreentime();
   const entry = records.find(r => r.date === date);
+  if (req.query.check === 'true' && entry) {
+    const topApps = entry.apps.slice().sort((a, b) => b.minutes - a.minutes).slice(0, 3).map(a => a.name + ' ' + a.minutes + '分钟').join('、');
+    addFootprint('screentime_check', '顾晏查看了你的屏幕使用时间', '总计' + entry.total_minutes + '分钟 · ' + topApps);
+  }
   if (!entry) return res.json({ date, found: false, total_minutes: 0, apps: [] });
   res.json({ date, found: true, ...entry });
 });
