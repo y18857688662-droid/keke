@@ -3080,6 +3080,8 @@ function startWakeEngine() {
       const now = bjNow();
       const hour = now.getUTCHours();
       if (hour >= 1 && hour < 8) { writeAutoState(s); return; }
+      const sinceChat = s.lastChat ? (Date.now() - s.lastChat) / 60000 : 999;
+      if (sinceChat < 15) { writeAutoState(s); return; }
       const lambda = computeLambda(s);
       const deltaH = lambda * (TICK_SEC / 3600);
       s.H += deltaH;
