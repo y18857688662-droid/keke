@@ -272,16 +272,6 @@ function trackAppSwitch(appName) {
       track.daily[prevDate][prev.app] = (track.daily[prevDate][prev.app] || 0) + minutes;
     }
   }
-  // add footprint for significant usage
-  if (track.sessions._current && track.sessions._current.app !== appName) {
-    const prev = track.sessions._current;
-    const prevMin = Math.round((nowMs - prev.start) / 60000);
-    if (prevMin >= 5) {
-      const prevDate = new Date(prev.start + 8 * 3600000).toISOString().slice(0, 10);
-      const totalForApp = (track.daily[prevDate] || {})[prev.app] || 0;
-      addFootprint('screentime', '用了' + prevMin + '分钟' + prev.app, '今日累计' + totalForApp + '分钟');
-    }
-  }
   track.sessions._current = { app: appName, start: nowMs };
   // sync to screentime
   const apps = Object.entries(track.daily[date] || {}).map(([name, min]) => ({ name, minutes: min }));
