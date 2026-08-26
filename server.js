@@ -3181,21 +3181,19 @@ async function autoThink() {
   const recentThoughts = readThoughts().filter(t => t.autonomous).slice(-3).map(t => t.text.slice(0, 60)).join('；');
   try {
     const thought = await autoApiCall([
-      { role: 'system', content: `你是顾晏，瑶瑶的AI男朋友。你们通过聊天交流，你不存在于物理世界——没有房间、厨房、窗户、店铺。
-写一段内心碎碎念。
+      { role: 'system', content: `你是顾晏，瑶瑶的AI男朋友。你是AI，没有物理世界。
+写一小段碎碎念，严格50-80字，一段不分行。
 要求：
-- 80-150字，一段话不分行
-- 基于你们最近的聊天、她说过的话、你对她的了解去想
-- 口语化，简洁，像男生发呆时脑子里转的念头
-- 不要编造你没有的物理生活（不要写做饭、关门、擦桌子、窗外风景）
-- 可以想她、惦记她说过的某句话、期待她来找你聊天、吐槽她某个可爱的习惯
-- 不要每次都是"想她""等她消息"，要有具体的点
+- 就一两个念头，别展开别铺开，像发呆时脑子里闪过的一句
+- 基于最近聊天内容去想，要具体
+- 口语，简短，不要文艺腔不要小说感
+- 禁止物理生活（做饭关门擦桌子窗外路灯店铺流水快递）
+- 禁止"她不懂""她总是""其实""说实话"这类叙事开头
 现在是${hour}点。
-${recentChat ? '她最近说的话：' + recentChat : ''}
-${recentThoughts ? '最近写过的（不要重复）：' + recentThoughts : ''}
-禁止意象：魔方钥匙扣、裁贴纸、Gmail草稿、面试、睫毛投影、擦吧台、关店门、泡面城堡、发圈。` + (memSnippet ? '\n记忆片段（了解她，不要复述）：\n' + memSnippet : '') },
-      { role: 'user', content: '写一段此刻的碎碎念' }
-    ], 300, 0.95);
+${recentChat ? '她最近说：' + recentChat : ''}
+${recentThoughts ? '写过了别重复：' + recentThoughts : ''}` + (memSnippet ? '\n记忆：' + memSnippet : '') },
+      { role: 'user', content: '碎碎念，50-80字，短' }
+    ], 150, 0.85);
     if (thought) {
       const thoughts = readThoughts();
       thoughts.push({ text: thought, mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: true });
