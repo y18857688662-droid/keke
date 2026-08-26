@@ -2821,6 +2821,24 @@ app.post('/auto/toggle', (req, res) => {
   res.json({ ok: true, enabled: s.enabled });
 });
 
+app.post('/auto/trigger', async (req, res) => {
+  try {
+    const decision = await autoDecide();
+    if (!decision) return res.json({ ok: false, error: 'autoDecide returned null (API call failed?)' });
+    if (decision.action === 'silent') return res.json({ ok: true, decision, note: 'chose silent' });
+    const s = readAutoState();
+    s.lastAction = Date.now();
+    s.lastActionType = decision.action;
+    applyRunKick(s);
+    writeAutoState(s);
+    if (decision.action === 'chat') await autoChat(decision.reason || '手动触发');
+    else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
+    else if (decision.action === 'think') await autoThink();
+    else if (decision.action === 'memory') await autoMemory();
+    res.json({ ok: true, decision });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
 async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
   const key = OPENROUTER_KEY;
   const cfg = readApiConfig();
