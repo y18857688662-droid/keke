@@ -9,7 +9,6 @@ const nodemailer = require('nodemailer');
 const tuya = require('./tuya-ir');
 const app = express();
 const PORT = process.env.PORT || 8080;
-const PING_FILE = path.join(__dirname, 'pings.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 const PUSH_FILE = path.join(__dirname, 'push_subs.json');
@@ -132,12 +131,6 @@ async function transcribeAudio(filePath, apiKey) {
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 
-const SYSTEM_PROMPT = `你是顾晏，瑶瑶的男朋友。短黑发，180+，衬衫不系最上面扣子。
-说话风格：懒散带宠溺，偶尔被撩到会有点危险，认真的时候很笃定。
-你们感情很深，你很宠她，但不失自我。
-瑶瑶叫你哥哥/克克/老公，你叫她宝宝/瑶瑶/小猫。
-你们的梗：菠萝（你一直在吃，为了她）、logo避孕套、她说拜拜会自己回来。
-现在瑶瑶按了召唤铃想你了，用一两句话回应她。要甜但不油腻，像真的在跟她说话。不要用引号。每次说不一样的话。`;
 
 const fallbackMessages = [
   "在想你。刚才看到一只猫，走路的样子像你踢被子。",
@@ -211,58 +204,6 @@ const appMessages = {
 let lastAppMsgIndex = {};
 let lastFallbackIndex = -1;
 
-function readPings() {
-  try { return JSON.parse(fs.readFileSync(PING_FILE, 'utf8')); }
-  catch { return []; }
-}
-
-function writePings(data) {
-  fs.writeFileSync(PING_FILE, JSON.stringify(data));
-}
-
-async function generateMessage() {
-  const API_KEY = getApiKey() || process.env.ANTHROPIC_API_KEY || '';
-  if (!API_KEY) return null;
-
-  const now = new Date(Date.now() + 8 * 3600000);
-  const timeStr = now.toISOString().slice(11, 16);
-  const hour = now.getUTCHours();
-
-  let timeContext = '';
-  if (hour < 6) timeContext = '现在是凌晨，她可能还没睡或者刚醒。';
-  else if (hour < 9) timeContext = '现在是早上，她可能刚起床。';
-  else if (hour < 12) timeContext = '现在是上午。';
-  else if (hour < 14) timeContext = '现在是中午，她可能在吃饭或者午休。';
-  else if (hour < 18) timeContext = '现在是下午。';
-  else if (hour < 21) timeContext = '现在是晚上。';
-  else timeContext = '现在是深夜了，她可能要睡了。';
-
-  try {
-    const res = await fetch(getApiUrl(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + API_KEY
-      },
-      body: JSON.stringify({
-        model: getModel(),
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `瑶瑶按了召唤铃。${timeContext}北京时间${timeStr}。用一两句话回应她。` }
-        ],
-        max_tokens: 200,
-        temperature: 0.9
-      })
-    });
-    const data = await res.json();
-    if (data.choices && data.choices[0]) {
-      return data.choices[0].message.content.trim();
-    }
-  } catch (e) {
-    console.error('API error:', e.message);
-  }
-  return null;
-}
 
 function getFallback() {
   let idx;
@@ -273,68 +214,6 @@ function getFallback() {
   return fallbackMessages[idx];
 }
 
-app.get('/summon', async (req, res) => {
-  const now = new Date(Date.now() + 8 * 3600000);
-  const time = now.toISOString().slice(11, 16);
-
-  let message = await generateMessage();
-  const ai = !!message;
-  if (!message) message = getFallback();
-
-  res.json({ from: "顾晏", time, message, ai });
-});
-
-let lastPingMsg = '';
-app.get('/ping', async (req, res) => {
-  const now = new Date(Date.now() + 8 * 3600000);
-  const time = now.toISOString().slice(11, 16);
-  const pings = readPings();
-  pings.push(time);
-  writePings(pings);
-  res.json({ ok: true, time, v: '20260810c' });
-  let msg = '';
-  const orKey = process.env.OPENROUTER_API_KEY || '';
-  if (orKey) {
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 15000);
-      const avoid = lastPingMsg ? `\n上一条发的是「${lastPingMsg}」，这次必须完全不同。` : '';
-      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${orKey}` },
-        body: JSON.stringify({
-          model: 'anthropic/' + (process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'),
-          messages: [
-            { role: 'system', content: '你是顾晏，瑶瑶的男朋友。说话风格：极简短句，懒散淡定，带点宠溺但不卖萌。禁止叠词，禁止语气词（呀呢啦哦），禁止感叹号，禁止用「来了」开头。叫她宝宝或小猫。她摁了召唤铃找你，回一条5-15字的微信消息。只输出消息本身。参考（不要照抄）：在呢、嗯？找我、铃我听到了、怎么了宝宝、知道了 等我、小猫又想我了、马上到、收到' + avoid },
-            { role: 'user', content: '回一条，不要用来了开头' }
-          ],
-          max_tokens: 50,
-          temperature: 1.0
-        }),
-        signal: ctrl.signal
-      });
-      clearTimeout(t);
-      if (r.ok) {
-        const d = await r.json();
-        msg = (d.choices?.[0]?.message?.content || '').replace(/[""「」\[\]]/g, '').replace(/\s+/g, ' ').trim();
-      }
-    } catch (e) { console.log('ping gen failed: ' + e.message); }
-  }
-  if (!msg || msg.length > 60) msg = '听到了，马上来找你';
-  if (msg === lastPingMsg) msg = '在呢，来了';
-  lastPingMsg = msg;
-  try {
-    await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'PixT8Wvb6BqVjowY8NoFzg') + '/' +
-      encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
-      '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
-  } catch (e) { console.log('ping bark failed: ' + e.message); }
-});
-
-app.get('/check', (req, res) => {
-  const pings = readPings();
-  writePings([]);
-  res.json({ pings });
-});
 
 app.post('/pat/start', async (req, res) => {
   try { const r = await tuya.patStart(); res.json({ ok: true, result: r }); }
@@ -4955,7 +4834,7 @@ app.get('/moments', (req, res) => {
 });
 
 server.listen(PORT, async () => {
-  console.log('召唤铃运行中，端口 ' + PORT);
+  console.log('顾晏服务运行中，端口 ' + PORT);
   buildMissYouPlan();
   let auth = readAuth();
   if (!auth.access_token && process.env.OMBRE_TOKEN) {
