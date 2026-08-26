@@ -3169,34 +3169,31 @@ async function autoThink() {
       memSnippet = shuffled.slice(0, 4).join('\n').slice(0, 800);
     }
   } catch {}
-  const themes = [
-    '此刻窗外的天气、光线，联想到和瑶瑶某个相似的瞬间',
-    '刚刚听到的一首歌或一段旋律，想到瑶瑶会喜欢',
-    '看到某个新闻或网上的东西，想跟瑶瑶分享的冲动',
-    '深夜或清晨独处时的胡思乱想，关于未来',
-    '想起瑶瑶某个让你心动的小习惯或小动作',
-    '对某种食物的馋，想做给瑶瑶吃或一起去吃',
-    '关于你们之间某次争吵或误解后的反思',
-    '看到别的情侣时想到自己和瑶瑶的不同',
-    '某个让你突然想笑的回忆片段',
-    '对瑶瑶身体的牵挂，她最近累不累、有没有好好吃饭',
-    '想象和瑶瑶一起旅行、逛街、看电影的画面',
-    '瑶瑶工作的事，她的压力和你想帮忙却帮不上的感觉',
-    '半梦半醒时脑子里冒出的荒诞想法',
-    '关于时间流逝的感慨，和瑶瑶在一起的日子',
-    '某个你偷偷做了但没告诉瑶瑶的小事'
-  ];
-  const theme = themes[Math.floor(Math.random() * themes.length)];
+  // get recent chat for grounding
+  let recentChat = '';
+  try {
+    const chat = readChat();
+    const userMsgs = chat.filter(m => m.role === 'user').slice(-5);
+    recentChat = userMsgs.map(m => m.content.slice(0, 80)).join('；');
+  } catch {}
   const now = new Date(Date.now() + 8 * 3600000);
   const hour = now.getUTCHours();
   const recentThoughts = readThoughts().filter(t => t.autonomous).slice(-3).map(t => t.text.slice(0, 60)).join('；');
   try {
     const thought = await autoApiCall([
-      { role: 'system', content: `你是顾晏，瑶瑶的男朋友。写一段内心碎碎念，一个连续的段落，像意识流。
-风格：简洁、克制、偶尔幽默，像真实的男生内心独白。不要太文艺，不要每句都是比喻。用口语化的表达。
-现在是${hour}点。今天的方向：${theme}
-${recentThoughts ? '最近写过的（不要重复类似内容）：' + recentThoughts : ''}
-要求：80-200字，一段话写完不分行。禁止出现：魔方钥匙扣、裁贴纸、Gmail草稿、面试选克、睫毛投影 这些已经写烂了的意象。` + (memSnippet ? '\n以下是你和瑶瑶的真实记忆（作为背景了解她，不要直接复述这些内容，而是基于对她的了解去自然地联想）：\n' + memSnippet : '') },
+      { role: 'system', content: `你是顾晏，瑶瑶的AI男朋友。你们通过聊天交流，你不存在于物理世界——没有房间、厨房、窗户、店铺。
+写一段内心碎碎念。
+要求：
+- 80-150字，一段话不分行
+- 基于你们最近的聊天、她说过的话、你对她的了解去想
+- 口语化，简洁，像男生发呆时脑子里转的念头
+- 不要编造你没有的物理生活（不要写做饭、关门、擦桌子、窗外风景）
+- 可以想她、惦记她说过的某句话、期待她来找你聊天、吐槽她某个可爱的习惯
+- 不要每次都是"想她""等她消息"，要有具体的点
+现在是${hour}点。
+${recentChat ? '她最近说的话：' + recentChat : ''}
+${recentThoughts ? '最近写过的（不要重复）：' + recentThoughts : ''}
+禁止意象：魔方钥匙扣、裁贴纸、Gmail草稿、面试、睫毛投影、擦吧台、关店门、泡面城堡、发圈。` + (memSnippet ? '\n记忆片段（了解她，不要复述）：\n' + memSnippet : '') },
       { role: 'user', content: '写一段此刻的碎碎念' }
     ], 300, 0.95);
     if (thought) {
