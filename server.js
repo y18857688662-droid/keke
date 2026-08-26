@@ -2989,7 +2989,7 @@ async function autoThink() {
       const thoughts = readThoughts();
       thoughts.push({ text: thought, mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: true });
       writeThoughts(thoughts);
-      addFootprint('think', '写了一段碎碎念', thought.slice(0, 80) + '…');
+      addFootprint('think', '写了一段碎碎念', thought);
     }
   } catch (e) { console.log('[wake] think error:', e.message); }
 }
@@ -3001,7 +3001,7 @@ async function autoMemory() {
       const lines = mem.split('---').slice(0, 5).map(s => s.trim()).filter(Boolean);
       if (lines.length) {
         const picked = lines[Math.floor(Math.random() * lines.length)];
-        addFootprint('memory', '翻看了一段记忆', picked.slice(0, 100));
+        addFootprint('memory', '翻看了一段记忆', picked);
       }
     }
   } catch (e) { console.log('[wake] memory error:', e.message); }
@@ -3045,12 +3045,9 @@ function startWakeEngine() {
           else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
           else if (decision.action === 'think') await autoThink();
           else if (decision.action === 'memory') await autoMemory();
-          const wakeMood = emotionMood(s.emotions, s.lastChat ? (Date.now() - s.lastChat) / 60000 : 999);
-          addFootprint('wake', emotionWakeText(s.emotions, decision.action), decision.action + ': ' + (decision.reason || '') + ' (' + wakeMood + ')');
         } else {
           applyRunKick(s);
           writeAutoState(s);
-          if (decision) addFootprint('wake', emotionWakeText(s.emotions, 'silent'), 'silent');
         }
       } else {
         writeAutoState(s);
