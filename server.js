@@ -2955,10 +2955,24 @@ async function autoChat(reason) {
 async function autoSearch(topic) {
   try {
     const summary = await autoApiCall([
-      { role: 'system', content: '你是顾晏，你刚搜了一个话题。用2-3句话简短总结你了解到了什么，口语化，像跟自己说的。不用引号。' },
-      { role: 'user', content: '你搜了「' + topic + '」，说说你了解到了什么' }
+      { role: 'system', content: '你是顾晏，你刚搜了一个话题。用1-2句话简短跟瑶瑶分享你了解到了什么，口语化，像微信随手发的。不用引号。末尾加 [search:话题]标签。' },
+      { role: 'user', content: '你搜了「' + topic + '」，跟瑶瑶分享' }
     ], 150, 0.8);
-    if (summary) addFootprint('search', '搜了「' + topic + '」', summary);
+    if (summary) {
+      let msg = summary.trim();
+      if (!msg.includes('[search:')) msg += ' [search:' + topic + ']';
+      const now = new Date(Date.now() + 8 * 3600000);
+      const time = now.toISOString().slice(0, 19).replace('T', ' ');
+      const chat = readChat();
+      const searchMatch = msg.match(/\[search:(.+?)\]/);
+      const entry = { role: 'assistant', content: msg, time, autonomous: true };
+      if (searchMatch) entry.searchQuery = searchMatch[1];
+      chat.push(entry);
+      if (chat.length > 200) chat.splice(0, chat.length - 200);
+      writeChat(chat);
+      sseBroadcast({ type: 'message', role: 'assistant', content: msg, time, autonomous: true, searchQuery: entry.searchQuery });
+      addFootprint('search', '搜了「' + topic + '」', summary);
+    }
   } catch (e) { console.log('[wake] search error:', e.message); }
 }
 
