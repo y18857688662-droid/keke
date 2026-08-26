@@ -34,6 +34,7 @@ async function sendPushNotification(title, body) {
 }
 const APPS_FILE = path.join(__dirname, 'apps.json');
 const APP_NOTIFY_FILE = path.join(__dirname, 'app_notify.json');
+const SCREENTIME_FILE = path.join(__dirname, 'screentime.json');
 const AUTH_FILE = path.join(__dirname, 'ombre_auth.json');
 
 const OMBRE_URL = 'http://127.0.0.1:18001';
@@ -91,6 +92,14 @@ function readApps() {
 
 function writeApps(data) {
   fs.writeFileSync(APPS_FILE, JSON.stringify(data));
+}
+
+function readScreentime() {
+  try { return JSON.parse(fs.readFileSync(SCREENTIME_FILE, 'utf8')); }
+  catch { return []; }
+}
+function writeScreentime(data) {
+  fs.writeFileSync(SCREENTIME_FILE, JSON.stringify(data));
 }
 
 const API_CONFIG_FILE = path.join(__dirname, 'api_config.json');
@@ -307,6 +316,46 @@ app.get('/apps/data', (req, res) => {
 
 app.get('/apps', (req, res) => {
   res.sendFile(path.join(__dirname, 'apps.html'));
+});
+
+app.post('/apps/screentime', (req, res) => {
+  const { apps, total_minutes, date: reqDate } = req.body;
+  if (!apps || !Array.isArray(apps)) return res.json({ ok: false, error: 'apps array required' });
+  const now = new Date(Date.now() + 8 * 3600000);
+  const date = reqDate || now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 16);
+  const records = readScreentime();
+  const existing = records.findIndex(r => r.date === date);
+  const entry = { date, time, total_minutes: total_minutes || 0, apps, updated: now.toISOString() };
+  if (existing >= 0) records[existing] = entry;
+  else records.push(entry);
+  if (records.length > 90) records.splice(0, records.length - 90);
+  writeScreentime(records);
+  res.json({ ok: true, date, total_minutes: entry.total_minutes, app_count: apps.length });
+});
+
+app.get('/apps/screentime', (req, res) => {
+  const now = new Date(Date.now() + 8 * 3600000);
+  const today = now.toISOString().slice(0, 10);
+  const date = req.query.date || today;
+  const records = readScreentime();
+  const entry = records.find(r => r.date === date);
+  if (!entry) return res.json({ date, found: false, total_minutes: 0, apps: [] });
+  res.json({ date, found: true, ...entry });
+});
+
+app.get('/apps/screentime/week', (req, res) => {
+  const records = readScreentime();
+  const now = new Date(Date.now() + 8 * 3600000);
+  const week = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const ds = d.toISOString().slice(0, 10);
+    const entry = records.find(r => r.date === ds);
+    week.push({ date: ds, total_minutes: entry ? entry.total_minutes : 0, apps: entry ? entry.apps : [] });
+  }
+  res.json({ week });
 });
 
 // === 心情日记 ===

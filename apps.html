@@ -3,21 +3,34 @@
 <style>
 :root{--bg:#E8EDE4;--card:#FEFCF8;--text:#111111;--text-faint:#999999;--accent:#7B8F6B;--divider:#D6DDD2;
   --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
-  --shadow:0 2px 12px rgba(0,0,0,.04)}
+  --shadow:0 2px 12px rgba(0,0,0,.04);--warn:#D4855C}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(safe-area-inset-bottom);font-family:var(--font);-webkit-font-smoothing:antialiased}
 .header{display:flex;align-items:center;padding:16px 0;gap:12px}
 .header a{color:var(--text);text-decoration:none;font-size:20px}
 .header h1{font-size:18px;font-weight:600}
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{flex:1;text-align:center;padding:10px;border-radius:12px;background:var(--card);font-size:14px;font-weight:500;cursor:pointer;border:1px solid var(--divider)}
+.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .date-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px}
 .date-nav button{background:none;border:none;font-size:18px;color:var(--text);cursor:pointer;padding:4px 8px}
 .date-nav span{font-size:15px;color:var(--text);font-weight:500}
 .stats{background:var(--card);border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);text-align:center}
+.stats-row{display:flex;justify-content:center;gap:24px}
+.stats-item{text-align:center}
 .stats-num{font-size:32px;font-weight:700;color:var(--accent)}
+.stats-num.warn{color:var(--warn)}
 .stats-label{font-size:13px;color:var(--text-faint);margin-top:2px}
 .summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
 .app-tag{background:var(--card);border:1px solid var(--divider);border-radius:999px;padding:6px 14px;font-size:13px;display:flex;align-items:center;gap:6px}
-.app-tag .count{background:var(--accent);color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+.app-tag .count{background:var(--accent);color:#fff;border-radius:50%;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;padding:0 4px}
+.st-list{background:var(--card);border-radius:16px;padding:12px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
+.st-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--divider)}
+.st-item:last-child{border-bottom:none}
+.st-app{font-size:15px;font-weight:500}
+.st-time{font-size:14px;color:var(--accent);font-weight:600}
+.st-bar{height:4px;background:var(--divider);border-radius:2px;margin-top:4px}
+.st-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
 .timeline{position:relative;padding-left:20px}
 .timeline::before{content:'';position:absolute;left:6px;top:0;bottom:0;width:2px;background:var(--divider)}
 .tl-item{position:relative;margin-bottom:12px;padding-left:16px}
@@ -27,18 +40,40 @@ body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(
 .empty{text-align:center;color:var(--text-faint);padding:40px 0;font-size:14px}
 </style></head><body>
 <div class="header"><a href="/">‹</a><h1>使用记录</h1></div>
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('screentime')">屏幕时间</div>
+  <div class="tab" onclick="switchTab('records')">打开记录</div>
+</div>
 <div class="date-nav">
   <button onclick="changeDate(-1)">‹</button>
   <span id="dateLabel"></span>
   <button onclick="changeDate(1)">›</button>
 </div>
-<div class="stats"><div class="stats-num" id="totalNum">0</div><div class="stats-label">次使用</div></div>
-<div class="summary" id="summary"></div>
-<div class="timeline" id="timeline"></div>
+<div id="screentime-view">
+  <div class="stats">
+    <div class="stats-row">
+      <div class="stats-item"><div class="stats-num" id="stTotal">--</div><div class="stats-label">总屏幕时间</div></div>
+    </div>
+  </div>
+  <div class="st-list" id="stList"></div>
+</div>
+<div id="records-view" style="display:none">
+  <div class="stats"><div class="stats-num" id="totalNum">0</div><div class="stats-label">次使用</div></div>
+  <div class="summary" id="summary"></div>
+  <div class="timeline" id="timeline"></div>
+</div>
 <script>
 var now=new Date(Date.now()+8*3600000);
 var curDate=now.toISOString().slice(0,10);
 var today=curDate;
+var curTab='screentime';
+function switchTab(t){
+  curTab=t;
+  document.querySelectorAll('.tab').forEach(function(el,i){el.classList.toggle('active',i===(t==='screentime'?0:1))});
+  document.getElementById('screentime-view').style.display=t==='screentime'?'':'none';
+  document.getElementById('records-view').style.display=t==='records'?'':'none';
+  loadData();
+}
 function changeDate(d){
   var parts=curDate.split('-');
   var dt=new Date(parts[0],parts[1]-1,parseInt(parts[2])+d);
@@ -50,8 +85,33 @@ function formatDate(d){
   var parts=d.split('-');
   return parseInt(parts[1])+'月'+parseInt(parts[2])+'日';
 }
-async function loadData(){
-  document.getElementById('dateLabel').textContent=formatDate(curDate);
+function fmtMin(m){
+  if(m<60)return m+'分钟';
+  var h=Math.floor(m/60),r=m%60;
+  return r?h+'小时'+r+'分钟':h+'小时';
+}
+async function loadScreentime(){
+  try{
+    var r=await fetch('/apps/screentime?date='+curDate);
+    var d=await r.json();
+    if(!d.found){
+      document.getElementById('stTotal').textContent='--';
+      document.getElementById('stTotal').className='stats-num';
+      document.getElementById('stList').innerHTML='<div class="empty">暂无数据</div>';
+      return;
+    }
+    var totalEl=document.getElementById('stTotal');
+    totalEl.textContent=fmtMin(d.total_minutes);
+    totalEl.className='stats-num'+(d.total_minutes>480?' warn':'');
+    var apps=(d.apps||[]).slice().sort(function(a,b){return(b.minutes||0)-(a.minutes||0)});
+    var maxMin=apps.length?apps[0].minutes:1;
+    document.getElementById('stList').innerHTML=apps.map(function(a){
+      var pct=Math.round((a.minutes||0)/Math.max(maxMin,1)*100);
+      return '<div class="st-item"><div style="flex:1"><div class="st-app">'+a.name+'</div><div class="st-bar"><div class="st-bar-fill" style="width:'+pct+'%"></div></div></div><div class="st-time">'+fmtMin(a.minutes||0)+'</div></div>';
+    }).join('');
+  }catch(e){document.getElementById('stList').innerHTML='<div class="empty">加载失败</div>';}
+}
+async function loadRecords(){
   try{
     var r=await fetch('/apps/data?date='+curDate);
     var d=await r.json();
@@ -64,6 +124,11 @@ async function loadData(){
     var records=(d.records||[]).slice().reverse();
     document.getElementById('timeline').innerHTML=records.map(function(r){return '<div class="tl-item"><div class="tl-app">'+r.app+'</div><div class="tl-time">'+r.time+'</div></div>'}).join('');
   }catch(e){document.getElementById('timeline').innerHTML='<div class="empty">加载失败</div>';}
+}
+function loadData(){
+  document.getElementById('dateLabel').textContent=formatDate(curDate);
+  if(curTab==='screentime')loadScreentime();
+  else loadRecords();
 }
 loadData();
 </script></body></html>
