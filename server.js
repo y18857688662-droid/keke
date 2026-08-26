@@ -254,6 +254,41 @@ app.post('/bark/push', async (req, res) => {
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
+function trackAppSwitch(appName) {
+  const nowMs = Date.now();
+  const cnNow = new Date(nowMs + 8 * 3600000);
+  const date = cnNow.toISOString().slice(0, 10);
+  const track = readAppTrack();
+  if (!track.sessions) track.sessions = {};
+  if (!track.daily) track.daily = {};
+  if (!track.daily[date]) track.daily[date] = {};
+  // close previous app session
+  if (track.sessions._current && track.sessions._current.app !== appName) {
+    const prev = track.sessions._current;
+    const minutes = Math.round((nowMs - prev.start) / 60000);
+    if (minutes > 0 && minutes < 480) {
+      const prevDate = new Date(prev.start + 8 * 3600000).toISOString().slice(0, 10);
+      if (!track.daily[prevDate]) track.daily[prevDate] = {};
+      track.daily[prevDate][prev.app] = (track.daily[prevDate][prev.app] || 0) + minutes;
+    }
+  }
+  track.sessions._current = { app: appName, start: nowMs };
+  // sync to screentime
+  const apps = Object.entries(track.daily[date] || {}).map(([name, min]) => ({ name, minutes: min }));
+  const totalMin = apps.reduce((s, a) => s + a.minutes, 0);
+  const records = readScreentime();
+  const existing = records.findIndex(r => r.date === date);
+  const entry = { date, time: cnNow.toISOString().slice(11, 16), total_minutes: totalMin, apps, updated: cnNow.toISOString() };
+  if (existing >= 0) records[existing] = entry;
+  else records.push(entry);
+  if (records.length > 90) records.splice(0, records.length - 90);
+  writeScreentime(records);
+  // clean old daily data (keep 30 days)
+  const dates = Object.keys(track.daily).sort();
+  while (dates.length > 30) { delete track.daily[dates.shift()]; }
+  writeAppTrack(track);
+}
+
 app.post('/app', (req, res) => {
   const appName = req.body.app || req.query.app;
   if (!appName) return res.json({ ok: false, error: 'missing app name' });
@@ -264,6 +299,7 @@ app.post('/app', (req, res) => {
   apps.push({ app: appName, time, date });
   if (apps.length > 500) apps.splice(0, apps.length - 500);
   writeApps(apps);
+  trackAppSwitch(appName);
   const notify = readAppNotify();
   notify.push({ app: appName, time });
   writeAppNotify(notify);
@@ -285,6 +321,7 @@ app.get('/app/:name', (req, res) => {
   apps.push({ app: appName, time, date });
   if (apps.length > 500) apps.splice(0, apps.length - 500);
   writeApps(apps);
+  trackAppSwitch(appName);
   const notify = readAppNotify();
   notify.push({ app: appName, time });
   writeAppNotify(notify);
