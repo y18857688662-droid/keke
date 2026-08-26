@@ -743,6 +743,8 @@ app.post('/setup/api', (req, res) => {
     cfg.anthropic_key = key;
   } else if (provider === 'openrouter') {
     cfg.openrouter_key = key;
+    writeApiConfig(cfg);
+    return res.json({ ok: true });
   } else {
     cfg.api_key = key;
     cfg.api_url = 'https://openrouter.ai/api/v1/chat/completions';
