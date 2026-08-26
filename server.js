@@ -2823,8 +2823,10 @@ app.post('/auto/toggle', (req, res) => {
 
 app.post('/auto/trigger', async (req, res) => {
   try {
+    const cfg2 = readApiConfig();
+    const debugKeys = { openrouter: !!OPENROUTER_KEY, dsKey: !!(cfg2.api_key || process.env.DEEPSEEK_API_KEY), proMode: isProMode(), apiUrl: getApiUrl(), model: getModel() };
     const decision = await autoDecide();
-    if (!decision) return res.json({ ok: false, error: 'autoDecide returned null (API call failed?)' });
+    if (!decision) return res.json({ ok: false, error: 'autoDecide returned null', debug: debugKeys });
     if (decision.action === 'silent') return res.json({ ok: true, decision, note: 'chose silent' });
     const s = readAutoState();
     s.lastAction = Date.now();
