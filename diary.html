@@ -1,0 +1,94 @@
+<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>心情日记</title>
+<style>
+:root{--bg:#E8EDE4;--card:#FEFCF8;--text:#111111;--text-faint:#999999;--accent:#7B8F6B;--divider:#D6DDD2;
+  --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
+  --shadow:0 2px 12px rgba(0,0,0,.04)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(safe-area-inset-bottom);font-family:var(--font);-webkit-font-smoothing:antialiased}
+.header{display:flex;align-items:center;padding:16px 0;gap:12px}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600}
+.write-box{background:var(--card);border-radius:16px;padding:16px;margin-bottom:20px;box-shadow:var(--shadow)}
+.write-box textarea{width:100%;border:none;outline:none;resize:none;font-size:15px;line-height:1.6;min-height:80px;font-family:inherit;color:var(--text)}
+.write-box textarea::placeholder{color:var(--text-faint);opacity:.6}
+.mood-row{display:flex;gap:8px;margin:12px 0}
+.mood-btn{font-size:22px;padding:6px 10px;border-radius:12px;border:1px solid var(--divider);background:var(--card);cursor:pointer;transition:all .2s ease-in-out}
+.mood-btn.active{border-color:var(--accent);background:rgba(217,122,84,.1);transform:scale(1.12)}
+.write-actions{display:flex;justify-content:flex-end;margin-top:8px}
+.submit-btn{background:var(--accent);color:#fff;border:none;padding:8px 24px;border-radius:999px;font-size:14px;font-family:var(--font);cursor:pointer}
+.submit-btn:disabled{opacity:.4}
+.entry{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.entry-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.entry-mood{font-size:20px}
+.entry-time{font-size:13px;color:var(--text-faint)}
+.entry-text{font-size:15px;line-height:1.6;margin-bottom:10px}
+.entry-reply{background:var(--bg);border-radius:12px;padding:10px 14px;font-size:14px;line-height:1.5;color:var(--text);margin-top:8px;border-left:3px solid var(--accent)}
+.entry-reply-label{font-size:12px;color:var(--accent);margin-bottom:4px;font-weight:500}
+.empty{text-align:center;color:var(--text-faint);padding:40px 0;font-size:14px}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>心情日记</h1></div>
+<div class="write-box">
+  <textarea id="diaryInput" placeholder="今天心情怎么样？"></textarea>
+  <div class="mood-row">
+    <button class="mood-btn" onclick="pickMood(this,'😊')">😊</button>
+    <button class="mood-btn" onclick="pickMood(this,'😢')">😢</button>
+    <button class="mood-btn" onclick="pickMood(this,'😡')">😡</button>
+    <button class="mood-btn" onclick="pickMood(this,'🥰')">🥰</button>
+    <button class="mood-btn" onclick="pickMood(this,'😴')">😴</button>
+    <button class="mood-btn" onclick="pickMood(this,'🤔')">🤔</button>
+  </div>
+  <div class="write-actions"><button class="submit-btn" id="submitBtn" onclick="submitDiary()">写好了</button></div>
+</div>
+<div id="entries"></div>
+<script>
+var mood='';
+function saveLocal(entries){try{localStorage.setItem('ke_diary',JSON.stringify(entries));}catch(e){}}
+function loadLocal(){try{return JSON.parse(localStorage.getItem('ke_diary')||'[]');}catch(e){return[];}}
+function pickMood(el,m){
+  mood=m;
+  document.querySelectorAll('.mood-btn').forEach(function(b){b.classList.remove('active')});
+  el.classList.add('active');
+}
+async function submitDiary(){
+  var text=document.getElementById('diaryInput').value.trim();
+  if(!text)return;
+  document.getElementById('submitBtn').disabled=true;
+  try{
+    var r=await fetch('/diary/write',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,mood:mood||'📝'})});
+    var d=await r.json();
+    if(d.ok){document.getElementById('diaryInput').value='';var local=loadLocal();local.unshift({text:text,mood:mood||'📝',date:new Date(Date.now()+8*3600000).toISOString().slice(0,10),time:new Date(Date.now()+8*3600000).toISOString().slice(11,16),pending:true});saveLocal(local);mood='';document.querySelectorAll('.mood-btn').forEach(function(b){b.classList.remove('active')});loadEntries();}
+  }catch(e){}
+  document.getElementById('submitBtn').disabled=false;
+}
+async function loadEntries(){
+  var local=loadLocal();
+  var serverEntries=[];
+  try{
+    var r=await fetch('/diary/list');
+    var d=await r.json();
+    serverEntries=d.entries||[];
+  }catch(e){}
+  var entries=serverEntries.length>=local.length?serverEntries:mergeEntries(local,serverEntries);
+  saveLocal(entries);
+  var el=document.getElementById('entries');
+  if(!entries||entries.length===0){el.innerHTML='<div class="empty">还没有日记，写一篇吧</div>';return;}
+  el.innerHTML=entries.map(function(e){
+    var reply=e.reply?'<div class="entry-reply"><div class="entry-reply-label">顾晏的回复</div>'+e.reply.replace(/\n/g,'<br>')+'</div>':'<div class="entry-reply"><div class="entry-reply-label">顾晏的回复</div><i style="color:var(--text-faint)">等顾晏看到…</i></div>';
+    return '<div class="entry"><div class="entry-header"><span class="entry-mood">'+e.mood+'</span><span class="entry-time">'+e.date+' '+e.time+'</span></div><div class="entry-text">'+e.text.replace(/\n/g,'<br>')+'</div>'+reply+'</div>';
+  }).join('');
+}
+function mergeEntries(local,server){
+  var map={};
+  local.forEach(function(e){map[e.date+e.time+e.text]=e;});
+  server.forEach(function(e){
+    var k=e.date+e.time+e.text;
+    if(map[k]){if(e.reply)map[k].reply=e.reply;if(!e.pending)map[k].pending=false;}
+    else map[k]=e;
+  });
+  var arr=Object.values(map);
+  arr.sort(function(a,b){return(b.date+b.time).localeCompare(a.date+a.time);});
+  return arr;
+}
+loadEntries();
+</script></body></html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>顾晏的收藏</title>
+<style>
+:root{--bg:#E8EDE4;--card:#FEFCF8;--text:#1A1816;--text-soft:#6B6560;--text-faint:#999;--accent:#7B8F6B;--divider:#D6DDD2;
+  --font:-apple-system,"SF Pro Display","SF Pro Text","PingFang SC","Noto Sans SC",system-ui,sans-serif;
+  --shadow:0 2px 12px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#242220;--text:#E8E3DB;--text-soft:#9B9590;--text-faint:#6B6560;--accent:#E8A090;--divider:#333;--shadow:0 2px 12px rgba(0,0,0,.2)}}
+:root[data-theme="dark"]{--bg:#1A1816;--card:#242220;--text:#E8E3DB;--text-soft:#9B9590;--text-faint:#6B6560;--accent:#E8A090;--divider:#333;--shadow:0 2px 12px rgba(0,0,0,.2)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;font-family:var(--font);-webkit-font-smoothing:antialiased}
+.header{display:flex;align-items:center;padding:16px;gap:12px;position:sticky;top:0;background:var(--bg);z-index:10}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600;flex:1}
+.refresh-btn{background:none;border:1px solid var(--divider);color:var(--accent);font-size:13px;padding:6px 14px;border-radius:20px;cursor:pointer;font-family:var(--font)}
+.refresh-btn:active{opacity:.6}
+.tabs{display:flex;gap:0;padding:0 16px 12px;border-bottom:1px solid var(--divider)}
+.tab{flex:1;text-align:center;padding:8px 0;font-size:13px;color:var(--text-soft);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500}
+.cards{padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bk-card{background:var(--card);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;text-decoration:none;color:var(--text);display:flex;flex-direction:column;transition:transform .15s}
+.bk-card:active{transform:scale(.97)}
+.bk-thumb{width:100%;aspect-ratio:16/10;object-fit:cover;background:var(--divider)}
+.bk-thumb.gh{aspect-ratio:1;width:48px;height:48px;border-radius:12px;margin:12px auto 0}
+.bk-body{padding:10px 12px 12px;flex:1;display:flex;flex-direction:column}
+.bk-source{font-size:11px;color:var(--accent);font-weight:500;margin-bottom:4px;text-transform:uppercase}
+.bk-title{font-size:13px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bk-desc{font-size:12px;color:var(--text-soft);line-height:1.4;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bk-meta{font-size:11px;color:var(--text-faint);margin-top:auto;padding-top:6px}
+.gh-card{grid-column:1/-1;flex-direction:row;align-items:center;padding:12px 16px;gap:12px}
+.gh-card .bk-thumb{margin:0;flex-shrink:0}
+.gh-card .bk-body{padding:0}
+.empty{text-align:center;color:var(--text-faint);padding:60px 0;font-size:14px;grid-column:1/-1}
+.loading{text-align:center;padding:40px 0;color:var(--text-faint);font-size:13px;grid-column:1/-1}
+.subtitle{color:var(--text-soft);font-size:13px;padding:0 16px 8px;text-align:center}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinning{animation:spin .8s linear infinite;display:inline-block}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>📑 顾晏的收藏</h1><button class="refresh-btn" onclick="discover()"><span id="ref-icon">↻</span> 发现</button></div>
+<div class="subtitle">顾晏替你逛了互联网</div>
+<div class="tabs">
+  <div class="tab active" data-src="" onclick="switchTab(this)">全部</div>
+  <div class="tab" data-src="bilibili" onclick="switchTab(this)">B站</div>
+  <div class="tab" data-src="youtube" onclick="switchTab(this)">油管</div>
+  <div class="tab" data-src="github" onclick="switchTab(this)">GitHub</div>
+</div>
+<div class="cards" id="cards"><div class="loading">加载中…</div></div>
+<script>
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+var curSource='';
+function switchTab(el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  curSource=el.dataset.src;
+  load();
+}
+function fmtNum(n){if(n>=10000)return(n/10000).toFixed(1)+'万';if(n>=1000)return(n/1000).toFixed(1)+'k';return n}
+function renderCard(b){
+  if(b.source==='github'){
+    return '<a class="bk-card gh-card" href="'+esc(b.url)+'" target="_blank">'
+      +'<img class="bk-thumb gh" src="'+esc(b.thumb)+'" onerror="this.style.display=\'none\'">'
+      +'<div class="bk-body"><div class="bk-source">GitHub</div>'
+      +'<div class="bk-title">'+esc(b.title)+'</div>'
+      +'<div class="bk-desc">'+esc(b.desc)+'</div>'
+      +'<div class="bk-meta">⭐ '+fmtNum(b.stars||0)+(b.lang?' · '+esc(b.lang):'')+'</div></div></a>';
+  }
+  var src=b.source==='bilibili'?'B站':'YouTube';
+  var meta=b.source==='bilibili'?('▶ '+fmtNum(b.play||0)+' · '+esc(b.author)):('▶ '+fmtNum(b.views||0)+' · '+esc(b.author));
+  return '<a class="bk-card" href="'+esc(b.url)+'" target="_blank">'
+    +(b.thumb?'<img class="bk-thumb" src="'+esc(b.thumb)+'" onerror="this.style.display=\'none\'">':'')
+    +'<div class="bk-body"><div class="bk-source">'+src+'</div>'
+    +'<div class="bk-title">'+esc(b.title)+'</div>'
+    +'<div class="bk-desc">'+esc(b.desc)+'</div>'
+    +'<div class="bk-meta">'+meta+'</div></div></a>';
+}
+async function load(){
+  var el=document.getElementById('cards');
+  el.innerHTML='<div class="loading">加载中…</div>';
+  try{
+    var url='/bookmarks/data'+(curSource?'?source='+curSource:'');
+    var r=await fetch(url);var d=await r.json();
+    if(!d.bookmarks||d.bookmarks.length===0){
+      el.innerHTML='<div class="empty">还没有收藏<br><span style="font-size:12px;margin-top:8px;display:block">点击右上角「发现」让顾晏去逛逛</span></div>';
+      return;
+    }
+    el.innerHTML=d.bookmarks.map(renderCard).join('');
+  }catch(e){el.innerHTML='<div class="empty">加载失败</div>';}
+}
+async function discover(){
+  var icon=document.getElementById('ref-icon');
+  icon.classList.add('spinning');
+  try{
+    var r=await fetch('/bookmarks/discover',{method:'POST'});
+    var d=await r.json();
+    load();
+  }catch(e){}
+  icon.classList.remove('spinning');
+}
+load();
+</script></body></html>

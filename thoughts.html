@@ -1,0 +1,39 @@
+<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>顾晏的碎碎念</title>
+<style>
+:root{--bg:#E8EDE4;--card:#FEFCF8;--text:#1A1816;--text-soft:#6B6560;--text-faint:#999;--accent:#7B8F6B;--divider:#D6DDD2;
+  --font:-apple-system,"SF Pro Display","SF Pro Text","Inter","PingFang SC","Helvetica Neue",sans-serif;
+  --shadow:0 2px 12px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1A1816;--card:#242220;--text:#E8E3DB;--text-soft:#9B9590;--text-faint:#6B6560;--accent:#E8A090;--divider:#333;--shadow:0 2px 12px rgba(0,0,0,.2)}}
+:root[data-theme="dark"]{--bg:#1A1816;--card:#242220;--text:#E8E3DB;--text-soft:#9B9590;--text-faint:#6B6560;--accent:#E8A090;--divider:#333;--shadow:0 2px 12px rgba(0,0,0,.2)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding:0 16px env(safe-area-inset-bottom);font-family:var(--font);-webkit-font-smoothing:antialiased}
+.header{display:flex;align-items:center;padding:16px 0;gap:12px}
+.header a{color:var(--text);text-decoration:none;font-size:20px}
+.header h1{font-size:18px;font-weight:600}
+.subtitle{color:var(--text-soft);font-size:13px;padding:0 0 16px;text-align:center}
+.t-card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.t-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.t-mood{font-size:18px}
+.t-date{font-size:13px;color:var(--text-faint)}
+.t-text{font-size:15px;line-height:1.75;color:var(--text)}
+.empty{text-align:center;color:var(--text-faint);padding:60px 0;font-size:14px}
+</style></head><body>
+<div class="header"><a href="/">‹</a><h1>💭 顾晏的碎碎念</h1></div>
+<div class="subtitle">那些没好意思跟你说的</div>
+<div id="list"><div class="empty">加载中…</div></div>
+<script>
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+async function load(){
+  try{
+    var r=await fetch('/thoughts/list');
+    var d=await r.json();
+    var el=document.getElementById('list');
+    if(!d.thoughts||d.thoughts.length===0){el.innerHTML='<div class="empty">顾晏还没写过碎碎念</div>';return;}
+    el.innerHTML=d.thoughts.map(function(t){
+      return '<div class="t-card"><div class="t-head"><span class="t-mood">'+(t.mood||'💭')+'</span><span class="t-date">'+esc(t.date)+' '+esc(t.time)+'</span></div><div class="t-text">'+esc(t.text).replace(/\n/g,'<br>')+'</div></div>';
+    }).join('');
+  }catch(e){document.getElementById('list').innerHTML='<div class="empty">加载失败</div>';}
+}
+load();
+</script></body></html>
