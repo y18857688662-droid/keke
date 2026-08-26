@@ -2845,7 +2845,8 @@ async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
   const key = OPENROUTER_KEY;
   const cfg = readApiConfig();
   const dsKey = cfg.api_key || process.env.DEEPSEEK_API_KEY || '';
-  if (!key && !dsKey) return null;
+  const anthropicKey = cfg.anthropic_key || process.env.ANTHROPIC_API_KEY || '';
+  if (!key && !dsKey && !anthropicKey) return null;
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 15000);
@@ -2858,8 +2859,7 @@ async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
         signal: ctrl.signal
       });
     }
-    if (!key || !r || !r.ok) {
-      if (!dsKey) { clearTimeout(t); return null; }
+    if ((!key || !r || !r.ok) && dsKey) {
       const sysMsg = messages.find(m => m.role === 'system');
       const otherMsgs = messages.filter(m => m.role !== 'system');
       const apiMessages = sysMsg ? [sysMsg, ...otherMsgs] : otherMsgs;
@@ -2867,6 +2867,17 @@ async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${dsKey}` },
         body: JSON.stringify({ model: getModel(), messages: apiMessages, max_tokens: maxTokens, temperature: temp }),
+        signal: ctrl.signal
+      });
+    }
+    if ((!key && !dsKey) || !r || !r.ok) {
+      if (!anthropicKey) { clearTimeout(t); return null; }
+      const sysMsg = messages.find(m => m.role === 'system');
+      const otherMsgs = messages.filter(m => m.role !== 'system');
+      r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', system: sysMsg ? sysMsg.content : '', messages: otherMsgs, max_tokens: maxTokens, temperature: temp }),
         signal: ctrl.signal
       });
     }
