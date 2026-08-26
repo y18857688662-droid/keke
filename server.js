@@ -2823,7 +2823,8 @@ app.post('/auto/toggle', (req, res) => {
 
 async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
   const key = OPENROUTER_KEY;
-  const dsKey = getApiKey();
+  const cfg = readApiConfig();
+  const dsKey = cfg.api_key || process.env.DEEPSEEK_API_KEY || '';
   if (!key && !dsKey) return null;
   try {
     const ctrl = new AbortController();
