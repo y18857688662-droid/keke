@@ -741,6 +741,8 @@ app.post('/setup/api', (req, res) => {
   const cfg = readApiConfig();
   if (provider === 'anthropic') {
     cfg.anthropic_key = key;
+  } else if (provider === 'openrouter') {
+    cfg.openrouter_key = key;
   } else {
     cfg.api_key = key;
     cfg.api_url = 'https://openrouter.ai/api/v1/chat/completions';
@@ -1874,7 +1876,8 @@ async function tgGetFileUrl(fileId) {
   return null;
 }
 
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
+function getOpenRouterKey() { return readApiConfig().openrouter_key || process.env.OPENROUTER_API_KEY || ''; }
+const OPENROUTER_KEY = getOpenRouterKey();
 
 async function describeImage(imgUrl) {
   try {
@@ -2850,7 +2853,7 @@ app.post('/auto/trigger', async (req, res) => {
 });
 
 async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
-  const key = OPENROUTER_KEY;
+  const key = getOpenRouterKey();
   const cfg = readApiConfig();
   const dsKey = cfg.api_key || process.env.DEEPSEEK_API_KEY || '';
   const anthropicKey = cfg.anthropic_key || process.env.ANTHROPIC_API_KEY || '';
