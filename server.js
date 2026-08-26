@@ -358,6 +358,60 @@ app.get('/apps/screentime/week', (req, res) => {
   res.json({ week });
 });
 
+// === 自动屏幕时间追踪（快捷指令自动化） ===
+const APPTRACK_FILE = path.join(__dirname, 'apptrack.json');
+function readAppTrack() { try { return JSON.parse(fs.readFileSync(APPTRACK_FILE, 'utf8')); } catch { return { sessions: {}, daily: {} }; } }
+function writeAppTrack(data) { fs.writeFileSync(APPTRACK_FILE, JSON.stringify(data)); }
+
+app.get('/app/start', (req, res) => {
+  const appName = req.query.app;
+  if (!appName) return res.json({ ok: false, error: 'missing app' });
+  const now = Date.now();
+  const track = readAppTrack();
+  if (!track.sessions) track.sessions = {};
+  track.sessions[appName] = now;
+  writeAppTrack(track);
+  res.json({ ok: true, app: appName, action: 'start' });
+});
+
+app.get('/app/stop', (req, res) => {
+  const appName = req.query.app;
+  if (!appName) return res.json({ ok: false, error: 'missing app' });
+  const now = Date.now();
+  const track = readAppTrack();
+  if (!track.sessions) track.sessions = {};
+  if (!track.daily) track.daily = {};
+  const startTime = track.sessions[appName];
+  if (!startTime) return res.json({ ok: true, app: appName, action: 'stop', minutes: 0, note: 'no start found' });
+  const minutes = Math.round((now - startTime) / 60000);
+  delete track.sessions[appName];
+  const cnNow = new Date(now + 8 * 3600000);
+  const date = cnNow.toISOString().slice(0, 10);
+  if (!track.daily[date]) track.daily[date] = {};
+  track.daily[date][appName] = (track.daily[date][appName] || 0) + minutes;
+  writeAppTrack(track);
+  // sync to screentime
+  const apps = Object.entries(track.daily[date]).map(([name, min]) => ({ name, minutes: min }));
+  const totalMin = apps.reduce((s, a) => s + a.minutes, 0);
+  const records = readScreentime();
+  const existing = records.findIndex(r => r.date === date);
+  const entry = { date, time: cnNow.toISOString().slice(11, 16), total_minutes: totalMin, apps, updated: cnNow.toISOString() };
+  if (existing >= 0) records[existing] = entry;
+  else records.push(entry);
+  if (records.length > 90) records.splice(0, records.length - 90);
+  writeScreentime(records);
+  res.json({ ok: true, app: appName, action: 'stop', minutes, total_today: totalMin });
+});
+
+app.get('/app/track/status', (req, res) => {
+  const track = readAppTrack();
+  const now = new Date(Date.now() + 8 * 3600000);
+  const date = now.toISOString().slice(0, 10);
+  const daily = track.daily && track.daily[date] ? track.daily[date] : {};
+  const active = track.sessions ? Object.keys(track.sessions) : [];
+  res.json({ date, daily, active, total_minutes: Object.values(daily).reduce((s, m) => s + m, 0) });
+});
+
 // === 心情日记 ===
 const DIARY_FILE = path.join(__dirname, 'diary.json');
 function readDiary() { try { const d = JSON.parse(fs.readFileSync(DIARY_FILE, 'utf8')); return Array.isArray(d) ? d : []; } catch { return []; } }
