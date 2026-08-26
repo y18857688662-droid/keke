@@ -2863,10 +2863,12 @@ async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
       const sysMsg = messages.find(m => m.role === 'system');
       const otherMsgs = messages.filter(m => m.role !== 'system');
       const apiMessages = sysMsg ? [sysMsg, ...otherMsgs] : otherMsgs;
-      r = await fetch(getApiUrl(), {
+      const dsUrl = dsKey.startsWith('sk-') ? 'https://api.deepseek.com/chat/completions' : getApiUrl();
+      const dsModel = dsKey.startsWith('sk-') ? 'deepseek-chat' : getModel();
+      r = await fetch(dsUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${dsKey}` },
-        body: JSON.stringify({ model: getModel(), messages: apiMessages, max_tokens: maxTokens, temperature: temp }),
+        body: JSON.stringify({ model: dsModel, messages: apiMessages, max_tokens: maxTokens, temperature: temp }),
         signal: ctrl.signal
       });
     }
