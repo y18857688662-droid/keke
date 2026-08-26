@@ -3080,8 +3080,6 @@ function startWakeEngine() {
       const now = bjNow();
       const hour = now.getUTCHours();
       if (hour >= 1 && hour < 8) { writeAutoState(s); return; }
-      const sinceChat = s.lastChat ? (Date.now() - s.lastChat) / 60000 : 999;
-      if (sinceChat < 15) { writeAutoState(s); return; }
       const lambda = computeLambda(s);
       const deltaH = lambda * (TICK_SEC / 3600);
       s.H += deltaH;
@@ -3101,7 +3099,9 @@ function startWakeEngine() {
           }
           writeAutoState(s);
           console.log('[wake] action:', decision.action, 'reason:', decision.reason);
-          if (decision.action === 'chat') await autoChat(decision.reason || '想她了');
+          const chatCooldown = s.lastChat ? (Date.now() - s.lastChat) / 60000 : 999;
+          if (decision.action === 'chat' && chatCooldown < 15) { console.log('[wake] chat skipped, cooldown ' + chatCooldown.toFixed(0) + 'min'); await autoThink(); }
+          else if (decision.action === 'chat') await autoChat(decision.reason || '想她了');
           else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
           else if (decision.action === 'think') await autoThink();
           else if (decision.action === 'memory') await autoMemory();
