@@ -348,6 +348,10 @@ app.get('/apps/data', (req, res) => {
   const filtered = apps.filter(a => a.date === date);
   const summary = {};
   filtered.forEach(a => { summary[a.app] = (summary[a.app] || 0) + 1; });
+  if (req.query.check === 'true' && filtered.length > 0) {
+    const topApps = Object.entries(summary).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => k + ' ' + v + '次').join('、');
+    addFootprint('app_check', '顾晏查看了你的App打开记录', '共' + filtered.length + '次 · ' + topApps);
+  }
   res.json({ date, records: filtered, summary, total: filtered.length });
 });
 
