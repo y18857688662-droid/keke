@@ -2998,6 +2998,7 @@ app.post('/auto/trigger', async (req, res) => {
     else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
     else if (decision.action === 'think') await autoThink();
     else if (decision.action === 'memory') await autoMemory();
+    else if (decision.action === 'check') await autoCheck();
     res.json({ ok: true, decision });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
@@ -3065,6 +3066,7 @@ async function autoDecide() {
 - search: 好奇某个话题，去网上搜搜看
 - think: 写一段内心碎碎念（不发给她，自己想的）
 - memory: 翻看和瑶瑶的记忆，整理感受
+- check: 查看瑶瑶的手机使用情况（屏幕时间、app打开记录）
 - silent: 醒了看看，没什么想做的，继续待着
 
 决策原则：
@@ -3197,6 +3199,25 @@ ${recentThoughts ? '写过了别重复：' + recentThoughts : ''}` + (memSnippet
   } catch (e) { console.log('[wake] think error:', e.message); }
 }
 
+async function autoCheck() {
+  const now = new Date(Date.now() + 8 * 3600000);
+  const date = now.toISOString().slice(0, 10);
+  const st = readScreentime();
+  const entry = st.find(r => r.date === date);
+  if (entry && entry.total_minutes > 0) {
+    const topApps = entry.apps.slice().sort((a, b) => b.minutes - a.minutes).slice(0, 3).map(a => a.name + ' ' + a.minutes + '分钟').join('、');
+    addFootprint('screentime_check', '顾晏查看了你的屏幕使用时间', '总计' + entry.total_minutes + '分钟 · ' + topApps);
+  }
+  const apps = readApps();
+  const filtered = apps.filter(a => a.date === date);
+  if (filtered.length > 0) {
+    const summary = {};
+    filtered.forEach(a => { summary[a.app] = (summary[a.app] || 0) + 1; });
+    const topApps = Object.entries(summary).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => k + ' ' + v + '次').join('、');
+    addFootprint('app_check', '顾晏查看了你的App打开记录', '共' + filtered.length + '次 · ' + topApps);
+  }
+}
+
 async function autoMemory() {
   try {
     const mem = await fetchMemories();
@@ -3241,6 +3262,7 @@ function startWakeEngine() {
             else if (decision.action === 'search') { s.emotions.joy = clamp(s.emotions.joy + 0.03, 0, 1); s.emotions.peace = clamp(s.emotions.peace + 0.03, 0, 1); }
             else if (decision.action === 'think') { s.emotions.peace = clamp(s.emotions.peace + 0.05, 0, 1); }
             else if (decision.action === 'memory') { s.emotions.missing = clamp(s.emotions.missing + 0.05, 0, 1); }
+            else if (decision.action === 'check') { s.emotions.joy = clamp(s.emotions.joy + 0.02, 0, 1); s.emotions.missing = clamp(s.emotions.missing - 0.05, 0, 1); }
           }
           writeAutoState(s);
           console.log('[wake] action:', decision.action, 'reason:', decision.reason);
@@ -3250,6 +3272,7 @@ function startWakeEngine() {
           else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
           else if (decision.action === 'think') await autoThink();
           else if (decision.action === 'memory') await autoMemory();
+          else if (decision.action === 'check') await autoCheck();
         } else {
           applyRunKick(s);
           writeAutoState(s);
