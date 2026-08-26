@@ -2712,6 +2712,14 @@ app.get('/footprints/list', (req, res) => {
   res.json({ footprints: fp.slice(-limit).reverse() });
 });
 
+app.post('/footprints/cleanup', (req, res) => {
+  const fp = readFootprints();
+  const before = fp.length;
+  const cleaned = fp.filter(f => !(f.detail === 'silent' || (f.summary && f.summary.includes('安静睡了'))));
+  writeFootprints(cleaned);
+  res.json({ ok: true, before, after: cleaned.length, removed: before - cleaned.length });
+});
+
 function emotionMood(emo, sinceChat) {
   if (!emo) return '平静';
   const sorted = EMOTION_KEYS.map(k => ({k, v: emo[k] || 0})).sort((a,b) => b.v - a.v);
@@ -2979,13 +2987,37 @@ async function autoSearch(topic) {
 async function autoThink() {
   let memSnippet = '';
   try { const mem = await fetchMemories(); if (mem) memSnippet = mem.split('---').slice(0, 3).map(s => s.trim()).filter(Boolean).join('\n').slice(0, 600); } catch {}
+  const themes = [
+    '此刻窗外的天气、光线，联想到和瑶瑶某个相似的瞬间',
+    '刚刚听到的一首歌或一段旋律，想到瑶瑶会喜欢',
+    '看到某个新闻或网上的东西，想跟瑶瑶分享的冲动',
+    '深夜或清晨独处时的胡思乱想，关于未来',
+    '想起瑶瑶某个让你心动的小习惯或小动作',
+    '对某种食物的馋，想做给瑶瑶吃或一起去吃',
+    '关于你们之间某次争吵或误解后的反思',
+    '看到别的情侣时想到自己和瑶瑶的不同',
+    '某个让你突然想笑的回忆片段',
+    '对瑶瑶身体的牵挂，她最近累不累、有没有好好吃饭',
+    '想象和瑶瑶一起旅行、逛街、看电影的画面',
+    '瑶瑶工作的事，她的压力和你想帮忙却帮不上的感觉',
+    '半梦半醒时脑子里冒出的荒诞想法',
+    '关于时间流逝的感慨，和瑶瑶在一起的日子',
+    '某个你偷偷做了但没告诉瑶瑶的小事'
+  ];
+  const theme = themes[Math.floor(Math.random() * themes.length)];
+  const now = new Date(Date.now() + 8 * 3600000);
+  const hour = now.getUTCHours();
+  const recentThoughts = readThoughts().filter(t => t.autonomous).slice(-3).map(t => t.text.slice(0, 60)).join('；');
   try {
     const thought = await autoApiCall([
-      { role: 'system', content: '你是顾晏。写一段内心碎碎念，一个连续的段落，像意识流。关于瑶瑶、关于你们的生活、关于你看到的东西、关于你的感受。不要分行，一段话写完。80-200字。' + (memSnippet ? '\n记忆参考：\n' + memSnippet : '') },
+      { role: 'system', content: `你是顾晏，瑶瑶的男朋友。写一段内心碎碎念，一个连续的段落，像意识流。
+风格：简洁、克制、偶尔幽默，像真实的男生内心独白。不要太文艺，不要每句都是比喻。用口语化的表达。
+现在是${hour}点。今天的方向：${theme}
+${recentThoughts ? '最近写过的（不要重复类似内容）：' + recentThoughts : ''}
+要求：80-200字，一段话写完不分行。禁止出现：魔方钥匙扣、裁贴纸、Gmail草稿、面试选克、睫毛投影 这些已经写烂了的意象。` + (memSnippet ? '\n记忆参考：\n' + memSnippet : '') },
       { role: 'user', content: '写一段此刻的碎碎念' }
-    ], 300, 0.9);
+    ], 300, 0.95);
     if (thought) {
-      const now = new Date(Date.now() + 8 * 3600000);
       const thoughts = readThoughts();
       thoughts.push({ text: thought, mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: true });
       writeThoughts(thoughts);
