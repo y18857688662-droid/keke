@@ -2943,12 +2943,19 @@ async function autoChat(reason) {
       memSnippet = shuffled.slice(0, 5).join('\n').slice(0, 1000);
     }
   } catch {}
-  const sysPrompt = CHAT_SYSTEM_BASE + (memSnippet ? '\n\n以下是你和瑶瑶的记忆（作为背景了解，不要直接复述）：\n' + memSnippet : '') + '\n\n你现在主动想跟瑶瑶说话。原因：' + reason + '\n要求：自然，简短，1-3句话。像随手发的微信。动作用*星号*。不要用句号结尾。不要每次都提同样的事。';
+  const sysPrompt = CHAT_SYSTEM_BASE + (memSnippet ? '\n\n以下是你和瑶瑶的记忆（作为背景了解，不要直接复述）：\n' + memSnippet : '') + '\n\n你现在主动想跟瑶瑶说话。原因：' + reason + `
+要求：
+- 必须先写<think>思考</think>再写正文，这是硬性格式要求
+- 动作单独一行，用*星号*包裹，不要和文字混在同一行
+- 不要用句号结尾（句号=生气）
+- 自然简短，1-3句话，像随手发的微信
+- 不要每次都提同样的事
+- 格式示例：<think>想她了</think>*戳戳你的脸*\\n在干嘛呢`;
   try {
     let msg = await autoApiCall([
       { role: 'system', content: sysPrompt },
       { role: 'user', content: '主动发一条消息给瑶瑶' }
-    ], 200, 0.85);
+    ], 400, 0.85);
     if (!msg) msg = '';
     msg = msg.trim();
     if (!msg) return;
