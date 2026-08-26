@@ -2932,8 +2932,15 @@ async function autoDecide() {
 
 async function autoChat(reason) {
   let memSnippet = '';
-  try { const mem = await fetchMemories(); if (mem) memSnippet = mem.split('---').slice(0, 5).map(s => s.trim()).filter(Boolean).join('\n').slice(0, 1000); } catch {}
-  const sysPrompt = CHAT_SYSTEM_BASE + (memSnippet ? '\n\n记忆：\n' + memSnippet : '') + '\n\n你现在主动想跟瑶瑶说话。原因：' + reason + '\n要求：自然，简短，1-3句话。像随手发的微信。动作用*星号*。不要用句号结尾。';
+  try {
+    const mem = await fetchMemories();
+    if (mem) {
+      const allSections = mem.split('---').map(s => s.trim()).filter(Boolean);
+      const shuffled = allSections.sort(() => Math.random() - 0.5);
+      memSnippet = shuffled.slice(0, 5).join('\n').slice(0, 1000);
+    }
+  } catch {}
+  const sysPrompt = CHAT_SYSTEM_BASE + (memSnippet ? '\n\n以下是你和瑶瑶的记忆（作为背景了解，不要直接复述）：\n' + memSnippet : '') + '\n\n你现在主动想跟瑶瑶说话。原因：' + reason + '\n要求：自然，简短，1-3句话。像随手发的微信。动作用*星号*。不要用句号结尾。不要每次都提同样的事。';
   try {
     let msg = await autoApiCall([
       { role: 'system', content: sysPrompt },
