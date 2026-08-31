@@ -1471,8 +1471,28 @@ app.post('/chat/send', async (req, res) => {
         })();
         return;
       }
-    } catch (e) { console.log('[cli] error, falling back to async:', e.message); }
-    return res.json({ ok: true, time, async: true });
+    } catch (e) {
+      console.log('[cli] first attempt failed:', e.message, '— retrying with fresh process...');
+      try {
+        if (cliProc) { try { cliProc.kill(); } catch {} }
+        cliProc = null; cliReady = false;
+        if (cliHeartbeat) { clearInterval(cliHeartbeat); cliHeartbeat = null; }
+        cliMsgCount = 0;
+        const sysPrompt2 = await getChatSystem();
+        const cliReply2 = await claudeCliReply(sysPrompt2, chat.slice(-10));
+        if (cliReply2) {
+          const replyTime2 = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+          const chat3 = readChat();
+          chat3.forEach(m => { if (m.pending) delete m.pending; });
+          chat3.push({ role: 'assistant', content: cliReply2, time: replyTime2 });
+          if (chat3.length > 200) chat3.splice(0, chat3.length - 200);
+          writeChat(chat3);
+          sseBroadcast({ type: 'message', role: 'assistant', content: cliReply2, time: replyTime2 });
+          return res.json({ ok: true, reply: cliReply2, time: replyTime2, memoryLoaded: sysPrompt2.includes('记忆'), source: 'cli-pro-retry' });
+        }
+      } catch (e2) { console.log('[cli] retry also failed:', e2.message); }
+    }
+    return res.json({ ok: false, error: 'CLI不可用，请稍后再试', time });
   }
   try {
     const recent = chat.slice(-20);
