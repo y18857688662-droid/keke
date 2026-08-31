@@ -136,9 +136,7 @@ function setupCliListeners() {
       try {
         const msg = JSON.parse(line);
         if (msg.type === 'result' && msg.result && cliPending) {
-          if (msg.usage) console.log('[cli] token usage:', JSON.stringify(msg.usage));
-          else if (msg.stats) console.log('[cli] stats:', JSON.stringify(msg.stats));
-          else console.log('[cli] result keys:', Object.keys(msg).join(','));
+          cliPending.usage = msg.usage || msg.stats || { keys: Object.keys(msg) };
           cliPending.resolve(msg.result);
           cliPending = null;
         } else if (msg.type === 'assistant' && msg.message?.content) {
@@ -245,7 +243,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
       }
       cliPending = null;
     }, 90000);
-    cliPending = { resolve: (text) => { clearTimeout(timeout); resolve(text); }, reject: (err) => { clearTimeout(timeout); reject(err); }, lastText: null };
+    cliPending = { resolve: (text) => { clearTimeout(timeout); resolve({ text, usage: cliPending?.usage }); }, reject: (err) => { clearTimeout(timeout); reject(err); }, lastText: null };
     const jsonMsg = JSON.stringify({ type: 'user', message: { role: 'user', content }, parent_tool_use_id: null }) + '\n';
     cliProc.stdin.write(jsonMsg);
   });
@@ -1430,7 +1428,9 @@ app.post('/chat/send', async (req, res) => {
       const sysPrompt = await getChatSystem();
       sseBroadcast({ type: 'memory', action: sysPrompt.includes('记忆') ? 'read_ok' : 'read_none' });
       console.log('[cli] calling claude CLI for reply...');
-      const cliReply = await claudeCliReply(sysPrompt, chat.slice(-10));
+      const cliResult = await claudeCliReply(sysPrompt, chat.slice(-10));
+      const cliReply = cliResult?.text || cliResult;
+      const cliUsage = cliResult?.usage;
       if (cliReply) {
         const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
         const chat2 = readChat();
@@ -1451,7 +1451,7 @@ app.post('/chat/send', async (req, res) => {
             }
           })().catch(() => {});
         }
-        res.json({ ok: true, reply: cliReply, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro' });
+        res.json({ ok: true, reply: cliReply, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage });
         (async () => {
           try {
             const last5 = chat2.slice(-6);
