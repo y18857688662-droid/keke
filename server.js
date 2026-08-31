@@ -1016,7 +1016,7 @@ app.post('/deploy', (req, res) => {
   if (token !== DEPLOY_TOKEN) return res.status(403).json({ ok: false, error: 'forbidden' });
   res.json({ ok: true, msg: 'deploying...' });
   const { exec } = require('child_process');
-  exec('cd /root/keke && git checkout -- . && git pull origin main; npm install --production; bash fix-nginx.sh; systemctl restart bridge-relay; systemctl restart keke', { timeout: 60000 }, (err, stdout, stderr) => {
+  exec('cd /root/keke && git checkout -- . && git pull origin main && npm install --production && node --check server.js && bash fix-nginx.sh && systemctl restart bridge-relay && systemctl restart keke || echo "DEPLOY_FAILED: syntax error or install failed, NOT restarting"', { timeout: 60000 }, (err, stdout, stderr) => {
     console.log('[deploy]', stdout, stderr);
     if (err) console.error('[deploy error]', err.message);
   });
