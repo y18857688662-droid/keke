@@ -3490,27 +3490,25 @@ function startWakeEngine() {
 startWakeEngine();
 
 let cliHealthOk = true;
-setInterval(async () => {
-  try {
-    const test = await cliOneshot('回复OK两个字母');
-    if (test && test.includes('OK')) {
-      if (!cliHealthOk) console.log('[health] CLI recovered');
+setInterval(() => {
+  const { execFile } = require('child_process');
+  execFile('claude', ['--version'], { env: { ...process.env, HOME: '/root' }, timeout: 10000 }, async (err, stdout) => {
+    if (!err && stdout && stdout.trim()) {
+      if (!cliHealthOk) console.log('[health] CLI recovered:', stdout.trim());
       cliHealthOk = true;
     } else {
-      throw new Error('unexpected response: ' + (test || '').slice(0, 50));
+      console.log('[health] CLI check failed:', err ? err.message : 'no output');
+      if (cliHealthOk) {
+        cliHealthOk = false;
+        try {
+          await fetch('https://api.day.app/' + BARK_KEY + '/' +
+            encodeURIComponent('CLI认证异常') + '/' +
+            encodeURIComponent('CLI进程不可用，可能需要重新登录。用Termius进VPS跑 claude login') +
+            '?group=system&level=timeSensitive&sound=alert');
+        } catch {}
+      }
     }
-  } catch (e) {
-    console.log('[health] CLI check failed:', e.message);
-    if (cliHealthOk) {
-      cliHealthOk = false;
-      try {
-        await fetch('https://api.day.app/' + BARK_KEY + '/' +
-          encodeURIComponent('CLI认证异常') + '/' +
-          encodeURIComponent('CLI进程不可用，可能需要重新登录。用Termius进VPS跑 claude login') +
-          '?group=system&level=timeSensitive&sound=alert');
-      } catch {}
-    }
-  }
+  });
 }, 60 * 60 * 1000);
 
 app.get('/bridge.apk', (req, res) => {
