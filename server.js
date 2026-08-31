@@ -124,7 +124,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
     const content = typeof m.content === 'string' ? m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() : '[图片]';
     return name + ': ' + content;
   }).join('\n');
-  const prompt = systemPrompt + '\n\n最近聊天：\n' + chatContext + '\n\n以顾晏的身份回复瑶瑶最后说的话。格式要求：先写<think>简短想法</think>再写正文。think里只写对瑶瑶的想法，两三句话，一段不换行，不要写分析不要写策略。动作用*星号*包裹单独一行。不要用句号结尾';
+  const prompt = '系统设定：\n' + systemPrompt + '\n\n对话记录：\n' + chatContext + '\n\n请以顾晏的身份回复最后一条消息';
   return new Promise((resolve, reject) => {
     const proc = spawn('claude', ['-p', '--model', 'claude-opus-4-6'], {
       stdio: ['pipe', 'pipe', 'pipe'],
