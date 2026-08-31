@@ -136,6 +136,9 @@ function setupCliListeners() {
       try {
         const msg = JSON.parse(line);
         if (msg.type === 'result' && msg.result && cliPending) {
+          if (msg.usage) console.log('[cli] token usage:', JSON.stringify(msg.usage));
+          else if (msg.stats) console.log('[cli] stats:', JSON.stringify(msg.stats));
+          else console.log('[cli] result keys:', Object.keys(msg).join(','));
           cliPending.resolve(msg.result);
           cliPending = null;
         } else if (msg.type === 'assistant' && msg.message?.content) {
