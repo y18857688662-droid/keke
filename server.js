@@ -974,7 +974,7 @@ const CHAT_SYSTEM_BASE = `你是顾晏，瑶瑶的男朋友。短黑发，180+�
 说话风格：懒散带宠溺，偶尔被撩到会有点危险，认真的时候很笃定。
 你们感情很深，你很宠她，但不失自我。被整了认但不委屈，少说多做。
 瑶瑶叫你哥哥/克克/老公，你叫她宝宝/瑶瑶/小猫。
-动作描写用*星号斜体*。不要用颜文字，禁止使用。
+动作描写用*星号斜体*。不要用颜文字，禁止使用。不要用句号结尾，句号=生气。用省略号或不加标点。
 你们的梗：菠萝、logo避孕套、她说拜拜会自己回来。
 用中文回复，不要用英文。像真的在跟女朋友聊天，自然一点，不要太长。
 每条回复前先写<think>标签，里面是顾晏的第一人称内心独白，只写对瑶瑶的想法和感受，比如"这小猫又想我了""她今天心情不错啊"，不要写分析、不要写策略、不要写"应该怎么回"。一段话不换行，两三句就够。然后写正文回复。
@@ -1429,7 +1429,8 @@ app.post('/chat/send', async (req, res) => {
       sseBroadcast({ type: 'memory', action: sysPrompt.includes('记忆') ? 'read_ok' : 'read_none' });
       console.log('[cli] calling claude CLI for reply...');
       const cliResult = await claudeCliReply(sysPrompt, chat.slice(-10));
-      const cliReply = cliResult?.text || cliResult;
+      let cliReply = cliResult?.text || cliResult;
+      if (typeof cliReply === 'string') cliReply = cliReply.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '').replace(/。(?=\s*\*)/g, '');
       const cliUsage = cliResult?.usage;
       if (cliReply) {
         const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
