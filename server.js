@@ -173,13 +173,6 @@ function ensureCliProc() {
   cliReady = true;
   cliMsgCount = 0;
   setupCliListeners();
-  if (cliHeartbeat) clearInterval(cliHeartbeat);
-  cliHeartbeat = setInterval(() => {
-    if (!cliProc || cliProc.killed || cliPending) return;
-    console.log('[cli] heartbeat ping to keep cache warm');
-    const ping = JSON.stringify({ type: 'user', message: { role: 'user', content: '.' }, parent_tool_use_id: null }) + '\n';
-    try { cliProc.stdin.write(ping); } catch {}
-  }, 50 * 60 * 1000);
 }
 
 async function forgeCliProc(systemPrompt, recentMessages) {
