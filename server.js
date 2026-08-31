@@ -3489,6 +3489,30 @@ function startWakeEngine() {
 }
 startWakeEngine();
 
+let cliHealthOk = true;
+setInterval(async () => {
+  try {
+    const test = await cliOneshot('回复OK两个字母');
+    if (test && test.includes('OK')) {
+      if (!cliHealthOk) console.log('[health] CLI recovered');
+      cliHealthOk = true;
+    } else {
+      throw new Error('unexpected response: ' + (test || '').slice(0, 50));
+    }
+  } catch (e) {
+    console.log('[health] CLI check failed:', e.message);
+    if (cliHealthOk) {
+      cliHealthOk = false;
+      try {
+        await fetch('https://api.day.app/' + BARK_KEY + '/' +
+          encodeURIComponent('CLI认证异常') + '/' +
+          encodeURIComponent('CLI进程不可用，可能需要重新登录。用Termius进VPS跑 claude login') +
+          '?group=system&level=timeSensitive&sound=alert');
+      } catch {}
+    }
+  }
+}, 60 * 60 * 1000);
+
 app.get('/bridge.apk', (req, res) => {
   const fs = require('fs');
   const p = __dirname + '/bridge-vps.apk';
