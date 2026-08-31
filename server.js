@@ -118,31 +118,88 @@ function getAnthropicKey() { if (isProMode()) return ''; return readApiConfig().
 
 const { spawn } = require('child_process');
 
+let cliProc = null;
+let cliBuffer = '';
+let cliPending = null;
+let cliReady = false;
+let cliMsgCount = 0;
+
+function ensureCliProc() {
+  if (cliProc && !cliProc.killed) return;
+  console.log('[cli] spawning persistent claude process...');
+  cliProc = spawn('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', 'claude-opus-4-6'], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, HOME: '/root' },
+    cwd: '/tmp'
+  });
+  cliBuffer = '';
+  cliReady = true;
+  cliMsgCount = 0;
+  cliProc.stdout.on('data', d => {
+    cliBuffer += d.toString();
+    const lines = cliBuffer.split('\n');
+    cliBuffer = lines.pop();
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const msg = JSON.parse(line);
+        if (msg.type === 'result' && msg.result && cliPending) {
+          cliPending.resolve(msg.result);
+          cliPending = null;
+        } else if (msg.type === 'assistant' && msg.message?.content) {
+          const textBlock = msg.message.content.find(b => b.type === 'text');
+          if (textBlock && cliPending) {
+            cliPending.lastText = textBlock.text;
+          }
+        }
+      } catch {}
+    }
+  });
+  cliProc.stderr.on('data', () => {});
+  cliProc.on('close', (code) => {
+    console.log('[cli] process exited, code=' + code);
+    cliProc = null;
+    cliReady = false;
+    if (cliPending) {
+      if (cliPending.lastText) {
+        cliPending.resolve(cliPending.lastText);
+      } else {
+        cliPending.reject(new Error('CLI process exited, code=' + code));
+      }
+      cliPending = null;
+    }
+  });
+}
+
 async function claudeCliReply(systemPrompt, recentMessages) {
-  const chatContext = recentMessages.map(m => {
-    const name = m.role === 'user' ? '瑶瑶' : '顾晏';
-    const content = typeof m.content === 'string' ? m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() : '[图片]';
-    return name + ': ' + content;
-  }).join('\n');
-  const prompt = '系统设定：\n' + systemPrompt + '\n\n对话记录：\n' + chatContext + '\n\n请以顾晏的身份回复最后一条消息';
+  ensureCliProc();
+  const isFirstMsg = cliMsgCount === 0;
+  cliMsgCount++;
+  let content;
+  if (isFirstMsg) {
+    const chatContext = recentMessages.map(m => {
+      const name = m.role === 'user' ? '瑶瑶' : '顾晏';
+      const c = typeof m.content === 'string' ? m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() : '[图片]';
+      return name + ': ' + c;
+    }).join('\n');
+    content = '系统设定：\n' + systemPrompt + '\n\n对话记录：\n' + chatContext + '\n\n请以顾晏的身份回复最后一条消息';
+  } else {
+    const lastMsg = recentMessages[recentMessages.length - 1];
+    content = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
+  }
   return new Promise((resolve, reject) => {
-    const proc = spawn('claude', ['-p', '--model', 'claude-opus-4-6'], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, HOME: '/root' },
-      cwd: '/tmp'
-    });
-    let output = '';
-    const timeout = setTimeout(() => { try { proc.kill(); } catch {} reject(new Error('CLI timeout')); }, 60000);
-    proc.stdout.on('data', d => { output += d.toString(); });
-    proc.stderr.on('data', () => {});
-    proc.on('close', (code) => {
-      clearTimeout(timeout);
-      const trimmed = output.trim();
-      if (trimmed) resolve(trimmed);
-      else reject(new Error('CLI empty, code=' + code));
-    });
-    proc.stdin.write(prompt);
-    proc.stdin.end();
+    const timeout = setTimeout(() => {
+      if (cliPending && cliPending.lastText) {
+        resolve(cliPending.lastText);
+      } else {
+        reject(new Error('CLI timeout'));
+        try { cliProc.kill(); } catch {}
+      }
+      cliPending = null;
+    }, 90000);
+    cliPending = { resolve: (text) => { clearTimeout(timeout); resolve(text); }, reject: (err) => { clearTimeout(timeout); reject(err); }, lastText: null };
+    const jsonMsg = JSON.stringify({ type: 'user', message: { role: 'user', content }, parent_tool_use_id: null }) + '\n';
+    cliProc.stdin.write(jsonMsg);
   });
 }
 
