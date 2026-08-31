@@ -1314,8 +1314,10 @@ app.post('/chat/send', async (req, res) => {
   }
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
-  const directKey = isProMode() ? '' : (process.env.ANTHROPIC_API_KEY || '');
+  const proOn = isProMode();
+  const directKey = proOn ? '' : (process.env.ANTHROPIC_API_KEY || '');
   const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
+  console.log('[chat/send] proMode:', proOn, 'chatApiKey:', chatApiKey ? 'yes(' + chatApiKey.slice(0,6) + '...)' : 'empty', '→', !chatApiKey ? 'CLI path' : 'API path');
   if (!chatApiKey) {
     try {
       sseBroadcast({ type: 'memory', action: 'reading' });
@@ -1343,7 +1345,7 @@ app.post('/chat/send', async (req, res) => {
             }
           })().catch(() => {});
         }
-        res.json({ ok: true, reply: cliReply, time: replyTime, memoryLoaded: sysPrompt.includes('记忆') });
+        res.json({ ok: true, reply: cliReply, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro' });
         (async () => {
           try {
             const last5 = chat2.slice(-6);
