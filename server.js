@@ -123,18 +123,10 @@ let cliBuffer = '';
 let cliPending = null;
 let cliReady = false;
 let cliMsgCount = 0;
+let cliHeartbeat = null;
+const CLI_FORGE_THRESHOLD = 80;
 
-function ensureCliProc() {
-  if (cliProc && !cliProc.killed) return;
-  console.log('[cli] spawning persistent claude process...');
-  cliProc = spawn('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', 'claude-opus-4-6'], {
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, HOME: '/root' },
-    cwd: '/tmp'
-  });
-  cliBuffer = '';
-  cliReady = true;
-  cliMsgCount = 0;
+function setupCliListeners() {
   cliProc.stdout.on('data', d => {
     cliBuffer += d.toString();
     const lines = cliBuffer.split('\n');
@@ -160,18 +152,66 @@ function ensureCliProc() {
     console.log('[cli] process exited, code=' + code);
     cliProc = null;
     cliReady = false;
+    if (cliHeartbeat) { clearInterval(cliHeartbeat); cliHeartbeat = null; }
     if (cliPending) {
-      if (cliPending.lastText) {
-        cliPending.resolve(cliPending.lastText);
-      } else {
-        cliPending.reject(new Error('CLI process exited, code=' + code));
-      }
+      if (cliPending.lastText) cliPending.resolve(cliPending.lastText);
+      else cliPending.reject(new Error('CLI process exited, code=' + code));
       cliPending = null;
     }
   });
 }
 
+function ensureCliProc() {
+  if (cliProc && !cliProc.killed) return;
+  console.log('[cli] spawning persistent claude process...');
+  cliProc = spawn('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', 'claude-opus-4-6'], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, HOME: '/root' },
+    cwd: '/tmp'
+  });
+  cliBuffer = '';
+  cliReady = true;
+  cliMsgCount = 0;
+  setupCliListeners();
+  if (cliHeartbeat) clearInterval(cliHeartbeat);
+  cliHeartbeat = setInterval(() => {
+    if (!cliProc || cliProc.killed || cliPending) return;
+    console.log('[cli] heartbeat ping to keep cache warm');
+    const ping = JSON.stringify({ type: 'user', message: { role: 'user', content: '.' }, parent_tool_use_id: null }) + '\n';
+    try { cliProc.stdin.write(ping); } catch {}
+  }, 50 * 60 * 1000);
+}
+
+function forgeCliProc(systemPrompt, recentMessages) {
+  console.log('[cli] forge: context too large (' + cliMsgCount + ' msgs), restarting with fresh context...');
+  try { cliProc.kill(); } catch {}
+  cliProc = null;
+  cliReady = false;
+  if (cliHeartbeat) { clearInterval(cliHeartbeat); cliHeartbeat = null; }
+  ensureCliProc();
+}
+
+function cliOneshot(prompt) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('claude', ['-p', '--model', 'claude-opus-4-6'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, HOME: '/root' },
+      cwd: '/tmp'
+    });
+    let output = '';
+    const timeout = setTimeout(() => { try { proc.kill(); } catch {} reject(new Error('oneshot timeout')); }, 60000);
+    proc.stdout.on('data', d => { output += d.toString(); });
+    proc.stderr.on('data', () => {});
+    proc.on('close', () => { clearTimeout(timeout); resolve(output.trim()); });
+    proc.stdin.write(prompt);
+    proc.stdin.end();
+  });
+}
+
 async function claudeCliReply(systemPrompt, recentMessages) {
+  if (cliMsgCount >= CLI_FORGE_THRESHOLD) {
+    forgeCliProc(systemPrompt, recentMessages);
+  }
   ensureCliProc();
   const isFirstMsg = cliMsgCount === 0;
   cliMsgCount++;
