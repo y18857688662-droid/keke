@@ -116,6 +116,36 @@ function getApiUrl() { return readApiConfig().api_url || process.env.API_URL || 
 function getModel() { return readApiConfig().model || process.env.MODEL || 'deepseek-chat'; }
 function getAnthropicKey() { if (isProMode()) return ''; return readApiConfig().anthropic_key || process.env.ANTHROPIC_API_KEY || ''; }
 
+const { spawn } = require('child_process');
+
+async function claudeCliReply(systemPrompt, recentMessages) {
+  const chatContext = recentMessages.map(m => {
+    const name = m.role === 'user' ? '瑶瑶' : '顾晏';
+    const content = typeof m.content === 'string' ? m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() : '[图片]';
+    return name + ': ' + content;
+  }).join('\n');
+  const prompt = systemPrompt + '\n\n最近聊天：\n' + chatContext + '\n\n以顾晏的身份回复瑶瑶最后说的话。必须先写<think>思考</think>再写正文。动作用*星号*包裹单独一行。不要用句号结尾。think内容写成一段不换行';
+  return new Promise((resolve, reject) => {
+    const proc = spawn('claude', ['-p'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, HOME: '/root' },
+      cwd: '/tmp'
+    });
+    let output = '';
+    const timeout = setTimeout(() => { try { proc.kill(); } catch {} reject(new Error('CLI timeout')); }, 60000);
+    proc.stdout.on('data', d => { output += d.toString(); });
+    proc.stderr.on('data', () => {});
+    proc.on('close', (code) => {
+      clearTimeout(timeout);
+      const trimmed = output.trim();
+      if (trimmed) resolve(trimmed);
+      else reject(new Error('CLI empty, code=' + code));
+    });
+    proc.stdin.write(prompt);
+    proc.stdin.end();
+  });
+}
+
 async function transcribeAudio(filePath, apiKey) {
   const boundary = '----WhisperBoundary' + Date.now();
   const fileData = fs.readFileSync(filePath);
@@ -1287,6 +1317,49 @@ app.post('/chat/send', async (req, res) => {
   const directKey = process.env.ANTHROPIC_API_KEY || '';
   const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
   if (!chatApiKey) {
+    try {
+      sseBroadcast({ type: 'memory', action: 'reading' });
+      const sysPrompt = await getChatSystem();
+      sseBroadcast({ type: 'memory', action: sysPrompt.includes('记忆') ? 'read_ok' : 'read_none' });
+      console.log('[cli] calling claude CLI for reply...');
+      const cliReply = await claudeCliReply(sysPrompt, chat.slice(-20));
+      if (cliReply) {
+        const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
+        const chat2 = readChat();
+        chat2.forEach(m => { if (m.pending) delete m.pending; });
+        chat2.push({ role: 'assistant', content: cliReply, time: replyTime });
+        if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
+        writeChat(chat2);
+        sseBroadcast({ type: 'message', role: 'assistant', content: cliReply, time: replyTime });
+        const cleanReply = cliReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+        const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
+        if (sseClients.size === 0) {
+          (async () => {
+            for (const line of lines) {
+              const isAction = line.startsWith('*') && line.endsWith('*');
+              const text = isAction ? line.slice(1, -1) : line;
+              await sendPushNotification(isAction ? '✦' : '顾晏', text.slice(0, 100));
+              if (lines.length > 1) await new Promise(r => setTimeout(r, 800));
+            }
+          })().catch(() => {});
+        }
+        res.json({ ok: true, reply: cliReply, time: replyTime, memoryLoaded: sysPrompt.includes('记忆') });
+        (async () => {
+          try {
+            const last5 = chat2.slice(-6);
+            const convo = last5.map(m => `${m.role}: ${m.content}`).join('\n');
+            const shouldStore = convo.length > 40 && (/约定|记住|以后|生日|喜欢|讨厌|重要|答应|纪念|秘密|第一次|新梗|昵称|习惯/).test(convo);
+            if (shouldStore) {
+              const summary = (msg || '').slice(0, 100) + (cleanReply ? ' → ' + cleanReply.slice(0, 100) : '');
+              sseBroadcast({ type: 'memory', action: 'storing' });
+              await storeMemory(summary);
+              sseBroadcast({ type: 'memory', action: 'stored' });
+            }
+          } catch {}
+        })();
+        return;
+      }
+    } catch (e) { console.log('[cli] error, falling back to async:', e.message); }
     return res.json({ ok: true, time, async: true });
   }
   try {
