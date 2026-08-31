@@ -1314,7 +1314,7 @@ app.post('/chat/send', async (req, res) => {
   }
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
-  const directKey = process.env.ANTHROPIC_API_KEY || '';
+  const directKey = isProMode() ? '' : (process.env.ANTHROPIC_API_KEY || '');
   const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
   if (!chatApiKey) {
     try {
@@ -2201,7 +2201,7 @@ app.post('/tg/webhook', async (req, res) => {
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
 
-  const directKey = process.env.ANTHROPIC_API_KEY || '';
+  const directKey = isProMode() ? '' : (process.env.ANTHROPIC_API_KEY || '');
   const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
 
   if (!chatApiKey) {
