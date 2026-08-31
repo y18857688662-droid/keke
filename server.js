@@ -1339,7 +1339,8 @@ app.get('/chat/stream', (req, res) => {
   res.flushHeaders();
   res.write('data: {"type":"connected"}\n\n');
   sseClients.add(res);
-  req.on('close', () => sseClients.delete(res));
+  const hb = setInterval(() => { try { res.write('data: {"type":"ping"}\n\n'); } catch { clearInterval(hb); } }, 25000);
+  req.on('close', () => { clearInterval(hb); sseClients.delete(res); });
 });
 
 function sseBroadcast(event) {

@@ -1390,8 +1390,10 @@ function attachSSE(src) {
     if (hs) hs.innerHTML = '<span class="status-dot" style="background:#ccc"></span>重连中...';
   };
   src.onmessage = function(e) {
+    lastSSEPing = Date.now();
     try {
       var data = JSON.parse(e.data);
+      if (data.type === 'ping') return;
       if (data.type === 'typing' && data.active) {
         var hs = document.querySelector('.header-status');
         if (hs) hs.innerHTML = '<span class="status-dot"></span>正在输入中...';
@@ -1419,17 +1421,22 @@ function attachSSE(src) {
     } catch(err) {}
   };
 }
+var lastSSEPing = Date.now();
 attachSSE(evtSource);
+function sseReconnect() {
+  evtSource.close();
+  evtSource = new EventSource('/chat/stream');
+  lastSSEPing = Date.now();
+  attachSSE(evtSource);
+  fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
+    if (!data.messages) return;
+    renderAll(data.messages);
+    pollKnown = data.messages.length;
+  }).catch(function(){});
+}
 setInterval(function() {
-  if (evtSource.readyState === 2) {
-    evtSource.close();
-    evtSource = new EventSource('/chat/stream');
-    attachSSE(evtSource);
-    fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
-      if (!data.messages) return;
-      renderAll(data.messages);
-      pollKnown = data.messages.length;
-    }).catch(function(){});
+  if (evtSource.readyState === 2 || (Date.now() - lastSSEPing > 45000)) {
+    sseReconnect();
   }
 }, 5000);
 var fpIcons = {chat:'💬',search:'🔍',think:'💭',memory:'📖',idle:'😴',thought:'💭',wake:'⏰'};
