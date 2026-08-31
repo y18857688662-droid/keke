@@ -728,6 +728,7 @@ var thinkingStore = {};
 var msgContainer = document.getElementById('messages');
 var inputField = document.querySelector('.input-field');
 var sending = false;
+var lastRenderedTime = '';
 var lastMsgCount = 0;
 var currentQuote = null;
 
@@ -1283,8 +1284,18 @@ function sendMessage() {
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(body)
   }).then(function(r){return r.json()}).then(function(data) {
-    pollKnown++;
     sending = false;
+    if (data.ok && data.reply) {
+      pollKnown += 2;
+      lastRenderedTime = data.time;
+      var replyMsg = {role:'assistant', content: data.reply, time: data.time};
+      var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
+      if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
+      msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
+      msgContainer.appendChild(replyEl);
+      scrollBottom();
+      petMood(detectMood(data.reply));
+    } else { pollKnown++; }
   }).catch(function() {
     sending = false;
   });
@@ -1402,9 +1413,10 @@ function attachSSE(src) {
         var hs2 = document.querySelector('.header-status');
         if (hs2) hs2.innerHTML = '<span class="status-dot"></span>在线';
       }
-      if (data.type === 'message' && data.role === 'assistant' && !sending) {
+      if (data.type === 'message' && data.role === 'assistant' && !sending && data.time !== lastRenderedTime) {
         lastMsgCount++;
         pollKnown++;
+        lastRenderedTime = data.time;
         var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl, audioUrl: data.audioUrl, searchQuery: data.searchQuery};
         var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
         if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
