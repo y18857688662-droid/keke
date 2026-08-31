@@ -126,7 +126,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
   }).join('\n');
   const prompt = systemPrompt + '\n\n最近聊天：\n' + chatContext + '\n\n以顾晏的身份回复瑶瑶最后说的话。必须先写<think>思考</think>再写正文。动作用*星号*包裹单独一行。不要用句号结尾。think内容写成一段不换行';
   return new Promise((resolve, reject) => {
-    const proc = spawn('claude', ['-p'], {
+    const proc = spawn('claude', ['-p', '--model', 'claude-opus-4-6'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, HOME: '/root' },
       cwd: '/tmp'
