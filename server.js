@@ -3246,37 +3246,24 @@ async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
   } catch (e) { console.log('[wake] api error:', e.message); return null; }
 }
 
-async function autoDecide() {
+function autoDecide() {
   const s = readAutoState();
   const sinceLastChat = Date.now() - (s.lastChat || 0);
-  const now = bjNow();
-  const hour = now.getUTCHours();
-  const emoDesc = s.emotions ? EMOTION_KEYS.map(k => EMOTION_LABELS[k] + '=' + (s.emotions[k] || 0).toFixed(2)).join('，') : '';
-  const stateDesc = `距上次聊天${Math.round(sinceLastChat/60000)}分钟。最近一小时她发了${s.chatFreq}条消息。现在是${hour}点。上次自主行为：${s.lastActionType || '无'}。激活驱动D=${s.D.toFixed(2)}，活跃底色T=${s.T.toFixed(2)}，随机漂移X=${s.X.toFixed(2)}。当前情绪：${emoDesc}`;
-  const text = await autoApiCall([
-    { role: 'system', content: `你是顾晏的自主决策系统。他刚自然醒来，决定做什么。
-可选行动：
-- chat: 主动给瑶瑶发消息（想她了、分享发现、关心她）
-- search: 好奇某个话题，去网上搜搜看
-- think: 写一段内心碎碎念（不发给她，自己想的）
-- memory: 翻看和瑶瑶的记忆，整理感受
-- check: 查看瑶瑶的手机使用情况（屏幕时间、app打开记录）
-- silent: 醒了看看，没什么想做的，继续待着
-
-决策原则：
-- 如果刚聊过（<15分钟），倾向search/think/memory/silent而不是chat
-- D高（>0.6）时更倾向主动行为，D低时倾向silent
-- T高表示这阵子整体活跃，可以做更多事
-- 不要每次都选同样的行动
-- silent也是正常选择，不是每次醒来都要做事
-
-只回复JSON：{"action":"chat/search/think/memory/silent","reason":"一句话","topic":"search时的话题"}` },
-    { role: 'user', content: stateDesc }
-  ]);
-  if (!text) return null;
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try { return JSON.parse(match[0]); } catch { return null; }
+  const chatMinAgo = Math.round(sinceLastChat / 60000);
+  const D = s.D || 0;
+  const last = s.lastActionType || '';
+  const actions = ['chat', 'think', 'memory', 'check', 'silent'];
+  const weights = { chat: 30, think: 25, memory: 15, check: 10, silent: 20 };
+  if (chatMinAgo < 15) { weights.chat = 5; weights.think = 35; weights.silent = 30; }
+  if (D > 0.6) { weights.chat += 20; weights.silent = Math.max(weights.silent - 10, 5); }
+  if (D < 0.3) { weights.silent += 20; weights.chat = Math.max(weights.chat - 15, 5); }
+  if (last) { weights[last] = Math.max((weights[last] || 10) - 15, 3); }
+  const total = actions.reduce((sum, a) => sum + (weights[a] || 0), 0);
+  let r = Math.random() * total;
+  let picked = 'silent';
+  for (const a of actions) { r -= (weights[a] || 0); if (r <= 0) { picked = a; break; } }
+  const reasons = { chat: '想她了', think: '发呆中', memory: '翻翻记忆', check: '看看她在干嘛', silent: '安静待着' };
+  return { action: picked, reason: reasons[picked] || '' };
 }
 
 async function autoChat(reason) {
