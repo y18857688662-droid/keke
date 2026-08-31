@@ -1435,7 +1435,7 @@ app.post('/chat/send', async (req, res) => {
       console.log('[cli] calling claude CLI for reply...');
       const cliReply = await claudeCliReply(sysPrompt, chat.slice(-20));
       if (cliReply) {
-        const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
+        const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
         const chat2 = readChat();
         chat2.forEach(m => { if (m.pending) delete m.pending; });
         chat2.push({ role: 'assistant', content: cliReply, time: replyTime });
@@ -1512,7 +1512,7 @@ app.post('/chat/send', async (req, res) => {
       const data = await r.json();
       reply = data.choices?.[0]?.message?.content?.trim() || getFallback();
     }
-    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
+    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
     const chat2 = readChat();
     chat2.forEach(m => { if (m.pending) delete m.pending; });
     chat2.push({ role: 'assistant', content: reply, time: replyTime });
@@ -2357,7 +2357,7 @@ app.post('/tg/webhook', async (req, res) => {
       reply = data.choices?.[0]?.message?.content?.trim() || '顾晏好像走神了…再说一次？';
     }
 
-    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
+    const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
     const chat2 = readChat();
     chat2.push({ role: 'assistant', content: reply, time: replyTime, source: 'telegram' });
     if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
