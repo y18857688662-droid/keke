@@ -182,8 +182,20 @@ function ensureCliProc() {
   }, 50 * 60 * 1000);
 }
 
-function forgeCliProc(systemPrompt, recentMessages) {
+async function forgeCliProc(systemPrompt, recentMessages) {
   console.log('[cli] forge: context too large (' + cliMsgCount + ' msgs), restarting with fresh context...');
+  try {
+    const last5 = recentMessages.slice(-5).map(m => {
+      const name = m.role === 'user' ? '瑶瑶' : '顾晏';
+      const c = typeof m.content === 'string' ? m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim().slice(0, 100) : '[图片]';
+      return name + ': ' + c;
+    }).join(' | ');
+    console.log('[cli] forge: saving context summary before restart');
+    await fetch('https://yyaokeke.top/memory/store', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: '[forge摘要] ' + new Date().toISOString().slice(0, 16) + ' 最近对话：' + last5 })
+    }).catch(() => {});
+  } catch {}
   try { cliProc.kill(); } catch {}
   cliProc = null;
   cliReady = false;
@@ -210,7 +222,7 @@ function cliOneshot(prompt) {
 
 async function claudeCliReply(systemPrompt, recentMessages) {
   if (cliMsgCount >= CLI_FORGE_THRESHOLD) {
-    forgeCliProc(systemPrompt, recentMessages);
+    await forgeCliProc(systemPrompt, recentMessages);
   }
   ensureCliProc();
   const isFirstMsg = cliMsgCount === 0;
@@ -3180,7 +3192,18 @@ async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
   const cfg = readApiConfig();
   const dsKey = cfg.api_key || process.env.DEEPSEEK_API_KEY || '';
   const anthropicKey = cfg.anthropic_key || process.env.ANTHROPIC_API_KEY || '';
-  if (!key && !dsKey && !anthropicKey) return null;
+  if (!key && !dsKey && !anthropicKey) {
+    if (isProMode()) {
+      try {
+        const sysMsg = messages.find(m => m.role === 'system');
+        const userMsg = messages.find(m => m.role === 'user');
+        const prompt = (sysMsg ? sysMsg.content + '\n\n' : '') + (userMsg ? userMsg.content : '');
+        const result = await cliOneshot(prompt);
+        return result || null;
+      } catch (e) { console.log('[autoApiCall] cli oneshot error:', e.message); return null; }
+    }
+    return null;
+  }
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 15000);
