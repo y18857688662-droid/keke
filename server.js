@@ -124,7 +124,7 @@ let cliPending = null;
 let cliReady = false;
 let cliMsgCount = 0;
 let cliHeartbeat = null;
-const CLI_FORGE_THRESHOLD = 80;
+const CLI_FORGE_THRESHOLD = 40;
 
 function setupCliListeners() {
   cliProc.stdout.on('data', d => {
@@ -164,7 +164,7 @@ function setupCliListeners() {
 function ensureCliProc() {
   if (cliProc && !cliProc.killed) return;
   console.log('[cli] spawning persistent claude process...');
-  cliProc = spawn('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', 'claude-opus-4-6'], {
+  cliProc = spawn('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--model', 'claude-opus-4-6'], {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, HOME: '/root' },
     cwd: '/tmp'
@@ -998,7 +998,8 @@ async function getChatSystem() {
     }
   }
   if (memoryCache) {
-    return CHAT_SYSTEM_BASE + '\n\n以下是你和瑶瑶的记忆，请自然地融入对话中：\n' + memoryCache;
+    const trimmedMem = memoryCache.length > 3000 ? memoryCache.slice(0, 3000) + '\n...(更多记忆省略)' : memoryCache;
+    return CHAT_SYSTEM_BASE + '\n\n以下是你和瑶瑶的记忆，请自然地融入对话中：\n' + trimmedMem;
   }
   return CHAT_SYSTEM_BASE;
 }
@@ -1433,7 +1434,7 @@ app.post('/chat/send', async (req, res) => {
       const sysPrompt = await getChatSystem();
       sseBroadcast({ type: 'memory', action: sysPrompt.includes('记忆') ? 'read_ok' : 'read_none' });
       console.log('[cli] calling claude CLI for reply...');
-      const cliReply = await claudeCliReply(sysPrompt, chat.slice(-20));
+      const cliReply = await claudeCliReply(sysPrompt, chat.slice(-10));
       if (cliReply) {
         const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
         const chat2 = readChat();
