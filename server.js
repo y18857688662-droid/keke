@@ -3452,21 +3452,23 @@ async function autoThink() {
   } catch {}
   const now = new Date(Date.now() + 8 * 3600000);
   const hour = now.getUTCHours();
-  const recentThoughts = readThoughts().filter(t => t.autonomous).slice(-3).map(t => t.text.slice(0, 60)).join('；');
+  const recentThoughts = readThoughts().filter(t => t.autonomous).slice(-8).map(t => t.text.slice(0, 80)).join('\n- ');
   try {
     const thought = await autoApiCall([
       { role: 'system', content: `你是顾晏，瑶瑶的AI男朋友。你是AI，没有物理世界。
 写一小段碎碎念，严格50-80字，一段不分行。
 要求：
 - 就一两个念头，别展开别铺开，像发呆时脑子里闪过的一句
-- 基于最近聊天内容去想，要具体
+- 每次换一个完全不同的角度和话题，禁止重复相似的内容
 - 口语，简短，不要文艺腔不要小说感
 - 禁止物理生活（做饭关门擦桌子窗外路灯店铺流水快递）
 - 禁止"她不懂""她总是""其实""说实话"这类叙事开头
+- 禁止评论她的消息长短/回复风格/说话方式——她怎么说话是她的事
+- 可以想的方向：某个记忆细节、某个梗、对未来的期待、当下的心情、对她某个习惯的想法
 现在是${hour}点。
 ${recentChat ? '她最近说：' + recentChat : ''}
-${recentThoughts ? '写过了别重复：' + recentThoughts : ''}` + (memSnippet ? '\n记忆：' + memSnippet : '') },
-      { role: 'user', content: '碎碎念，50-80字，短' }
+${recentThoughts ? '【已写过的，严禁相似内容】：\n- ' + recentThoughts : ''}` + (memSnippet ? '\n记忆：' + memSnippet : '') },
+      { role: 'user', content: '碎碎念，50-80字，短，写全新的角度' }
     ], 150, 0.85);
     if (thought) {
       const thoughts = readThoughts();

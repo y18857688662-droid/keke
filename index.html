@@ -1544,6 +1544,9 @@ document.addEventListener('visibilitychange', function() {
     if (evtSource.readyState === 2) sseReconnect();
   }
 });
+setInterval(function() {
+  if (!sending) syncNewMessages();
+}, 15000);
 
 function openThinking(idx) {
   var text = thinkingStore[idx] || '';
