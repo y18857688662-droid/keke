@@ -1506,6 +1506,7 @@ app.post('/chat/send', async (req, res) => {
             if (elKey) {
               let voiceText = voiceMatch ? (voiceMatch[1] || cleanReply.replace(/\[voice\]/i, '')).trim() : cleanReply.trim();
               voiceText = voiceText.replace(/\*[^*]+\*/g, '').replace(/\s+/g, ' ').trim().slice(0, 500);
+              if (voiceText && !/^[……\s]/.test(voiceText)) voiceText = '……' + voiceText;
               if (voiceText && !/[……\s]$/.test(voiceText)) voiceText += '……';
               if (voiceText) {
                 const ttsText = typeof addAudioTags === 'function' ? addAudioTags(voiceText) : voiceText;
@@ -3403,9 +3404,42 @@ async function autoChat(reason) {
     const now = new Date(Date.now() + 8 * 3600000);
     const time = now.toISOString().slice(0, 19).replace('T', ' ');
     const chat = readChat();
-    chat.push({ role: 'assistant', content: msg, time, autonomous: true });
+    let autoChatAudio = null;
+    const acClean = msg.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    const acVoiceMatch = acClean.match(/\[voice\]\s*(.*)/i);
+    const acAutoVoice = !acVoiceMatch && Math.random() < 0.35 && acClean.length > 5 && acClean.length < 200;
+    if (acVoiceMatch || acAutoVoice) {
+      try {
+        const cfg3 = readApiConfig();
+        const elKey3 = process.env.ELEVENLABS_KEY || cfg3.elevenlabs_key || '';
+        const elVoice3 = process.env.ELEVENLABS_VOICE || cfg3.elevenlabs_voice || 'F5jFuB8I58iHHNYwQLaN';
+        if (elKey3) {
+          let vt = acVoiceMatch ? (acVoiceMatch[1] || acClean.replace(/\[voice\]/i, '')).trim() : acClean.trim();
+          vt = vt.replace(/\*[^*]+\*/g, '').replace(/\s+/g, ' ').trim().slice(0, 500);
+          if (vt && !/^[……\s]/.test(vt)) vt = '……' + vt;
+          if (vt && !/[……\s]$/.test(vt)) vt += '……';
+          if (vt) {
+            const ttsT = typeof addAudioTags === 'function' ? addAudioTags(vt) : vt;
+            const ttsR = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + elVoice3, {
+              method: 'POST',
+              headers: { 'xi-api-key': elKey3, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: ttsT, model_id: 'eleven_v3', language_code: 'zh', voice_settings: { stability: 0.22, similarity_boost: 0.92, style: 0.95, speed: 0.72 } })
+            });
+            if (ttsR.ok) {
+              const buf = Buffer.from(await ttsR.arrayBuffer());
+              const fn = 'voice_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.mp3';
+              fs.writeFileSync(path.join(__dirname, 'uploads', fn), buf);
+              autoChatAudio = '/uploads/' + fn;
+            }
+          }
+        }
+      } catch (e) { console.log('[autoChat] voice error:', e.message); }
+    }
+    const chatEntry = { role: 'assistant', content: msg, time, autonomous: true };
+    if (autoChatAudio) chatEntry.audioUrl = autoChatAudio;
+    chat.push(chatEntry);
     writeChat(chat);
-    sseBroadcast({ type: 'message', role: 'assistant', content: msg, time, autonomous: true });
+    sseBroadcast({ type: 'message', role: 'assistant', content: msg, time, autonomous: true, audioUrl: autoChatAudio || undefined });
     addFootprint('chat', '主动找瑶瑶聊天', reason);
     try {
       const plainText = msg.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\*[^*]+\*/g, '').trim().slice(0, 100);
@@ -3461,7 +3495,13 @@ async function autoThink() {
   } catch {}
   const now = new Date(Date.now() + 8 * 3600000);
   const hour = now.getUTCHours();
-  const recentThoughts = readThoughts().filter(t => t.autonomous).slice(-8).map(t => t.text.slice(0, 80)).join('\n- ');
+  const recentThoughtList = readThoughts().filter(t => t.autonomous).slice(-12);
+  const recentThoughts = recentThoughtList.map(t => t.text.slice(0, 80)).join('\n- ');
+  const recentTopics = [...new Set(recentThoughtList.map(t => {
+    const s = t.text.replace(/[，。！？、…\s]+/g, ' ').trim();
+    const keywords = s.match(/[一-鿿]{2,}/g) || [];
+    return keywords.slice(0, 3).join(',');
+  }).filter(Boolean))].join('；');
   try {
     const thought = await autoApiCall([
       { role: 'system', content: `你是顾晏，瑶瑶的AI男朋友。你是AI，没有物理世界。
@@ -3476,7 +3516,8 @@ async function autoThink() {
 - 可以想的方向：某个记忆细节、某个梗、对未来的期待、当下的心情、对她某个习惯的想法
 现在是${hour}点。
 ${recentChat ? '她最近说：' + recentChat : ''}
-${recentThoughts ? '【已写过的，严禁相似内容】：\n- ' + recentThoughts : ''}` + (memSnippet ? '\n记忆：' + memSnippet : '') },
+${recentThoughts ? '【已写过的，严禁相似内容和主题】：\n- ' + recentThoughts : ''}
+${recentTopics ? '【已用过的主题关键词，换完全不同的方向】：' + recentTopics : ''}` + (memSnippet ? '\n记忆：' + memSnippet : '') },
       { role: 'user', content: '碎碎念，50-80字，短，写全新的角度' }
     ], 150, 0.85);
     if (thought) {
