@@ -1025,6 +1025,7 @@ function renderMessage(msg, idx, stagger) {
   if (think) { thinkingStore[idx] = think; }
   var group = document.createElement('div');
   group.className = 'msg-group ' + who;
+  if (msg.time) group.setAttribute('data-time', msg.time);
   var avaHtml = '<div class="msg-avatar">';
   if (isKe) {
     var keData = localStorage.getItem('avatar_ke');
@@ -1440,6 +1441,39 @@ function sseReconnect() {
   evtSource = new EventSource('/chat/stream');
   lastSSEPing = Date.now();
   attachSSE(evtSource);
+  if (!sending) {
+    setTimeout(function() {
+      fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
+        if (!data.messages || !data.messages.length) return;
+        var existing = msgContainer.querySelectorAll('.msg-group[data-time]');
+        var lastTime = '';
+        for (var i = existing.length - 1; i >= 0; i--) {
+          var t = existing[i].getAttribute('data-time');
+          if (t) { lastTime = t; break; }
+        }
+        var newMsgs = [];
+        if (lastTime) {
+          for (var j = 0; j < data.messages.length; j++) {
+            if (data.messages[j].time > lastTime) newMsgs.push(data.messages[j]);
+          }
+        } else {
+          renderAll(data.messages);
+          pollKnown = data.messages.length;
+          return;
+        }
+        for (var k = 0; k < newMsgs.length; k++) {
+          var m = newMsgs[k];
+          var el = renderMessage(m, pollKnown + k);
+          if (el._searchQuery) msgContainer.appendChild(renderSearchNarrator(el._searchQuery));
+          if (m.time && m.role === 'assistant') msgContainer.appendChild(renderTime(m.time, el._thinkIdx));
+          msgContainer.appendChild(el);
+          if (m.time) lastRenderedTime = m.time;
+        }
+        pollKnown = data.messages.length;
+        if (newMsgs.length > 0) scrollBottom();
+      }).catch(function(){});
+    }, 1000);
+  }
 }
 setInterval(function() {
   if (sending) return;
