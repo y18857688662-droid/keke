@@ -221,6 +221,8 @@ async function claudeCliReply(systemPrompt, recentMessages) {
   ensureCliProc();
   const isFirstMsg = cliMsgCount === 0;
   cliMsgCount++;
+  const lastMsg = recentMessages[recentMessages.length - 1];
+  const lastHasImage = lastMsg && (lastMsg.image || (lastMsg.images && lastMsg.images.length) || lastMsg.imageUrl || (lastMsg.imageUrls && lastMsg.imageUrls.length));
   let content;
   if (isFirstMsg) {
     const chatContext = recentMessages.map(m => {
@@ -228,10 +230,20 @@ async function claudeCliReply(systemPrompt, recentMessages) {
       const c = typeof m.content === 'string' ? m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() : '[图片]';
       return name + ': ' + c;
     }).join('\n');
-    content = '系统设定：\n' + systemPrompt + '\n\n对话记录：\n' + chatContext + '\n\n请以顾晏的身份回复最后一条消息';
+    const textPart = '系统设定：\n' + systemPrompt + '\n\n对话记录：\n' + chatContext + '\n\n请以顾晏的身份回复最后一条消息';
+    if (lastHasImage) {
+      const imgBlocks = buildMsgContent(lastMsg);
+      if (Array.isArray(imgBlocks)) {
+        const imgs = imgBlocks.filter(b => b.type === 'image');
+        content = [...imgs, { type: 'text', text: textPart }];
+      } else { content = textPart; }
+    } else { content = textPart; }
   } else {
-    const lastMsg = recentMessages[recentMessages.length - 1];
-    content = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
+    if (lastHasImage) {
+      content = buildMsgContent(lastMsg);
+    } else {
+      content = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
+    }
   }
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
