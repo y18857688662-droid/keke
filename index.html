@@ -1441,39 +1441,7 @@ function sseReconnect() {
   evtSource = new EventSource('/chat/stream');
   lastSSEPing = Date.now();
   attachSSE(evtSource);
-  if (!sending) {
-    setTimeout(function() {
-      fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
-        if (!data.messages || !data.messages.length) return;
-        var existing = msgContainer.querySelectorAll('.msg-group[data-time]');
-        var lastTime = '';
-        for (var i = existing.length - 1; i >= 0; i--) {
-          var t = existing[i].getAttribute('data-time');
-          if (t) { lastTime = t; break; }
-        }
-        var newMsgs = [];
-        if (lastTime) {
-          for (var j = 0; j < data.messages.length; j++) {
-            if (data.messages[j].time > lastTime) newMsgs.push(data.messages[j]);
-          }
-        } else {
-          renderAll(data.messages);
-          pollKnown = data.messages.length;
-          return;
-        }
-        for (var k = 0; k < newMsgs.length; k++) {
-          var m = newMsgs[k];
-          var el = renderMessage(m, pollKnown + k);
-          if (el._searchQuery) msgContainer.appendChild(renderSearchNarrator(el._searchQuery));
-          if (m.time && m.role === 'assistant') msgContainer.appendChild(renderTime(m.time, el._thinkIdx));
-          msgContainer.appendChild(el);
-          if (m.time) lastRenderedTime = m.time;
-        }
-        pollKnown = data.messages.length;
-        if (newMsgs.length > 0) scrollBottom();
-      }).catch(function(){});
-    }, 1000);
-  }
+  if (!sending) setTimeout(syncNewMessages, 1000);
 }
 setInterval(function() {
   if (sending) return;
@@ -1538,40 +1506,42 @@ function loadFootprints() {
       '<span class="fp-stat">30分钟内醒来 <b>' + p30 + '%</b></span>';
   }).catch(function(){});
 }
-setInterval(function() {
+function syncNewMessages() {
   fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
-    if (!data.messages) return;
-    var count = data.messages.length;
-    if (pollKnown >= 0 && count > pollKnown) {
-      var newMsgs = data.messages.slice(pollKnown);
-      for (var i = 0; i < newMsgs.length; i++) {
-        var m = newMsgs[i];
-        if (m.role === 'assistant') {
-          var mEl = renderMessage(m, Object.keys(thinkingStore).length);
-          if (mEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(mEl._searchQuery));
-          msgContainer.appendChild(renderTime(m.time, mEl._thinkIdx));
-          msgContainer.appendChild(mEl);
-          scrollBottom();
-        }
+    if (!data.messages || !data.messages.length) return;
+    var existing = msgContainer.querySelectorAll('.msg-group[data-time]');
+    var lastTime = '';
+    for (var i = existing.length - 1; i >= 0; i--) {
+      var t = existing[i].getAttribute('data-time');
+      if (t) { lastTime = t; break; }
+    }
+    if (!lastTime) {
+      renderAll(data.messages);
+      pollKnown = data.messages.length;
+      return;
+    }
+    var added = 0;
+    for (var j = 0; j < data.messages.length; j++) {
+      var m = data.messages[j];
+      if (m.time && m.time > lastTime) {
+        var el = renderMessage(m, pollKnown + added);
+        if (el._searchQuery) msgContainer.appendChild(renderSearchNarrator(el._searchQuery));
+        if (m.time && m.role === 'assistant') msgContainer.appendChild(renderTime(m.time, el._thinkIdx));
+        msgContainer.appendChild(el);
+        if (m.time) lastRenderedTime = m.time;
+        added++;
       }
     }
-    pollKnown = count;
+    pollKnown = data.messages.length;
+    if (added > 0) scrollBottom();
   }).catch(function(){});
-}, 2000);
+}
 
 document.addEventListener('visibilitychange', function() {
   fetch('/chat/presence', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:document.visibilityState==='visible'?'online':'away'})}).catch(function(){});
   if (document.visibilityState === 'visible') {
-    fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
-      if (!data.messages) return;
-      renderAll(data.messages);
-      pollKnown = data.messages.length;
-    }).catch(function(){});
-    if (evtSource.readyState === 2) {
-      evtSource.close();
-      evtSource = new EventSource('/chat/stream');
-      attachSSE(evtSource);
-    }
+    syncNewMessages();
+    if (evtSource.readyState === 2) sseReconnect();
   }
 });
 
