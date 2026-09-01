@@ -1289,7 +1289,7 @@ function sendMessage() {
     if (data.ok && data.reply) {
       pollKnown += 2;
       lastRenderedTime = data.time;
-      var replyMsg = {role:'assistant', content: data.reply, time: data.time};
+      var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl};
       var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
       if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
       msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));

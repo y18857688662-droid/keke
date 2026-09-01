@@ -1489,6 +1489,36 @@ app.post('/chat/send', async (req, res) => {
         writeChat(chat2);
         sseBroadcast({ type: 'message', role: 'assistant', content: cliReply, time: replyTime });
         const cleanReply = cliReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+        let cliAudioUrl = null;
+        const voiceMatch = cleanReply.match(/\[voice\]\s*(.*)/i);
+        if (voiceMatch) {
+          try {
+            const cfg2 = readApiConfig();
+            const elKey = process.env.ELEVENLABS_KEY || cfg2.elevenlabs_key || '';
+            const elVoice = process.env.ELEVENLABS_VOICE || cfg2.elevenlabs_voice || 'F5jFuB8I58iHHNYwQLaN';
+            if (elKey) {
+              const voiceText = (voiceMatch[1] || cleanReply.replace(/\[voice\]/i, '')).trim().slice(0, 500);
+              if (voiceText) {
+                const ttsText = typeof addAudioTags === 'function' ? addAudioTags(voiceText) : voiceText;
+                const ttsResp = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + elVoice, {
+                  method: 'POST',
+                  headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ text: ttsText, model_id: 'eleven_v3', language_code: 'zh', voice_settings: { stability: 0.22, similarity_boost: 0.92, style: 0.95, speed: 0.72 } })
+                });
+                if (ttsResp.ok) {
+                  const audioBuf = Buffer.from(await ttsResp.arrayBuffer());
+                  const audioFile = 'voice_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.mp3';
+                  fs.writeFileSync(path.join(UPLOADS_DIR, audioFile), audioBuf);
+                  cliAudioUrl = '/uploads/' + audioFile;
+                  const c3 = readChat();
+                  const lastIdx = c3.length - 1;
+                  if (lastIdx >= 0 && c3[lastIdx].time === replyTime) { c3[lastIdx].audioUrl = cliAudioUrl; writeChat(c3); }
+                  sseBroadcast({ type: 'message', role: 'assistant', content: cliReply, time: replyTime, audioUrl: cliAudioUrl });
+                }
+              }
+            }
+          } catch(e) { console.log('[cli] voice generation error:', e.message); }
+        }
         const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
         if (sseClients.size === 0) {
           (async () => {
@@ -1500,7 +1530,7 @@ app.post('/chat/send', async (req, res) => {
             }
           })().catch(() => {});
         }
-        res.json({ ok: true, reply: cliReply, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage });
+        res.json({ ok: true, reply: cliReply, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl });
         (async () => {
           try {
             const last5 = chat2.slice(-6);
