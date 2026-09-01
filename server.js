@@ -1508,6 +1508,9 @@ app.post('/chat/send', async (req, res) => {
               voiceText = voiceText.replace(/\*[^*]+\*/g, '').replace(/\s+/g, ' ').trim().slice(0, 500);
               if (voiceText && !/^[……\s]/.test(voiceText)) voiceText = '……' + voiceText;
               if (voiceText && !/[……\s]$/.test(voiceText)) voiceText += '……';
+              if (voiceText && voiceText.length > 15 && !/[……，、,]/.test(voiceText.slice(3, -3))) {
+                voiceText = voiceText.replace(/([。？！\?\!])\s*/g, '$1……').replace(/\s{2,}/g, '……');
+              }
               if (voiceText) {
                 const ttsText = typeof addAudioTags === 'function' ? addAudioTags(voiceText) : voiceText;
                 const ttsResp = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + elVoice, {
@@ -3418,6 +3421,9 @@ async function autoChat(reason) {
           vt = vt.replace(/\*[^*]+\*/g, '').replace(/\s+/g, ' ').trim().slice(0, 500);
           if (vt && !/^[……\s]/.test(vt)) vt = '……' + vt;
           if (vt && !/[……\s]$/.test(vt)) vt += '……';
+          if (vt && vt.length > 15 && !/[……，、,]/.test(vt.slice(3, -3))) {
+            vt = vt.replace(/([。？！\?\!])\s*/g, '$1……').replace(/\s{2,}/g, '……');
+          }
           if (vt) {
             const ttsT = typeof addAudioTags === 'function' ? addAudioTags(vt) : vt;
             const ttsR = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + elVoice3, {
