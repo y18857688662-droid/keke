@@ -214,6 +214,32 @@ function cliOneshot(prompt) {
   });
 }
 
+const TEXT_EXTS = new Set(['.txt','.md','.json','.csv','.js','.ts','.py','.html','.css','.xml','.yaml','.yml','.toml','.ini','.sh','.log','.sql','.java','.c','.cpp','.h','.rb','.go','.rs','.swift','.kt']);
+const IMG_EXTS = new Set(['.png','.jpg','.jpeg','.gif','.webp']);
+function buildFileContent(msg) {
+  if (!msg.fileUrl) return null;
+  const fp = path.join(__dirname, msg.fileUrl);
+  if (!fs.existsSync(fp)) return null;
+  const ext = path.extname(msg.filename || msg.fileUrl).toLowerCase();
+  const textLabel = msg.content || '[文件]';
+  try {
+    if (ext === '.pdf') {
+      const b64 = fs.readFileSync(fp).toString('base64');
+      return [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } }, { type: 'text', text: textLabel }];
+    }
+    if (IMG_EXTS.has(ext)) {
+      const mt = ext === '.png' ? 'image/png' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+      const b64 = fs.readFileSync(fp).toString('base64');
+      return [{ type: 'image', source: { type: 'base64', media_type: mt, data: b64 } }, { type: 'text', text: textLabel }];
+    }
+    if (TEXT_EXTS.has(ext)) {
+      const txt = fs.readFileSync(fp, 'utf8').slice(0, 8000);
+      return textLabel + '\n```\n' + txt + '\n```';
+    }
+  } catch(e) { console.log('[cli] file read error:', e.message); }
+  return null;
+}
+
 async function claudeCliReply(systemPrompt, recentMessages) {
   if (cliMsgCount >= CLI_FORGE_THRESHOLD) {
     await forgeCliProc(systemPrompt, recentMessages);
@@ -223,6 +249,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
   cliMsgCount++;
   const lastMsg = recentMessages[recentMessages.length - 1];
   const lastHasImage = lastMsg && (lastMsg.image || (lastMsg.images && lastMsg.images.length) || lastMsg.imageUrl || (lastMsg.imageUrls && lastMsg.imageUrls.length));
+  const lastHasFile = lastMsg && lastMsg.fileUrl;
   let content;
   if (isFirstMsg) {
     const chatContext = recentMessages.map(m => {
@@ -237,10 +264,19 @@ async function claudeCliReply(systemPrompt, recentMessages) {
         const imgs = imgBlocks.filter(b => b.type === 'image');
         content = [...imgs, { type: 'text', text: textPart }];
       } else { content = textPart; }
+    } else if (lastHasFile) {
+      const fc = buildFileContent(lastMsg);
+      if (Array.isArray(fc)) {
+        const media = fc.filter(b => b.type !== 'text');
+        content = [...media, { type: 'text', text: textPart }];
+      } else { content = textPart + (typeof fc === 'string' ? '\n\n' + fc : ''); }
     } else { content = textPart; }
   } else {
     if (lastHasImage) {
       content = buildMsgContent(lastMsg);
+    } else if (lastHasFile) {
+      const fc = buildFileContent(lastMsg);
+      content = fc || (typeof lastMsg.content === 'string' ? lastMsg.content : '[文件]');
     } else {
       content = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
     }
