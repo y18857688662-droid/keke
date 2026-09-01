@@ -1491,13 +1491,14 @@ app.post('/chat/send', async (req, res) => {
         const cleanReply = cliReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         let cliAudioUrl = null;
         const voiceMatch = cleanReply.match(/\[voice\]\s*(.*)/i);
-        if (voiceMatch) {
+        const autoVoice = !voiceMatch && Math.random() < 0.3 && cleanReply.length > 5 && cleanReply.length < 200;
+        if (voiceMatch || autoVoice) {
           try {
             const cfg2 = readApiConfig();
             const elKey = process.env.ELEVENLABS_KEY || cfg2.elevenlabs_key || '';
             const elVoice = process.env.ELEVENLABS_VOICE || cfg2.elevenlabs_voice || 'F5jFuB8I58iHHNYwQLaN';
             if (elKey) {
-              const voiceText = (voiceMatch[1] || cleanReply.replace(/\[voice\]/i, '')).trim().slice(0, 500);
+              const voiceText = voiceMatch ? (voiceMatch[1] || cleanReply.replace(/\[voice\]/i, '')).trim().slice(0, 500) : cleanReply.replace(/\*[^*]+\*/g, '').trim().slice(0, 500);
               if (voiceText) {
                 const ttsText = typeof addAudioTags === 'function' ? addAudioTags(voiceText) : voiceText;
                 const ttsResp = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + elVoice, {
