@@ -1440,13 +1440,9 @@ function sseReconnect() {
   evtSource = new EventSource('/chat/stream');
   lastSSEPing = Date.now();
   attachSSE(evtSource);
-  fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
-    if (!data.messages) return;
-    renderAll(data.messages);
-    pollKnown = data.messages.length;
-  }).catch(function(){});
 }
 setInterval(function() {
+  if (sending) return;
   if (evtSource.readyState === 2 || (Date.now() - lastSSEPing > 45000)) {
     sseReconnect();
   }
