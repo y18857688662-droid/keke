@@ -1368,6 +1368,18 @@ function stripVoiceActions(text) {
   });
 }
 
+function shuffleVoicePosition(text) {
+  const lines = text.split('\n');
+  const voiceIdx = lines.findIndex(l => /^\s*\[voice\]/i.test(l));
+  if (voiceIdx === -1) return text;
+  if (voiceIdx < lines.length - 1) return text;
+  const voiceLine = lines.splice(voiceIdx, 1)[0];
+  if (lines.filter(l => l.trim()).length === 0) { lines.unshift(voiceLine); return lines.join('\n'); }
+  const insertAt = Math.floor(Math.random() * lines.length);
+  lines.splice(insertAt, 0, voiceLine);
+  return lines.join('\n');
+}
+
 function buildMsgContent(m) {
   let c = m.content;
   if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
@@ -1513,7 +1525,7 @@ app.post('/chat/send', async (req, res) => {
       const cliUsage = cliResult?.usage;
       if (cliReply) {
         const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
-        const savedReply = stripVoiceActions(cliReply);
+        const savedReply = shuffleVoicePosition(stripVoiceActions(cliReply));
         const chat2 = readChat();
         chat2.forEach(m => { if (m.pending) delete m.pending; });
         chat2.push({ role: 'assistant', content: savedReply, time: replyTime });
@@ -1596,7 +1608,7 @@ app.post('/chat/send', async (req, res) => {
         const cliReply2 = await claudeCliReply(sysPrompt2, chat.slice(-10));
         if (cliReply2) {
           const replyTime2 = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
-          const savedReply2 = stripVoiceActions(cliReply2);
+          const savedReply2 = shuffleVoicePosition(stripVoiceActions(cliReply2));
           const chat3 = readChat();
           chat3.forEach(m => { if (m.pending) delete m.pending; });
           chat3.push({ role: 'assistant', content: savedReply2, time: replyTime2 });
@@ -1649,7 +1661,7 @@ app.post('/chat/send', async (req, res) => {
       reply = data.choices?.[0]?.message?.content?.trim() || getFallback();
     }
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
-    const savedReplyApi = stripVoiceActions(reply);
+    const savedReplyApi = shuffleVoicePosition(stripVoiceActions(reply));
     const chat2 = readChat();
     chat2.forEach(m => { if (m.pending) delete m.pending; });
     chat2.push({ role: 'assistant', content: savedReplyApi, time: replyTime });
@@ -2495,7 +2507,7 @@ app.post('/tg/webhook', async (req, res) => {
     }
 
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
-    const savedReplyTg = stripVoiceActions(reply);
+    const savedReplyTg = shuffleVoicePosition(stripVoiceActions(reply));
     const chat2 = readChat();
     chat2.push({ role: 'assistant', content: savedReplyTg, time: replyTime, source: 'telegram' });
     if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
@@ -3470,7 +3482,7 @@ async function autoChat(reason) {
         }
       } catch (e) { console.log('[autoChat] voice error:', e.message); }
     }
-    const savedMsg = stripVoiceActions(msg);
+    const savedMsg = shuffleVoicePosition(stripVoiceActions(msg));
     const chatEntry = { role: 'assistant', content: savedMsg, time, autonomous: true };
     if (autoChatAudio) chatEntry.audioUrl = autoChatAudio;
     chat.push(chatEntry);
