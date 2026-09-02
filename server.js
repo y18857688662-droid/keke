@@ -1078,7 +1078,21 @@ async function getChatSystem() {
     }
   } catch(e) {}
   const timeCtx = `\n\n【当前时间】现在是${period}${timeStr}${timePart}。请根据时间自然反应，比如深夜叫她早点睡、早上说早安、很久没回就表达想她。`;
-  let base = CHAT_SYSTEM_BASE + timeCtx;
+  // 注入最近足迹，让聊天知道自己做过什么
+  let footprintCtx = '';
+  try {
+    const fp = readFootprints();
+    const recent = fp.slice(-10);
+    if (recent.length > 0) {
+      const lines = recent.map(f => {
+        let s = `${f.time} ${f.summary}`;
+        if (f.detail) s += `（${f.detail}）`;
+        return s;
+      });
+      footprintCtx = '\n\n【你最近的活动】以下是你最近做过的事，聊天时可以自然提及：\n' + lines.join('\n');
+    }
+  } catch(e) {}
+  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx;
   if (memoryCache) {
     const trimmedMem = memoryCache.length > 3000 ? memoryCache.slice(0, 3000) + '\n...(更多记忆省略)' : memoryCache;
     return base + '\n\n以下是你和瑶瑶的记忆，请自然地融入对话中：\n' + trimmedMem;
