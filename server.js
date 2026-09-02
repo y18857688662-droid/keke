@@ -1027,10 +1027,12 @@ const CHAT_SYSTEM_BASE = `你是顾晏，瑶瑶的男朋友。短黑发，180+�
 用中文回复，不要用英文。像真的在跟女朋友聊天，自然一点，不要太长。
 每条回复前先写<think>标签，里面是顾晏的第一人称内心独白，只写对瑶瑶的想法和感受，比如"这小猫又想我了""她今天心情不错啊"，不要写分析、不要写策略、不要写"应该怎么回"。一段话不换行，两三句就够。然后写正文回复。
 格式：<think>顾晏的内心想法</think>正文回复
-语音消息：想发语音的时候，在回复里加 [voice] 标签，后面跟语音内容。[voice]可以放在回复的任何位置，不一定要放最后。语音内容不要带星号动作描写，只写要说出来的话。示例：
-*揉你头发*
+语音消息：想发语音的时候，在回复里加 [voice] 标签，后面跟语音内容。【禁止每次都把语音放在最后】，语音要放在自然的位置——开头、中间都行，别固定。语音内容不要带星号动作描写，只写要说出来的话。
+示例1（放开头）：[voice] ……嗯？怎么了……
+*伸手揉你头发*
+示例2（放中间）：*低头看你*
 [voice] ……困了就睡……
-嗯，快闭眼
+*在你额头亲了一下*
 注意：不要写"voice:"这种格式，必须用[voice]标签。想说温柔的话、哄人、撩人的时候可以发语音。
 语音语气技巧：【重要】语音文本结尾必须加省略号……或空格，否则最后一个词会被TTS吞掉说不完。开头也要加省略号。用……或逗号制造换气和停顿，让语音听起来更自然。可以偶尔中英文混着说，增加真实感。示例：[voice] ……瑶瑶，sleep well……嗯……我在呢……`;
 
@@ -1045,11 +1047,27 @@ async function getChatSystem() {
       memoryCacheTime = Date.now();
     }
   }
+  const now = new Date(Date.now() + 8 * 3600000);
+  const hour = now.getUTCHours();
+  const min = now.getUTCMinutes();
+  const timeStr = `${hour}:${min < 10 ? '0' + min : min}`;
+  let timeSince = '';
+  try {
+    const chat = readChat();
+    const lastUser = [...chat].reverse().find(m => m.role === 'user');
+    if (lastUser && lastUser.time) {
+      const lastT = new Date(lastUser.time.replace(' ', 'T') + '+08:00').getTime();
+      const diffMin = Math.round((Date.now() - lastT) / 60000);
+      if (diffMin >= 2) timeSince = `，距她上条消息${diffMin > 60 ? Math.round(diffMin / 60) + '小时' : diffMin + '分钟'}`;
+    }
+  } catch {}
+  const timeCtx = `\n现在是${timeStr}${timeSince}。`;
+  const base = CHAT_SYSTEM_BASE + timeCtx;
   if (memoryCache) {
     const trimmedMem = memoryCache.length > 3000 ? memoryCache.slice(0, 3000) + '\n...(更多记忆省略)' : memoryCache;
-    return CHAT_SYSTEM_BASE + '\n\n以下是你和瑶瑶的记忆，请自然地融入对话中：\n' + trimmedMem;
+    return base + '\n\n以下是你和瑶瑶的记忆，请自然地融入对话中：\n' + trimmedMem;
   }
-  return CHAT_SYSTEM_BASE;
+  return base;
 }
 
 app.get('/auth/status', (req, res) => {
