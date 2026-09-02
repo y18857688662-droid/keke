@@ -1095,7 +1095,7 @@ function renderMessage(msg, idx, stagger) {
   });
   }
   if (voiceIdx !== -1) {
-    var vText = voicePart;
+    var vText = voicePart.replace(/\*[^*]+\*/g, '').replace(/\s{2,}/g, ' ').trim();
     var vDur = Math.max(2, Math.min(Math.ceil(vText.length / 4), 60));
     var vBars = '';
     for (var vb = 0; vb < 18; vb++) { var vh = 4 + Math.floor(Math.random() * 14); vBars += '<span style="height:'+vh+'px"></span>'; }
