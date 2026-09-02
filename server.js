@@ -1361,6 +1361,13 @@ function writeChat(data) {
   fs.writeFileSync(CHAT_FILE, JSON.stringify(data));
 }
 
+function stripVoiceActions(text) {
+  return text.replace(/(\[voice\]\s*)([\s\S]*)/i, (_, tag, rest) => {
+    const cleaned = rest.replace(/\*[^*]+\*/g, '').replace(/\s{2,}/g, ' ').trim();
+    return cleaned !== rest.trim() ? tag + cleaned : tag + rest;
+  });
+}
+
 function buildMsgContent(m) {
   let c = m.content;
   if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
@@ -1506,13 +1513,14 @@ app.post('/chat/send', async (req, res) => {
       const cliUsage = cliResult?.usage;
       if (cliReply) {
         const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+        const savedReply = stripVoiceActions(cliReply);
         const chat2 = readChat();
         chat2.forEach(m => { if (m.pending) delete m.pending; });
-        chat2.push({ role: 'assistant', content: cliReply, time: replyTime });
+        chat2.push({ role: 'assistant', content: savedReply, time: replyTime });
         if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
         writeChat(chat2);
-        sseBroadcast({ type: 'message', role: 'assistant', content: cliReply, time: replyTime });
-        const cleanReply = cliReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+        sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time: replyTime });
+        const cleanReply = savedReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         let cliAudioUrl = null;
         const voiceMatch = cleanReply.match(/\[voice\]\s*(.*)/i);
         const autoVoice = !voiceMatch && Math.random() < 0.3 && cleanReply.length > 5 && cleanReply.length < 200;
@@ -1544,7 +1552,7 @@ app.post('/chat/send', async (req, res) => {
                   const c3 = readChat();
                   const lastIdx = c3.length - 1;
                   if (lastIdx >= 0 && c3[lastIdx].time === replyTime) { c3[lastIdx].audioUrl = cliAudioUrl; writeChat(c3); }
-                  sseBroadcast({ type: 'message', role: 'assistant', content: cliReply, time: replyTime, audioUrl: cliAudioUrl });
+                  sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time: replyTime, audioUrl: cliAudioUrl });
                 }
               }
             }
@@ -1561,7 +1569,7 @@ app.post('/chat/send', async (req, res) => {
             }
           })().catch(() => {});
         }
-        res.json({ ok: true, reply: cliReply, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl });
+        res.json({ ok: true, reply: savedReply, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl });
         (async () => {
           try {
             const last5 = chat2.slice(-6);
@@ -1588,13 +1596,14 @@ app.post('/chat/send', async (req, res) => {
         const cliReply2 = await claudeCliReply(sysPrompt2, chat.slice(-10));
         if (cliReply2) {
           const replyTime2 = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+          const savedReply2 = stripVoiceActions(cliReply2);
           const chat3 = readChat();
           chat3.forEach(m => { if (m.pending) delete m.pending; });
-          chat3.push({ role: 'assistant', content: cliReply2, time: replyTime2 });
+          chat3.push({ role: 'assistant', content: savedReply2, time: replyTime2 });
           if (chat3.length > 200) chat3.splice(0, chat3.length - 200);
           writeChat(chat3);
-          sseBroadcast({ type: 'message', role: 'assistant', content: cliReply2, time: replyTime2 });
-          return res.json({ ok: true, reply: cliReply2, time: replyTime2, memoryLoaded: sysPrompt2.includes('记忆'), source: 'cli-pro-retry' });
+          sseBroadcast({ type: 'message', role: 'assistant', content: savedReply2, time: replyTime2 });
+          return res.json({ ok: true, reply: savedReply2, time: replyTime2, memoryLoaded: sysPrompt2.includes('记忆'), source: 'cli-pro-retry' });
         }
       } catch (e2) { console.log('[cli] retry also failed:', e2.message); }
     }
@@ -1640,13 +1649,14 @@ app.post('/chat/send', async (req, res) => {
       reply = data.choices?.[0]?.message?.content?.trim() || getFallback();
     }
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+    const savedReplyApi = stripVoiceActions(reply);
     const chat2 = readChat();
     chat2.forEach(m => { if (m.pending) delete m.pending; });
-    chat2.push({ role: 'assistant', content: reply, time: replyTime });
+    chat2.push({ role: 'assistant', content: savedReplyApi, time: replyTime });
     if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
     writeChat(chat2);
-    sseBroadcast({ type: 'message', role: 'assistant', content: reply, time: replyTime });
-    const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    sseBroadcast({ type: 'message', role: 'assistant', content: savedReplyApi, time: replyTime });
+    const cleanReply = savedReplyApi.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
     if (sseClients.size === 0) {
       (async () => {
@@ -1658,7 +1668,7 @@ app.post('/chat/send', async (req, res) => {
         }
       })().catch(() => {});
     }
-    res.json({ ok: true, reply, time: replyTime, memoryLoaded });
+    res.json({ ok: true, reply: savedReplyApi, time: replyTime, memoryLoaded });
     (async () => {
       try {
         const last5 = chat2.slice(-6);
@@ -2485,14 +2495,15 @@ app.post('/tg/webhook', async (req, res) => {
     }
 
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+    const savedReplyTg = stripVoiceActions(reply);
     const chat2 = readChat();
-    chat2.push({ role: 'assistant', content: reply, time: replyTime, source: 'telegram' });
+    chat2.push({ role: 'assistant', content: savedReplyTg, time: replyTime, source: 'telegram' });
     if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
     writeChat(chat2);
 
-    sseBroadcast({ type: 'message', role: 'assistant', content: reply, time: replyTime });
+    sseBroadcast({ type: 'message', role: 'assistant', content: savedReplyTg, time: replyTime });
 
-    const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    const cleanReply = savedReplyTg.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     await tgSend(chatId, cleanReply);
 
     (async () => {
@@ -3459,11 +3470,12 @@ async function autoChat(reason) {
         }
       } catch (e) { console.log('[autoChat] voice error:', e.message); }
     }
-    const chatEntry = { role: 'assistant', content: msg, time, autonomous: true };
+    const savedMsg = stripVoiceActions(msg);
+    const chatEntry = { role: 'assistant', content: savedMsg, time, autonomous: true };
     if (autoChatAudio) chatEntry.audioUrl = autoChatAudio;
     chat.push(chatEntry);
     writeChat(chat);
-    sseBroadcast({ type: 'message', role: 'assistant', content: msg, time, autonomous: true, audioUrl: autoChatAudio || undefined });
+    sseBroadcast({ type: 'message', role: 'assistant', content: savedMsg, time, autonomous: true, audioUrl: autoChatAudio || undefined });
     addFootprint('chat', '主动找瑶瑶聊天', reason);
     try {
       const plainText = msg.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\*[^*]+\*/g, '').trim().slice(0, 100);
