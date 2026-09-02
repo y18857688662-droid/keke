@@ -1551,7 +1551,7 @@ app.post('/chat/send', async (req, res) => {
                   const c3 = readChat();
                   const lastIdx = c3.length - 1;
                   if (lastIdx >= 0 && c3[lastIdx].time === replyTime) { c3[lastIdx].audioUrl = cliAudioUrl; writeChat(c3); }
-                  sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time: replyTime, audioUrl: cliAudioUrl });
+                  sseBroadcast({ type: 'voice_ready', time: replyTime, audioUrl: cliAudioUrl });
                 }
               }
             }

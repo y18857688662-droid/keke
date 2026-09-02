@@ -1076,7 +1076,6 @@ function renderMessage(msg, idx, stagger) {
   for (var vli = 0; vli < allLines.length; vli++) {
     if (/^\[voice\]/i.test(allLines[vli])) { voiceLnIdx = vli; break; }
   }
-  if (voiceLnIdx > 0 && !msg.audioUrl) voiceLnIdx = -1;
   var lines = allLines.filter(function(l,i){ return i !== voiceLnIdx; });
   var bubbleIdx = 0;
   allLines.forEach(function(line, idx) {
@@ -1423,6 +1422,20 @@ function attachSSE(src) {
         msgContainer.appendChild(replyEl);
         scrollBottom();
         petMood(detectMood(data.content));
+      }
+      if (data.type === 'voice_ready' && data.time && data.audioUrl) {
+        var msgs = document.querySelectorAll('.msg-group');
+        for (var vi = msgs.length - 1; vi >= 0; vi--) {
+          var tEl = msgs[vi].previousElementSibling;
+          if (tEl && tEl.getAttribute('data-time') === data.time) {
+            var wrap = msgs[vi].querySelector('.voice-wrap');
+            if (wrap) {
+              var vm = wrap.querySelector('.voice-msg');
+              if (vm) vm.setAttribute('onclick', "playAudioMsg(this,'"+data.audioUrl+"')");
+            }
+            break;
+          }
+        }
       }
       if (data.type === 'footprint') {
         var dot = document.getElementById('fpDot');
