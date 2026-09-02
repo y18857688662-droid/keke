@@ -1100,6 +1100,11 @@ async function getChatSystem() {
   return base;
 }
 
+app.get('/debug/system', async (req, res) => {
+  const sys = await getChatSystem();
+  res.type('text/plain').send(sys);
+});
+
 app.get('/auth/status', (req, res) => {
   const auth = readAuth();
   const cfg = readApiConfig();
