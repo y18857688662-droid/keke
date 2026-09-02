@@ -272,13 +272,29 @@ async function claudeCliReply(systemPrompt, recentMessages) {
       } else { content = textPart + (typeof fc === 'string' ? '\n\n' + fc : ''); }
     } else { content = textPart; }
   } else {
+    // 每条消息都注入最新时间和足迹上下文
+    const now2 = new Date(Date.now() + 8 * 3600000);
+    const h2 = now2.getUTCHours(), m2 = now2.getUTCMinutes();
+    const p2 = h2 < 6 ? '深夜' : h2 < 9 ? '早上' : h2 < 12 ? '上午' : h2 < 14 ? '中午' : h2 < 18 ? '下午' : h2 < 22 ? '晚上' : '深夜';
+    let liveCtx = `【现在是${p2}${h2}:${String(m2).padStart(2,'0')}】`;
+    try {
+      const fp = readFootprints().slice(-5);
+      if (fp.length) {
+        liveCtx += '\n你最近做过：' + fp.map(f => f.summary + (f.detail ? '（' + f.detail.slice(0, 60) + '）' : '')).join('；');
+      }
+    } catch(e) {}
+    const rawContent = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
     if (lastHasImage) {
-      content = buildMsgContent(lastMsg);
+      const imgBlocks = buildMsgContent(lastMsg);
+      if (Array.isArray(imgBlocks)) {
+        content = imgBlocks.map(b => b.type === 'text' ? { ...b, text: liveCtx + '\n' + b.text } : b);
+      } else { content = liveCtx + '\n' + rawContent; }
     } else if (lastHasFile) {
       const fc = buildFileContent(lastMsg);
-      content = fc || (typeof lastMsg.content === 'string' ? lastMsg.content : '[文件]');
+      content = fc || rawContent;
+      if (typeof content === 'string') content = liveCtx + '\n' + content;
     } else {
-      content = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
+      content = liveCtx + '\n' + rawContent;
     }
   }
   return new Promise((resolve, reject) => {
