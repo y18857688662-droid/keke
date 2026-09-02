@@ -1068,20 +1068,36 @@ function renderMessage(msg, idx, stagger) {
     var fn2 = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\'a\');a.href=\''+msg.fileUrl+'\';a.download=\''+escHtml(msg.filename||'file')+'\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn2 + '</div>';
   }
-  var voiceLineRe = content.match(/(^|\n)\s*\[voice\]/i);
-  var voiceIdx = voiceLineRe ? content.indexOf(voiceLineRe[0]) + voiceLineRe[0].indexOf('[') : -1;
-  if (voiceIdx > 0 && !msg.audioUrl) voiceIdx = -1;
-  var voicePart = '', textPart = content;
-  if (voiceIdx !== -1) {
-    textPart = content.slice(0, voiceIdx).trim();
-    var afterTag = content.slice(voiceIdx).replace(/^\[voice\]\s*/i, '');
-    voicePart = afterTag.trim();
-  }
-  if (textPart) {
   var hasMedia = msg.image || msg.imageUrl || msg.audioUrl || msg.file || msg.fileUrl;
-  var lines = textPart.split(/\n+/).map(function(l){return l.trim()}).filter(function(l){return l && !(hasMedia && /^\[(图片|语音|文件)\]/.test(l)) && !(msg.audioUrl && /^\[语音\]/.test(l))});
+  var allLines = content.split(/\n+/).map(function(l){return l.trim()}).filter(function(l){
+    return l && !(hasMedia && /^\[(图片|语音|文件)\]/.test(l)) && !(msg.audioUrl && /^\[语音\]/.test(l));
+  });
+  var voiceLnIdx = -1;
+  for (var vli = 0; vli < allLines.length; vli++) {
+    if (/^\[voice\]/i.test(allLines[vli])) { voiceLnIdx = vli; break; }
+  }
+  if (voiceLnIdx > 0 && !msg.audioUrl) voiceLnIdx = -1;
+  var lines = allLines.filter(function(l,i){ return i !== voiceLnIdx; });
   var bubbleIdx = 0;
-  lines.forEach(function(line) {
+  allLines.forEach(function(line, idx) {
+    if (idx === voiceLnIdx) {
+      var vText = line.replace(/^\[voice\]\s*/i, '').replace(/\*[^*]+\*/g, '').replace(/\s{2,}/g, ' ').trim();
+      var vDur = Math.max(2, Math.min(Math.ceil(vText.length / 4), 60));
+      var vBars = '';
+      for (var vb = 0; vb < 18; vb++) { var vh = 4 + Math.floor(Math.random() * 14); vBars += '<span style="height:'+vh+'px"></span>'; }
+      var vB64 = btoa(encodeURIComponent(vText));
+      var vOnClick = msg.audioUrl ? 'playAudioMsg(this,\''+msg.audioUrl+'\')' : 'playVoice(this,\''+vB64+'\')';
+      colHtml += '<div class="voice-wrap' + (isKe ? '' : ' voice-wrap-human') + '">'
+        + '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" onclick="' + vOnClick + '">'
+        + '<div class="voice-play"><svg viewBox="0 0 10 12" fill="currentColor"><polygon points="1,0 10,6 1,12"/></svg></div>'
+        + '<div class="voice-bars">' + vBars + '</div>'
+        + '<span class="voice-dur">' + vDur + '&Prime;</span>'
+        + '</div>'
+        + '<div class="voice-to-text" onclick="toggleVoiceText(this,\''+vB64+'\')">转文字</div>'
+        + '<div class="voice-text-content" style="display:none"></div>'
+        + '</div>';
+      return;
+    }
     var delay = stagger ? 'style="opacity:0;animation:fadeInBubble 0.3s ease '+((bubbleIdx)*0.4)+'s forwards"' : '';
     var imgMatch = line.match(/^\[图片\]\(([^)]+)\)$/);
     if (imgMatch) {
@@ -1093,24 +1109,6 @@ function renderMessage(msg, idx, stagger) {
     }
     bubbleIdx++;
   });
-  }
-  if (voiceIdx !== -1) {
-    var vText = voicePart.replace(/\*[^*]+\*/g, '').replace(/\s{2,}/g, ' ').trim();
-    var vDur = Math.max(2, Math.min(Math.ceil(vText.length / 4), 60));
-    var vBars = '';
-    for (var vb = 0; vb < 18; vb++) { var vh = 4 + Math.floor(Math.random() * 14); vBars += '<span style="height:'+vh+'px"></span>'; }
-    var vB64 = btoa(encodeURIComponent(vText));
-    var vOnClick = msg.audioUrl ? 'playAudioMsg(this,\''+msg.audioUrl+'\')' : 'playVoice(this,\''+vB64+'\')';
-    colHtml += '<div class="voice-wrap' + (isKe ? '' : ' voice-wrap-human') + '">'
-      + '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" onclick="' + vOnClick + '">'
-      + '<div class="voice-play"><svg viewBox="0 0 10 12" fill="currentColor"><polygon points="1,0 10,6 1,12"/></svg></div>'
-      + '<div class="voice-bars">' + vBars + '</div>'
-      + '<span class="voice-dur">' + vDur + '&Prime;</span>'
-      + '</div>'
-      + '<div class="voice-to-text" onclick="toggleVoiceText(this,\''+vB64+'\')">转文字</div>'
-      + '<div class="voice-text-content" style="display:none"></div>'
-      + '</div>';
-  }
   colHtml += '</div>';
   group.innerHTML = avaHtml + colHtml;
   if (stagger && lines && lines.length > 1) {
