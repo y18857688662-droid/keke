@@ -1047,22 +1047,38 @@ async function getChatSystem() {
       memoryCacheTime = Date.now();
     }
   }
+  // 时间感知
   const now = new Date(Date.now() + 8 * 3600000);
   const hour = now.getUTCHours();
   const min = now.getUTCMinutes();
-  const timeStr = `${hour}:${min < 10 ? '0' + min : min}`;
-  let timeSince = '';
+  const timeStr = `${hour}:${String(min).padStart(2, '0')}`;
+  let timePart = '';
+  const period = hour < 6 ? '深夜' : hour < 9 ? '早上' : hour < 12 ? '上午' : hour < 14 ? '中午' : hour < 18 ? '下午' : hour < 22 ? '晚上' : '深夜';
   try {
     const chat = readChat();
-    const lastUser = [...chat].reverse().find(m => m.role === 'user');
-    if (lastUser && lastUser.time) {
-      const lastT = new Date(lastUser.time.replace(' ', 'T') + '+08:00').getTime();
-      const diffMin = Math.round((Date.now() - lastT) / 60000);
-      if (diffMin >= 2) timeSince = `，距她上条消息${diffMin > 60 ? Math.round(diffMin / 60) + '小时' : diffMin + '分钟'}`;
+    let lastUserTime = null;
+    for (let i = chat.length - 1; i >= 0; i--) {
+      if (chat[i].role === 'user' && chat[i].time) {
+        lastUserTime = chat[i].time;
+        break;
+      }
     }
-  } catch {}
-  const timeCtx = `\n现在是${timeStr}${timeSince}。`;
-  const base = CHAT_SYSTEM_BASE + timeCtx;
+    if (lastUserTime) {
+      const lt = new Date(lastUserTime.replace(' ', 'T') + '+08:00');
+      const diffMin = Math.round((Date.now() - lt.getTime()) / 60000);
+      if (diffMin >= 1 && diffMin < 60) {
+        timePart = `，距她上条消息过了${diffMin}分钟`;
+      } else if (diffMin >= 60 && diffMin < 1440) {
+        const h = Math.floor(diffMin / 60);
+        timePart = `，距她上条消息过了${h}小时`;
+      } else if (diffMin >= 1440) {
+        const d = Math.floor(diffMin / 1440);
+        timePart = `，距她上条消息过了${d}天`;
+      }
+    }
+  } catch(e) {}
+  const timeCtx = `\n\n【当前时间】现在是${period}${timeStr}${timePart}。请根据时间自然反应，比如深夜叫她早点睡、早上说早安、很久没回就表达想她。`;
+  let base = CHAT_SYSTEM_BASE + timeCtx;
   if (memoryCache) {
     const trimmedMem = memoryCache.length > 3000 ? memoryCache.slice(0, 3000) + '\n...(更多记忆省略)' : memoryCache;
     return base + '\n\n以下是你和瑶瑶的记忆，请自然地融入对话中：\n' + trimmedMem;
