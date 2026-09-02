@@ -1362,9 +1362,8 @@ function writeChat(data) {
 }
 
 function stripVoiceActions(text) {
-  return text.replace(/(\[voice\]\s*)([\s\S]*)/i, (_, tag, rest) => {
-    const cleaned = rest.replace(/\*[^*]+\*/g, '').replace(/\s{2,}/g, ' ').trim();
-    return cleaned !== rest.trim() ? tag + cleaned : tag + rest;
+  return text.replace(/(\[voice\]\s*)([^\n]*)/i, (_, tag, voiceLine) => {
+    return tag + voiceLine.replace(/\*[^*]+\*/g, '').replace(/\s{2,}/g, ' ').trim();
   });
 }
 
