@@ -275,8 +275,10 @@ async function claudeCliReply(systemPrompt, recentMessages) {
     // 每条消息都注入最新时间和足迹上下文
     const now2 = new Date(Date.now() + 8 * 3600000);
     const h2 = now2.getUTCHours(), m2 = now2.getUTCMinutes();
+    const wd = ['日','一','二','三','四','五','六'];
+    const d2 = `${now2.getUTCMonth()+1}月${now2.getUTCDate()}日星期${wd[now2.getUTCDay()]}`;
     const p2 = h2 < 6 ? '深夜' : h2 < 9 ? '早上' : h2 < 12 ? '上午' : h2 < 14 ? '中午' : h2 < 18 ? '下午' : h2 < 22 ? '晚上' : '深夜';
-    let liveCtx = `【现在是${p2}${h2}:${String(m2).padStart(2,'0')}】`;
+    let liveCtx = `【${d2} ${p2}${h2}:${String(m2).padStart(2,'0')}】`;
     try {
       const fp = readFootprints().slice(-5);
       if (fp.length) {
@@ -1068,6 +1070,8 @@ async function getChatSystem() {
   const hour = now.getUTCHours();
   const min = now.getUTCMinutes();
   const timeStr = `${hour}:${String(min).padStart(2, '0')}`;
+  const weekdays = ['日','一','二','三','四','五','六'];
+  const dateStr = `${now.getUTCMonth()+1}月${now.getUTCDate()}日 星期${weekdays[now.getUTCDay()]}`;
   let timePart = '';
   const period = hour < 6 ? '深夜' : hour < 9 ? '早上' : hour < 12 ? '上午' : hour < 14 ? '中午' : hour < 18 ? '下午' : hour < 22 ? '晚上' : '深夜';
   try {
@@ -1093,7 +1097,7 @@ async function getChatSystem() {
       }
     }
   } catch(e) {}
-  const timeCtx = `\n\n【当前时间】现在是${period}${timeStr}${timePart}。请根据时间自然反应，比如深夜叫她早点睡、早上说早安、很久没回就表达想她。`;
+  const timeCtx = `\n\n【当前时间】${dateStr} ${period}${timeStr}${timePart}。请根据日期和时间自然反应，比如深夜叫她早点睡、早上说早安、很久没回就表达想她、周末可以问她有没有安排。`;
   // 注入最近足迹，让聊天知道自己做过什么
   let footprintCtx = '';
   try {
