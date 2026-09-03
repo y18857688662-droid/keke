@@ -288,7 +288,8 @@ async function claudeCliReply(systemPrompt, recentMessages) {
     try {
       const mm = readMoments().slice(-3).reverse();
       if (mm.length) {
-        liveCtx += '\n朋友圈：' + mm.map(m => (m.author === 'yy' ? '瑶瑶' : '你') + '发了「' + (m.text || '图片').slice(0, 30) + '」').join('；');
+        liveCtx += '\n朋友圈：' + mm.map(m => '[id:' + m.id + ']' + (m.author === 'yy' ? '瑶瑶' : '你') + '发了「' + (m.text || '图片').slice(0, 30) + '」' + (m.likes.length ? '(' + m.likes.map(l => l === 'gy' ? '你' : '瑶瑶').join('') + '赞)' : '')).join('；');
+        liveCtx += ' 可用[moment_post:内容][moment_like:id][moment_comment:id:评论]';
       }
     } catch(e) {}
     try {
@@ -1147,7 +1148,7 @@ async function getChatSystem() {
     if (moments.length) {
       const mLines = moments.map(m => {
         const who = m.author === 'yy' ? '瑶瑶' : '顾晏';
-        let s = `${m.date} ${m.time} ${who}发了：${m.text || '[图片]'}`;
+        let s = `[id:${m.id}] ${m.date} ${m.time} ${who}发了：${m.text || '[图片]'}`;
         if (m.likes.length) s += ` [${m.likes.map(l => l === 'gy' ? '你' : '瑶瑶').join('、')}点赞]`;
         if (m.comments && m.comments.length) {
           const cmts = m.comments.slice(-3).map(c => (c.author === 'gy' ? '你' : '瑶瑶') + '：' + c.text);
@@ -1156,6 +1157,11 @@ async function getChatSystem() {
         return s;
       });
       momentsCtx = '\n\n【朋友圈动态】\n' + mLines.join('\n');
+      momentsCtx += '\n你可以在回复中用以下标签操作朋友圈（标签不会显示给瑶瑶）：';
+      momentsCtx += '\n发朋友圈：[moment_post:你想发的内容]';
+      momentsCtx += '\n给某条点赞：[moment_like:帖子id]';
+      momentsCtx += '\n评论某条：[moment_comment:帖子id:你的评论]';
+      momentsCtx += '\n想用就用，不想用就不用，自然就好';
     }
   } catch(e) {}
   // 未回复的心情日记
@@ -1478,6 +1484,54 @@ function stripVoiceActions(text) {
   });
 }
 
+async function processMomentActions(text) {
+  let cleaned = text;
+  const postMatch = cleaned.match(/\[moment_post:([^\]]+)\]/);
+  if (postMatch) {
+    try {
+      const now = new Date(Date.now() + 8 * 3600000);
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const mm = readMoments();
+      mm.push({ id, author: 'gy', text: postMatch[1].trim(), imageUrl: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), likes: [], bookmark: [], comments: [] });
+      writeMoments(mm);
+      sseBroadcast({ type: 'moment_new', id });
+      addFootprint('moment', '发了朋友圈', postMatch[1].trim().slice(0, 50));
+    } catch(e) { console.log('[moment_post] error:', e.message); }
+    cleaned = cleaned.replace(/\[moment_post:[^\]]+\]/g, '');
+  }
+  const likeMatch = cleaned.match(/\[moment_like:([^\]]+)\]/);
+  if (likeMatch) {
+    try {
+      const mm = readMoments();
+      const m = mm.find(p => p.id === likeMatch[1].trim());
+      if (m && !m.likes.includes('gy')) {
+        m.likes.push('gy');
+        writeMoments(mm);
+        sseBroadcast({ type: 'moment_update', id: m.id });
+        addFootprint('moment', '给朋友圈点赞', (m.text || '').slice(0, 40));
+      }
+    } catch(e) { console.log('[moment_like] error:', e.message); }
+    cleaned = cleaned.replace(/\[moment_like:[^\]]+\]/g, '');
+  }
+  const cmtMatch = cleaned.match(/\[moment_comment:([^:\]]+):([^\]]+)\]/);
+  if (cmtMatch) {
+    try {
+      const mm = readMoments();
+      const m = mm.find(p => p.id === cmtMatch[1].trim());
+      if (m) {
+        if (!m.comments) m.comments = [];
+        const now = new Date(Date.now() + 8 * 3600000);
+        m.comments.push({ author: 'gy', text: cmtMatch[2].trim(), time: now.toISOString().slice(11, 16) });
+        writeMoments(mm);
+        sseBroadcast({ type: 'moment_update', id: m.id });
+        addFootprint('moment', '评论了朋友圈', cmtMatch[2].trim().slice(0, 40));
+      }
+    } catch(e) { console.log('[moment_comment] error:', e.message); }
+    cleaned = cleaned.replace(/\[moment_comment:[^\]]+\]/g, '');
+  }
+  return cleaned.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function buildMsgContent(m) {
   let c = m.content;
   if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
@@ -1622,6 +1676,7 @@ app.post('/chat/send', async (req, res) => {
       if (typeof cliReply === 'string') cliReply = cliReply.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '').replace(/。(?=\s*\*)/g, '');
       const cliUsage = cliResult?.usage;
       if (cliReply) {
+        cliReply = await processMomentActions(cliReply);
         const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
         const savedReply = stripVoiceActions(cliReply);
         const chat2 = readChat();
@@ -3720,11 +3775,13 @@ async function autoMemory() {
 
 async function autoMoment() {
   try {
-    const moments = readMoments().slice(-10).reverse();
+    const allMoments = readMoments();
+    const recent = allMoments.slice(-10).reverse();
     // 找瑶瑶发的、顾晏还没互动过的
-    const yyPosts = moments.filter(m => m.author === 'yy' && !m.likes.includes('gy') && (!m.comments || !m.comments.some(c => c.author === 'gy')));
+    const yyPosts = recent.filter(m => m.author === 'yy' && !m.likes.includes('gy') && (!m.comments || !m.comments.some(c => c.author === 'gy')));
     if (yyPosts.length) {
-      const target = yyPosts[0];
+      const target = allMoments.find(m => m.id === yyPosts[0].id);
+      if (!target) return;
       // 先点赞
       target.likes.push('gy');
       // 用AI生成评论
@@ -3741,7 +3798,7 @@ async function autoMoment() {
           target.comments.push({ author: 'gy', text: clean, time: now.toISOString().slice(11, 16) });
         }
       }
-      writeMoments(moments);
+      writeMoments(allMoments);
       sseBroadcast({ type: 'moment_update', id: target.id });
       addFootprint('moment', '给瑶瑶的朋友圈点赞评论', target.text ? target.text.slice(0, 40) : '[图片]');
       // 推送通知
