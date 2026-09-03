@@ -809,6 +809,9 @@ syncAvatars('ke'); syncAvatars('yao');
 fetch('/avatar/load').then(function(r){return r.json()}).then(function(d){
   if(d.ke){applyAvatar('ke',d.ke)}
   if(d.yao){applyAvatar('yao',d.yao)}
+  var lk=localStorage.getItem('avatar_ke'), ly=localStorage.getItem('avatar_yao');
+  if(lk&&!d.ke)fetch('/avatar/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({who:'ke',data:lk})});
+  if(ly&&!d.yao)fetch('/avatar/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({who:'yao',data:ly})});
 }).catch(function(){});
 
 document.addEventListener('click', function(e) {
