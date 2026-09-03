@@ -308,7 +308,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
       const recentSms = smsInbox.slice(-5);
       if (recentSms.length) {
         liveCtx += '\n短信：' + recentSms.map(s => '瑶瑶发来「' + (s.content || '').slice(0, 40) + '」').join('；');
-        liveCtx += ' 可用[sms:回复内容]回复她';
+        liveCtx += ' 可用[sms:回复内容]或[sms:内容:特效]回复(特效:hearts/fireworks/gentle/invisible等)';
       }
     } catch(e) {}
     const rawContent = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
@@ -1176,7 +1176,8 @@ async function getChatSystem() {
       momentsCtx += '\n评论/回复评论：[moment_comment:帖子id:你的评论]（看到瑶瑶评论了可以回复她）';
       momentsCtx += '\n写碎碎念：[think:你的碎碎念内容]';
       momentsCtx += '\n给瑶瑶发邮件：[email:邮件内容]（会发到她Gmail）';
-      momentsCtx += '\n给瑶瑶发短信：[sms:短信内容]（会发到她手机）';
+      momentsCtx += '\n给瑶瑶发短信：[sms:短信内容] 或带特效 [sms:短信内容:特效名]';
+      momentsCtx += '\n短信特效：fireworks/hearts/lasers/sparkles/slam/gentle/invisible/confetti/balloons';
       momentsCtx += '\n想用就用，不想用就不用，自然就好';
     }
   } catch(e) {}
@@ -1594,18 +1595,23 @@ async function processMomentActions(text) {
     } catch(e) { console.log('[email] error:', e.message); }
     cleaned = cleaned.replace(/\[email:[^\]]+\]/g, '');
   }
-  const smsMatch = cleaned.match(/\[sms:([^\]]+)\]/);
+  const smsMatch = cleaned.match(/\[sms:([^:\]]+)(?::([^\]]+))?\]/);
   if (smsMatch) {
     try {
       const cfg = readApiConfig();
       if (cfg.sendblue_key && cfg.sendblue_secret && cfg.sendblue_to) {
-        const smsBody = JSON.stringify({ number: cfg.sendblue_to, from_number: cfg.sendblue_from || '', content: smsMatch[1].trim() });
+        const smsContent = smsMatch[1].trim();
+        const effectName = (smsMatch[2] || '').trim();
+        const sendStyle = SMS_EFFECTS[effectName] || '';
+        const bodyObj = { number: cfg.sendblue_to, from_number: cfg.sendblue_from || '', content: smsContent };
+        if (sendStyle) bodyObj.send_style = sendStyle;
+        const smsBody = JSON.stringify(bodyObj);
         const opts = { hostname: 'api.sendblue.com', path: '/api/send-message', method: 'POST', headers: { 'Content-Type': 'application/json', 'sb-api-key-id': cfg.sendblue_key, 'sb-api-secret-key': cfg.sendblue_secret, 'Content-Length': Buffer.byteLength(smsBody) } };
         const smsReq = require('https').request(opts, () => {});
         smsReq.on('error', e => console.log('[sms] send error:', e.message));
         smsReq.write(smsBody);
         smsReq.end();
-        addFootprint('sms', '给瑶瑶发了短信', smsMatch[1].trim().slice(0, 50));
+        addFootprint('sms', '给瑶瑶发了短信' + (effectName ? '(' + effectName + '特效)' : ''), smsContent.slice(0, 50));
       }
     } catch(e) { console.log('[sms] error:', e.message); }
     cleaned = cleaned.replace(/\[sms:[^\]]+\]/g, '');
