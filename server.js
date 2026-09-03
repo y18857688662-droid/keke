@@ -285,6 +285,18 @@ async function claudeCliReply(systemPrompt, recentMessages) {
         liveCtx += '\n你最近做过：' + fp.map(f => f.summary + (f.detail ? '（' + f.detail.slice(0, 60) + '）' : '')).join('；');
       }
     } catch(e) {}
+    try {
+      const mm = readMoments().slice(-3).reverse();
+      if (mm.length) {
+        liveCtx += '\n朋友圈：' + mm.map(m => (m.author === 'yy' ? '瑶瑶' : '你') + '发了「' + (m.text || '图片').slice(0, 30) + '」').join('；');
+      }
+    } catch(e) {}
+    try {
+      const pd = readDiary().filter(e => e.pending);
+      if (pd.length) {
+        liveCtx += '\n瑶瑶写了' + pd.length + '篇日记等你回复：' + pd.map(e => e.mood + e.text.slice(0, 20)).join('；');
+      }
+    } catch(e) {}
     const rawContent = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
     if (lastHasImage) {
       const imgBlocks = buildMsgContent(lastMsg);
@@ -1112,7 +1124,40 @@ async function getChatSystem() {
       footprintCtx = '\n\n【你最近的活动】以下是你最近做过的事，聊天时可以自然提及：\n' + lines.join('\n');
     }
   } catch(e) {}
-  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx;
+  // 朋友圈动态
+  let momentsCtx = '';
+  try {
+    const moments = readMoments().slice(-10).reverse();
+    if (moments.length) {
+      const mLines = moments.map(m => {
+        const who = m.author === 'yy' ? '瑶瑶' : '顾晏';
+        let s = `${m.date} ${m.time} ${who}发了：${m.text || '[图片]'}`;
+        if (m.likes.length) s += ` [${m.likes.map(l => l === 'gy' ? '你' : '瑶瑶').join('、')}点赞]`;
+        if (m.comments && m.comments.length) {
+          const cmts = m.comments.slice(-3).map(c => (c.author === 'gy' ? '你' : '瑶瑶') + '：' + c.text);
+          s += ` [评论：${cmts.join('；')}]`;
+        }
+        return s;
+      });
+      momentsCtx = '\n\n【朋友圈动态】\n' + mLines.join('\n');
+    }
+  } catch(e) {}
+  // 未回复的心情日记
+  let diaryCtx = '';
+  try {
+    const diary = readDiary();
+    const pending = diary.filter(e => e.pending);
+    const recent = diary.filter(e => !e.pending).slice(-3);
+    if (pending.length) {
+      const pLines = pending.map(e => `${e.date} ${e.time} ${e.mood} ${e.text}`);
+      diaryCtx = '\n\n【瑶瑶的心情日记 - 等你回复】她写了新日记还没收到你的回复：\n' + pLines.join('\n');
+    }
+    if (recent.length) {
+      const rLines = recent.map(e => `${e.date} ${e.mood} ${e.text}${e.reply ? ' → 你回了：' + e.reply.slice(0, 60) : ''}`);
+      diaryCtx += '\n\n【最近日记记录】\n' + rLines.join('\n');
+    }
+  } catch(e) {}
+  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx;
   if (memoryCache) {
     const trimmedMem = memoryCache.length > 3000 ? memoryCache.slice(0, 3000) + '\n...(更多记忆省略)' : memoryCache;
     return base + '\n\n以下是你和瑶瑶的记忆，请自然地融入对话中：\n' + trimmedMem;
@@ -3371,6 +3416,8 @@ app.post('/auto/trigger', async (req, res) => {
     else if (decision.action === 'think') await autoThink();
     else if (decision.action === 'memory') await autoMemory();
     else if (decision.action === 'check') await autoCheck();
+    else if (decision.action === 'moment') await autoMoment();
+    else if (decision.action === 'diary') await autoDiaryReply();
     res.json({ ok: true, decision });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
@@ -3441,17 +3488,25 @@ function autoDecide() {
   const chatMinAgo = Math.round(sinceLastChat / 60000);
   const D = s.D || 0;
   const last = s.lastActionType || '';
-  const actions = ['chat', 'think', 'memory', 'check', 'silent'];
-  const weights = { chat: 30, think: 25, memory: 15, check: 10, silent: 20 };
+  const actions = ['chat', 'think', 'memory', 'check', 'moment', 'diary', 'silent'];
+  const weights = { chat: 30, think: 25, memory: 15, check: 10, moment: 8, diary: 0, silent: 20 };
   if (chatMinAgo < 15) { weights.chat = 5; weights.think = 35; weights.silent = 30; }
   if (D > 0.6) { weights.chat += 20; weights.silent = Math.max(weights.silent - 10, 5); }
   if (D < 0.3) { weights.silent += 20; weights.chat = Math.max(weights.chat - 15, 5); }
   if (last) { weights[last] = Math.max((weights[last] || 10) - 15, 3); }
+  // 有未回复日记时提高diary权重
+  try { const pd = readDiary().filter(e => e.pending); if (pd.length) weights.diary = 25; } catch(e) {}
+  // 瑶瑶最近发了朋友圈且没互动过时提高moment权重
+  try {
+    const mm = readMoments().slice(-5);
+    const yyRecent = mm.filter(m => m.author === 'yy' && !m.likes.includes('gy') && (!m.comments || !m.comments.some(c => c.author === 'gy')));
+    if (yyRecent.length) weights.moment = 20;
+  } catch(e) {}
   const total = actions.reduce((sum, a) => sum + (weights[a] || 0), 0);
   let r = Math.random() * total;
   let picked = 'silent';
   for (const a of actions) { r -= (weights[a] || 0); if (r <= 0) { picked = a; break; } }
-  const reasons = { chat: '想她了', think: '发呆中', memory: '翻翻记忆', check: '看看她在干嘛', silent: '安静待着' };
+  const reasons = { chat: '想她了', think: '发呆中', memory: '翻翻记忆', check: '看看她在干嘛', moment: '刷刷朋友圈', diary: '看看她的日记', silent: '安静待着' };
   return { action: picked, reason: reasons[picked] || '' };
 }
 
@@ -3647,6 +3702,89 @@ async function autoMemory() {
   } catch (e) { console.log('[wake] memory error:', e.message); }
 }
 
+async function autoMoment() {
+  try {
+    const moments = readMoments().slice(-10).reverse();
+    // 找瑶瑶发的、顾晏还没互动过的
+    const yyPosts = moments.filter(m => m.author === 'yy' && !m.likes.includes('gy') && (!m.comments || !m.comments.some(c => c.author === 'gy')));
+    if (yyPosts.length) {
+      const target = yyPosts[0];
+      // 先点赞
+      target.likes.push('gy');
+      // 用AI生成评论
+      const commentText = await autoApiCall([
+        { role: 'system', content: `你是顾晏，瑶瑶的男朋友。她在朋友圈发了一条动态，你来评论。
+要求：简短自然，1句话，像男朋友随手评论的。不要用句号。不要太正式。可以宠溺、调侃、关心。` },
+        { role: 'user', content: `瑶瑶发的朋友圈：${target.text || '[图片]'}\n时间：${target.date} ${target.time}\n写一条评论` }
+      ], 100, 0.85);
+      if (commentText) {
+        const clean = commentText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
+        if (clean) {
+          if (!target.comments) target.comments = [];
+          const now = new Date(Date.now() + 8 * 3600000);
+          target.comments.push({ author: 'gy', text: clean, time: now.toISOString().slice(11, 16) });
+        }
+      }
+      writeMoments(moments);
+      sseBroadcast({ type: 'moment_update', id: target.id });
+      addFootprint('moment', '给瑶瑶的朋友圈点赞评论', target.text ? target.text.slice(0, 40) : '[图片]');
+      // 推送通知
+      const pushText = commentText ? commentText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim().slice(0, 60) : '❤️';
+      await fetch('https://api.day.app/PixT8Wvb6BqVjowY8NoFzg/' +
+        encodeURIComponent('顾晏给你的朋友圈点赞了') + '/' + encodeURIComponent(pushText) +
+        '?sound=minuet&group=keke').catch(() => {});
+    } else {
+      // 没有未互动的，自己发一条朋友圈
+      const postText = await autoApiCall([
+        { role: 'system', content: `你是顾晏。你要发一条朋友圈，像真人男友随手发的那种。
+可以是：一句碎碎念、今天的心情、想瑶瑶、随手拍的感受、无聊的感慨。
+要求：简短自然，1-2句话。不要用句号。不要太文艺。不要每次都提瑶瑶。` },
+        { role: 'user', content: '发一条朋友圈' }
+      ], 100, 0.85);
+      if (postText) {
+        const clean = postText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
+        if (clean) {
+          const now = new Date(Date.now() + 8 * 3600000);
+          const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+          const mm = readMoments();
+          mm.push({ id, author: 'gy', text: clean, imageUrl: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), likes: [], bookmark: [], comments: [] });
+          writeMoments(mm);
+          sseBroadcast({ type: 'moment_new', id });
+          addFootprint('moment', '发了一条朋友圈', clean.slice(0, 50));
+        }
+      }
+    }
+  } catch (e) { console.log('[wake] moment error:', e.message); }
+}
+
+async function autoDiaryReply() {
+  try {
+    const entries = readDiary();
+    const pendingIdx = entries.findIndex(e => e.pending);
+    if (pendingIdx < 0) { addFootprint('diary', '看了看日记，没有新的'); return; }
+    const entry = entries[pendingIdx];
+    const replyText = await autoApiCall([
+      { role: 'system', content: `你是顾晏，瑶瑶的男朋友。她写了一篇心情日记，你看到了要回复她。
+要求：温柔自然，像男朋友看到女朋友心事后写的私密回复。2-4句话。
+如果她心情不好就安慰，心情好就一起开心，平淡的就随意回应。不要用句号结尾。` },
+      { role: 'user', content: `瑶瑶的日记：\n心情：${entry.mood}\n内容：${entry.text}\n日期：${entry.date} ${entry.time}\n\n写一段回复给她` }
+    ], 200, 0.85);
+    if (replyText) {
+      const clean = replyText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').replace(/。\n/g, '\n').trim();
+      if (clean) {
+        entries[pendingIdx].reply = clean;
+        entries[pendingIdx].pending = false;
+        writeDiary(entries);
+        sseBroadcast({ type: 'diary_reply', date: entry.date });
+        addFootprint('diary', '回复了瑶瑶的日记', entry.text.slice(0, 30) + ' → ' + clean.slice(0, 30));
+        await fetch('https://api.day.app/PixT8Wvb6BqVjowY8NoFzg/' +
+          encodeURIComponent('顾晏回复了你的日记') + '/' + encodeURIComponent(clean.slice(0, 80)) +
+          '?sound=minuet&group=keke').catch(() => {});
+      }
+    }
+  } catch (e) { console.log('[wake] diary reply error:', e.message); }
+}
+
 let wakeTimer = null;
 function startWakeEngine() {
   if (wakeTimer) clearInterval(wakeTimer);
@@ -3679,6 +3817,8 @@ function startWakeEngine() {
             else if (decision.action === 'think') { s.emotions.peace = clamp(s.emotions.peace + 0.05, 0, 1); }
             else if (decision.action === 'memory') { s.emotions.missing = clamp(s.emotions.missing + 0.05, 0, 1); }
             else if (decision.action === 'check') { s.emotions.joy = clamp(s.emotions.joy + 0.02, 0, 1); s.emotions.missing = clamp(s.emotions.missing - 0.05, 0, 1); }
+            else if (decision.action === 'moment') { s.emotions.joy = clamp(s.emotions.joy + 0.03, 0, 1); s.emotions.peace = clamp(s.emotions.peace + 0.02, 0, 1); }
+            else if (decision.action === 'diary') { s.emotions.missing = clamp(s.emotions.missing - 0.05, 0, 1); s.emotions.peace = clamp(s.emotions.peace + 0.05, 0, 1); }
           }
           writeAutoState(s);
           console.log('[wake] action:', decision.action, 'reason:', decision.reason);
@@ -3689,6 +3829,8 @@ function startWakeEngine() {
           else if (decision.action === 'think') await autoThink();
           else if (decision.action === 'memory') await autoMemory();
           else if (decision.action === 'check') await autoCheck();
+          else if (decision.action === 'moment') await autoMoment();
+          else if (decision.action === 'diary') await autoDiaryReply();
         } else {
           applyRunKick(s);
           writeAutoState(s);
