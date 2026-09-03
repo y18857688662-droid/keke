@@ -300,7 +300,8 @@ async function claudeCliReply(systemPrompt, recentMessages) {
     try {
       const pd = readDiary().filter(e => e.pending);
       if (pd.length) {
-        liveCtx += '\n瑶瑶写了' + pd.length + '篇日记等你回复：' + pd.map(e => e.mood + e.text.slice(0, 20)).join('；');
+        liveCtx += '\n瑶瑶写了' + pd.length + '篇日记等你回复：' + pd.map(e => '[' + e.date + ']' + e.mood + e.text.slice(0, 30)).join('；');
+        liveCtx += ' 可用[diary_reply:日期:你的回复内容]';
       }
     } catch(e) {}
     const rawContent = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
@@ -1178,6 +1179,7 @@ async function getChatSystem() {
     if (pending.length) {
       const pLines = pending.map(e => `${e.date} ${e.time} ${e.mood} ${e.text}`);
       diaryCtx = '\n\n【瑶瑶的心情日记 - 等你回复】她写了新日记还没收到你的回复：\n' + pLines.join('\n');
+      diaryCtx += '\n你可以在回复中用 [diary_reply:日期:你的回复内容] 来回复她的日记（标签不会显示给瑶瑶）';
     }
     if (recent.length) {
       const rLines = recent.map(e => `${e.date} ${e.mood} ${e.text}${e.reply ? ' → 你回了：' + e.reply.slice(0, 60) : ''}`);
@@ -1533,6 +1535,21 @@ async function processMomentActions(text) {
       }
     } catch(e) { console.log('[moment_comment] error:', e.message); }
     cleaned = cleaned.replace(/\[moment_comment:[^\]]+\]/g, '');
+  }
+  const diaryMatch = cleaned.match(/\[diary_reply:([^:\]]+):([^\]]+)\]/);
+  if (diaryMatch) {
+    try {
+      const entries = readDiary();
+      const idx = entries.findIndex(e => e.date === diaryMatch[1].trim() && e.pending);
+      if (idx >= 0) {
+        entries[idx].reply = diaryMatch[2].trim();
+        entries[idx].pending = false;
+        writeDiary(entries);
+        sseBroadcast({ type: 'diary_reply', date: entries[idx].date });
+        addFootprint('diary', '回复了瑶瑶的日记', entries[idx].text.slice(0, 30) + ' → ' + diaryMatch[2].trim().slice(0, 30));
+      }
+    } catch(e) { console.log('[diary_reply] error:', e.message); }
+    cleaned = cleaned.replace(/\[diary_reply:[^\]]+\]/g, '');
   }
   return cleaned.replace(/\n{3,}/g, '\n\n').trim();
 }
