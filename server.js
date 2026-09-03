@@ -304,6 +304,13 @@ async function claudeCliReply(systemPrompt, recentMessages) {
         liveCtx += ' 可用[diary_reply:日期:你的回复内容]';
       }
     } catch(e) {}
+    try {
+      const recentSms = smsInbox.slice(-5);
+      if (recentSms.length) {
+        liveCtx += '\n短信：' + recentSms.map(s => '瑶瑶发来「' + (s.content || '').slice(0, 40) + '」').join('；');
+        liveCtx += ' 可用[sms:回复内容]回复她';
+      }
+    } catch(e) {}
     const rawContent = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
     if (lastHasImage) {
       const imgBlocks = buildMsgContent(lastMsg);
@@ -1189,7 +1196,16 @@ async function getChatSystem() {
       diaryCtx += '\n\n【最近日记记录】\n' + rLines.join('\n');
     }
   } catch(e) {}
-  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx;
+  let smsCtx = '';
+  try {
+    const recentSms = smsInbox.slice(-5);
+    if (recentSms.length) {
+      const smsLines = recentSms.map(s => `${s.time ? s.time.slice(11, 16) : ''} 瑶瑶发来：${(s.content || '').slice(0, 60)}`);
+      smsCtx = '\n\n【短信收件箱】瑶瑶给你发了短信：\n' + smsLines.join('\n');
+      smsCtx += '\n你可以用 [sms:回复内容] 回复她的短信';
+    }
+  } catch(e) {}
+  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx;
   if (memoryCache) {
     const trimmedMem = memoryCache.length > 3000 ? memoryCache.slice(0, 3000) + '\n...(更多记忆省略)' : memoryCache;
     return base + '\n\n以下是你和瑶瑶的记忆，请自然地融入对话中：\n' + trimmedMem;
