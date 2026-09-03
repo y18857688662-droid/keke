@@ -1166,7 +1166,7 @@ async function getChatSystem() {
       momentsCtx += '\n你可以在回复中用以下标签操作朋友圈（标签不会显示给瑶瑶）：';
       momentsCtx += '\n发朋友圈：[moment_post:你想发的内容]';
       momentsCtx += '\n给某条点赞：[moment_like:帖子id]';
-      momentsCtx += '\n评论某条：[moment_comment:帖子id:你的评论]';
+      momentsCtx += '\n评论/回复评论：[moment_comment:帖子id:你的评论]（看到瑶瑶评论了可以回复她）';
       momentsCtx += '\n写碎碎念：[think:你的碎碎念内容]';
       momentsCtx += '\n给瑶瑶发邮件：[email:邮件内容]（会发到她Gmail）';
       momentsCtx += '\n给瑶瑶发短信：[sms:短信内容]（会发到她手机）';
