@@ -1375,9 +1375,6 @@ app.post('/sms/incoming', (req, res) => {
     if (smsInbox.length > 100) smsInbox.shift();
     console.log(`[sms] incoming from ${from_number}: ${(content || '').slice(0, 50)}${effectName ? ' [' + effectName + ']' : ''}`);
     sseBroadcast({ type: 'sms_incoming', content: content || '', effect: effectName, from: from_number || '', time: msg.time });
-    fetch('https://api.day.app/PixT8Wvb6BqVjowY8NoFzg/' +
-      encodeURIComponent('瑶瑶发来短信') + '/' + encodeURIComponent((content || '').slice(0, 80) + (effectName ? ' [' + effectName + '特效]' : '')) +
-      '?sound=minuet&group=keke').catch(() => {});
   }
   res.json({ ok: true });
 });
