@@ -1374,34 +1374,6 @@ app.post('/sms/incoming', (req, res) => {
     smsInbox.push(msg);
     if (smsInbox.length > 100) smsInbox.shift();
     console.log(`[sms] incoming from ${from_number}: ${(content || '').slice(0, 50)}${effectName ? ' [' + effectName + ']' : ''}`);
-    // 自动回复短信
-    (async () => {
-      try {
-        const recentSms = smsInbox.slice(-5).map(s => (s.from ? '瑶瑶' : '你') + '：' + s.content).join('\n');
-        const replyText = await autoApiCall([
-          { role: 'system', content: CHAT_SYSTEM_BASE + '\n你在用短信跟瑶瑶聊天。简短自然，像发短信一样，1-2句话。不要太长。' },
-          { role: 'user', content: `短信记录：\n${recentSms}\n\n瑶瑶刚发来：${content}${effectName ? '（带了' + effectName + '特效）' : ''}\n回复她` }
-        ], 100, 0.85);
-        if (replyText) {
-          const clean = replyText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
-          if (clean) {
-            const cfg = readApiConfig();
-            if (cfg.sendblue_key && cfg.sendblue_secret && cfg.sendblue_to) {
-              const bodyObj = { number: cfg.sendblue_to, from_number: cfg.sendblue_from || '', content: clean };
-              const smsBody = JSON.stringify(bodyObj);
-              const opts = { hostname: 'api.sendblue.com', path: '/api/send-message', method: 'POST', headers: { 'Content-Type': 'application/json', 'sb-api-key-id': cfg.sendblue_key, 'sb-api-secret-key': cfg.sendblue_secret, 'Content-Length': Buffer.byteLength(smsBody) } };
-              const smsReq = require('https').request(opts, () => {});
-              smsReq.on('error', e => console.log('[sms-auto] send error:', e.message));
-              smsReq.write(smsBody);
-              smsReq.end();
-              smsInbox.push({ content: clean, from: '', to: from_number || '', time: new Date().toISOString(), autoReply: true });
-              addFootprint('sms', '自动回复了瑶瑶的短信', clean.slice(0, 50));
-              console.log('[sms-auto] replied:', clean.slice(0, 60));
-            }
-          }
-        }
-      } catch(e) { console.log('[sms-auto] error:', e.message); }
-    })();
   }
   res.json({ ok: true });
 });
