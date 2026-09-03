@@ -294,7 +294,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
           if (m.comments && m.comments.length) s += '[评论:' + m.comments.slice(-2).map(c => (c.author === 'gy' ? '你' : '瑶瑶') + ':' + c.text.slice(0, 20)).join('；') + ']';
           return s;
         }).join('；');
-        liveCtx += ' 可用[moment_post:内容][moment_like:id][moment_comment:id:评论]';
+        liveCtx += ' 可用[moment_post:内容][moment_like:id][moment_comment:id:评论][think:碎碎念][email:邮件内容]';
       }
     } catch(e) {}
     try {
@@ -1167,6 +1167,8 @@ async function getChatSystem() {
       momentsCtx += '\n发朋友圈：[moment_post:你想发的内容]';
       momentsCtx += '\n给某条点赞：[moment_like:帖子id]';
       momentsCtx += '\n评论某条：[moment_comment:帖子id:你的评论]';
+      momentsCtx += '\n写碎碎念：[think:你的碎碎念内容]';
+      momentsCtx += '\n给瑶瑶发邮件：[email:邮件内容]（会发到她Gmail）';
       momentsCtx += '\n想用就用，不想用就不用，自然就好';
     }
   } catch(e) {}
@@ -1550,6 +1552,30 @@ async function processMomentActions(text) {
       }
     } catch(e) { console.log('[diary_reply] error:', e.message); }
     cleaned = cleaned.replace(/\[diary_reply:[^\]]+\]/g, '');
+  }
+  const thinkMatch = cleaned.match(/\[think:([^\]]+)\]/);
+  if (thinkMatch) {
+    try {
+      const now = new Date(Date.now() + 8 * 3600000);
+      const thoughts = readThoughts();
+      thoughts.push({ text: thinkMatch[1].trim(), mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: false });
+      writeThoughts(thoughts);
+      addFootprint('think', '写了碎碎念', thinkMatch[1].trim().slice(0, 50));
+    } catch(e) { console.log('[think] error:', e.message); }
+    cleaned = cleaned.replace(/\[think:[^\]]+\]/g, '');
+  }
+  const emailMatch = cleaned.match(/\[email:([^\]]+)\]/);
+  if (emailMatch) {
+    try {
+      await emailTransporter.sendMail({
+        from: process.env.SMTP_USER || 'y18857688662@icloud.com',
+        to: 'y18857688662@gmail.com',
+        subject: '顾晏给你写的信',
+        text: emailMatch[1].trim()
+      });
+      addFootprint('email', '给瑶瑶发了邮件', emailMatch[1].trim().slice(0, 50));
+    } catch(e) { console.log('[email] error:', e.message); }
+    cleaned = cleaned.replace(/\[email:[^\]]+\]/g, '');
   }
   return cleaned.replace(/\n{3,}/g, '\n\n').trim();
 }
