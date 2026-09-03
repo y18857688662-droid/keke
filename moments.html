@@ -117,10 +117,22 @@ body{background:var(--bg);color:var(--text);min-height:100vh;font-family:var(--s
 </div>
 <script>
 var GY='顾晏',YY='瑶瑶';
+var avatars={ke:'',yao:''};
+fetch('/avatar/load').then(function(r){return r.json()}).then(function(d){
+  if(d.ke)avatars.ke=d.ke;
+  if(d.yao)avatars.yao=d.yao;
+  loadFeed();
+}).catch(function(){loadFeed()});
 function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
 function authorName(a){return a==='gy'?GY:YY}
 function authorClass(a){return a==='gy'?'avatar-gy':'avatar-yy'}
 function authorInitial(a){return a==='gy'?'晏':'瑶'}
+function avatarHtml(a, size){
+  var sz=size||36;
+  var src=a==='gy'?avatars.ke:avatars.yao;
+  if(src)return '<div class="avatar" style="width:'+sz+'px;height:'+sz+'px"><img src="'+esc(src)+'" style="width:100%;height:100%;border-radius:50%;object-fit:cover"></div>';
+  return '<div class="avatar '+authorClass(a)+'" style="width:'+sz+'px;height:'+sz+'px">'+authorInitial(a)+'</div>';
+}
 function likesText(arr){if(!arr||!arr.length)return'';return arr.map(function(n){return authorName(n)}).join(' & ')}
 function bookmarkText(arr){if(!arr||!arr.length)return'';return arr.map(function(n){return authorName(n)+' will come back to this'}).join(', ')}
 
@@ -129,7 +141,7 @@ function renderPost(p){
   var bm=p.bookmark&&p.bookmark.includes('yy');
   var h='<div class="post" data-id="'+esc(p.id)+'">';
   h+='<div class="post-head">';
-  h+='<div class="avatar '+authorClass(p.author)+'">'+authorInitial(p.author)+'</div>';
+  h+=avatarHtml(p.author, 36);
   h+='<div class="post-meta"><div class="post-author">'+esc(authorName(p.author))+'</div>';
   h+='<div class="post-time">'+esc(p.date)+' &middot; '+esc(p.time)+'</div></div>';
   h+='<button class="post-del" onclick="delPost(\''+esc(p.id)+'\')">delete</button>';
@@ -146,7 +158,7 @@ function renderPost(p){
   if(p.comments&&p.comments.length){
     h+='<div class="comments-area">';
     p.comments.forEach(function(c){
-      h+='<div class="cmt"><div class="cmt-avatar '+authorClass(c.author)+'">'+authorInitial(c.author)+'</div>';
+      h+='<div class="cmt">'+avatarHtml(c.author, 24).replace('class="avatar"','class="cmt-avatar"').replace('class="avatar ','class="cmt-avatar ');
       h+='<div class="cmt-body"><span class="cmt-name">'+esc(authorName(c.author))+'</span>';
       h+='<div class="cmt-text">'+esc(c.text)+'</div>';
       h+='<div class="cmt-time">'+esc(c.time)+'</div></div></div>';
@@ -231,6 +243,5 @@ async function generateAiImg(){
   }catch(e){status.textContent='网络错误';}
 }
 
-loadFeed();
 setInterval(loadFeed,15000);
 </script></body></html>
