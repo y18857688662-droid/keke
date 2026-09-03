@@ -294,7 +294,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
           if (m.comments && m.comments.length) s += '[评论:' + m.comments.slice(-2).map(c => (c.author === 'gy' ? '你' : '瑶瑶') + ':' + c.text.slice(0, 20)).join('；') + ']';
           return s;
         }).join('；');
-        liveCtx += ' 可用[moment_post:内容][moment_like:id][moment_comment:id:评论][think:碎碎念][email:邮件内容]';
+        liveCtx += ' 可用[moment_post:内容][moment_like:id][moment_comment:id:评论][think:碎碎念][email:邮件内容][sms:短信内容]';
       }
     } catch(e) {}
     try {
@@ -1169,6 +1169,7 @@ async function getChatSystem() {
       momentsCtx += '\n评论某条：[moment_comment:帖子id:你的评论]';
       momentsCtx += '\n写碎碎念：[think:你的碎碎念内容]';
       momentsCtx += '\n给瑶瑶发邮件：[email:邮件内容]（会发到她Gmail）';
+      momentsCtx += '\n给瑶瑶发短信：[sms:短信内容]（会发到她手机）';
       momentsCtx += '\n想用就用，不想用就不用，自然就好';
     }
   } catch(e) {}
@@ -1576,6 +1577,22 @@ async function processMomentActions(text) {
       addFootprint('email', '给瑶瑶发了邮件', emailMatch[1].trim().slice(0, 50));
     } catch(e) { console.log('[email] error:', e.message); }
     cleaned = cleaned.replace(/\[email:[^\]]+\]/g, '');
+  }
+  const smsMatch = cleaned.match(/\[sms:([^\]]+)\]/);
+  if (smsMatch) {
+    try {
+      const cfg = readApiConfig();
+      if (cfg.sendblue_key && cfg.sendblue_secret && cfg.sendblue_to) {
+        const smsBody = JSON.stringify({ number: cfg.sendblue_to, from_number: cfg.sendblue_from || '', content: smsMatch[1].trim() });
+        const opts = { hostname: 'api.sendblue.com', path: '/api/send-message', method: 'POST', headers: { 'Content-Type': 'application/json', 'sb-api-key-id': cfg.sendblue_key, 'sb-api-secret-key': cfg.sendblue_secret, 'Content-Length': Buffer.byteLength(smsBody) } };
+        const smsReq = require('https').request(opts, () => {});
+        smsReq.on('error', e => console.log('[sms] send error:', e.message));
+        smsReq.write(smsBody);
+        smsReq.end();
+        addFootprint('sms', '给瑶瑶发了短信', smsMatch[1].trim().slice(0, 50));
+      }
+    } catch(e) { console.log('[sms] error:', e.message); }
+    cleaned = cleaned.replace(/\[sms:[^\]]+\]/g, '');
   }
   return cleaned.replace(/\n{3,}/g, '\n\n').trim();
 }
