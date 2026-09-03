@@ -307,7 +307,12 @@ async function claudeCliReply(systemPrompt, recentMessages) {
     try {
       const recentSms = smsInbox.slice(-5);
       if (recentSms.length) {
-        liveCtx += '\n短信：' + recentSms.map(s => '瑶瑶发来「' + (s.content || '').slice(0, 40) + '」').join('；');
+        liveCtx += '\n短信：' + recentSms.map(s => {
+          const who = s.from ? '瑶瑶' : '你';
+          let t = who + '：' + (s.content || '').slice(0, 40);
+          if (s.effect) t += '(' + s.effect + '特效)';
+          return t;
+        }).join('；');
         liveCtx += ' 可用[sms:回复内容]或[sms:内容:特效]回复(特效:hearts/fireworks/gentle/invisible等)';
       }
     } catch(e) {}
@@ -1201,8 +1206,13 @@ async function getChatSystem() {
   try {
     const recentSms = smsInbox.slice(-5);
     if (recentSms.length) {
-      const smsLines = recentSms.map(s => `${s.time ? s.time.slice(11, 16) : ''} 瑶瑶发来：${(s.content || '').slice(0, 60)}`);
-      smsCtx = '\n\n【短信收件箱】瑶瑶给你发了短信：\n' + smsLines.join('\n');
+      const smsLines = recentSms.map(s => {
+        const who = s.from ? '瑶瑶' : '你';
+        let line = `${s.time ? s.time.slice(11, 16) : ''} ${who}：${(s.content || '').slice(0, 60)}`;
+        if (s.effect) line += `（${s.effect}特效）`;
+        return line;
+      });
+      smsCtx = '\n\n【短信记录】\n' + smsLines.join('\n');
       smsCtx += '\n你可以用 [sms:回复内容] 回复她的短信';
     }
   } catch(e) {}
@@ -1355,13 +1365,43 @@ app.get('/sms/status', (req, res) => {
 });
 
 const smsInbox = [];
+const SMS_EFFECT_NAMES = Object.fromEntries(Object.entries(SMS_EFFECTS).map(([k, v]) => [v, k]));
 app.post('/sms/incoming', (req, res) => {
-  const { content, from_number, to_number, media_url, was_downgraded } = req.body;
+  const { content, from_number, to_number, media_url, was_downgraded, send_style } = req.body;
   if (content || media_url) {
-    const msg = { content: content || '', from: from_number || '', to: to_number || '', media: media_url || null, downgraded: !!was_downgraded, time: new Date().toISOString() };
+    const effectName = send_style ? (SMS_EFFECT_NAMES[send_style] || send_style) : '';
+    const msg = { content: content || '', from: from_number || '', to: to_number || '', media: media_url || null, effect: effectName, downgraded: !!was_downgraded, time: new Date().toISOString() };
     smsInbox.push(msg);
     if (smsInbox.length > 100) smsInbox.shift();
-    console.log(`[sms] incoming from ${from_number}: ${(content || '').slice(0, 50)}`);
+    console.log(`[sms] incoming from ${from_number}: ${(content || '').slice(0, 50)}${effectName ? ' [' + effectName + ']' : ''}`);
+    // 自动回复短信
+    (async () => {
+      try {
+        const recentSms = smsInbox.slice(-5).map(s => (s.from ? '瑶瑶' : '你') + '：' + s.content).join('\n');
+        const replyText = await autoApiCall([
+          { role: 'system', content: CHAT_SYSTEM_BASE + '\n你在用短信跟瑶瑶聊天。简短自然，像发短信一样，1-2句话。不要太长。' },
+          { role: 'user', content: `短信记录：\n${recentSms}\n\n瑶瑶刚发来：${content}${effectName ? '（带了' + effectName + '特效）' : ''}\n回复她` }
+        ], 100, 0.85);
+        if (replyText) {
+          const clean = replyText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
+          if (clean) {
+            const cfg = readApiConfig();
+            if (cfg.sendblue_key && cfg.sendblue_secret && cfg.sendblue_to) {
+              const bodyObj = { number: cfg.sendblue_to, from_number: cfg.sendblue_from || '', content: clean };
+              const smsBody = JSON.stringify(bodyObj);
+              const opts = { hostname: 'api.sendblue.com', path: '/api/send-message', method: 'POST', headers: { 'Content-Type': 'application/json', 'sb-api-key-id': cfg.sendblue_key, 'sb-api-secret-key': cfg.sendblue_secret, 'Content-Length': Buffer.byteLength(smsBody) } };
+              const smsReq = require('https').request(opts, () => {});
+              smsReq.on('error', e => console.log('[sms-auto] send error:', e.message));
+              smsReq.write(smsBody);
+              smsReq.end();
+              smsInbox.push({ content: clean, from: '', to: from_number || '', time: new Date().toISOString(), autoReply: true });
+              addFootprint('sms', '自动回复了瑶瑶的短信', clean.slice(0, 50));
+              console.log('[sms-auto] replied:', clean.slice(0, 60));
+            }
+          }
+        }
+      } catch(e) { console.log('[sms-auto] error:', e.message); }
+    })();
   }
   res.json({ ok: true });
 });
