@@ -454,6 +454,22 @@ app.use('/static', express.static(path.join(__dirname, 'static')));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
+// 头像存储
+const AVATAR_FILE = path.join(__dirname, 'avatars.json');
+function readAvatars() { try { return JSON.parse(fs.readFileSync(AVATAR_FILE, 'utf8')); } catch { return {}; } }
+function writeAvatars(d) { fs.writeFileSync(AVATAR_FILE, JSON.stringify(d)); }
+app.post('/avatar/save', (req, res) => {
+  const { who, data } = req.body;
+  if (!who || !data) return res.json({ ok: false });
+  const avatars = readAvatars();
+  avatars[who] = data;
+  writeAvatars(avatars);
+  res.json({ ok: true });
+});
+app.get('/avatar/load', (req, res) => {
+  res.json(readAvatars());
+});
+
 app.post('/bark/push', async (req, res) => {
   const msg = (req.body?.msg || '').trim();
   if (!msg) return res.json({ ok: false, error: 'missing msg' });
