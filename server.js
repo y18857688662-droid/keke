@@ -288,7 +288,12 @@ async function claudeCliReply(systemPrompt, recentMessages) {
     try {
       const mm = readMoments().slice(-3).reverse();
       if (mm.length) {
-        liveCtx += '\n朋友圈：' + mm.map(m => '[id:' + m.id + ']' + (m.author === 'yy' ? '瑶瑶' : '你') + '发了「' + (m.text || '图片').slice(0, 30) + '」' + (m.likes.length ? '(' + m.likes.map(l => l === 'gy' ? '你' : '瑶瑶').join('') + '赞)' : '')).join('；');
+        liveCtx += '\n朋友圈：' + mm.map(m => {
+          let s = '[id:' + m.id + ']' + (m.author === 'yy' ? '瑶瑶' : '你') + '发了「' + (m.text || '图片').slice(0, 30) + '」';
+          if (m.likes.length) s += '(' + m.likes.map(l => l === 'gy' ? '你' : '瑶瑶').join('') + '赞)';
+          if (m.comments && m.comments.length) s += '[评论:' + m.comments.slice(-2).map(c => (c.author === 'gy' ? '你' : '瑶瑶') + ':' + c.text.slice(0, 20)).join('；') + ']';
+          return s;
+        }).join('；');
         liveCtx += ' 可用[moment_post:内容][moment_like:id][moment_comment:id:评论]';
       }
     } catch(e) {}
