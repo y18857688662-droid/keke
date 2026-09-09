@@ -31,8 +31,4 @@ self.addEventListener('notificationclick', (e) => {
   );
 });
 
-self.addEventListener('fetch', (e) => {
-  if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).catch(() => caches.match('/chat')));
-  }
-});
+self.addEventListener('fetch', () => {});
