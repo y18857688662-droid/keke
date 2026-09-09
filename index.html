@@ -1075,20 +1075,18 @@ function renderMessage(msg, idx, stagger) {
   var allLines = content.split(/\n+/).map(function(l){return l.trim()}).filter(function(l){
     return l && !(hasMedia && /^\[(图片|语音|文件)\]/.test(l)) && !(msg.audioUrl && /^\[语音\]/.test(l));
   });
-  var voiceLnIdx = -1;
-  for (var vli = 0; vli < allLines.length; vli++) {
-    if (/^\[voice\]/i.test(allLines[vli])) { voiceLnIdx = vli; break; }
-  }
-  var lines = allLines.filter(function(l,i){ return i !== voiceLnIdx; });
+  var lines = allLines.filter(function(l){ return !/^\[voice\]/i.test(l); });
   var bubbleIdx = 0;
+  var voiceNum = 0;
   allLines.forEach(function(line, idx) {
-    if (idx === voiceLnIdx) {
+    if (/^\[voice\]/i.test(line)) {
       var vText = line.replace(/^\[voice\]\s*/i, '').replace(/\*[^*]+\*/g, '').replace(/\s{2,}/g, ' ').trim();
       var vDur = Math.max(2, Math.min(Math.ceil(vText.length / 4), 60));
       var vBars = '';
       for (var vb = 0; vb < 18; vb++) { var vh = 4 + Math.floor(Math.random() * 14); vBars += '<span style="height:'+vh+'px"></span>'; }
       var vB64 = btoa(encodeURIComponent(vText));
-      var vOnClick = msg.audioUrl ? 'playAudioMsg(this,\''+msg.audioUrl+'\')' : 'playVoice(this,\''+vB64+'\')';
+      var useAudio = msg.audioUrl && voiceNum === 0;
+      var vOnClick = useAudio ? 'playAudioMsg(this,\''+msg.audioUrl+'\')' : 'playVoice(this,\''+vB64+'\')';
       colHtml += '<div class="voice-wrap' + (isKe ? '' : ' voice-wrap-human') + '">'
         + '<div class="voice-msg' + (isKe ? '' : ' voice-human') + '" onclick="' + vOnClick + '">'
         + '<div class="voice-play"><svg viewBox="0 0 10 12" fill="currentColor"><polygon points="1,0 10,6 1,12"/></svg></div>'
@@ -1098,6 +1096,7 @@ function renderMessage(msg, idx, stagger) {
         + '<div class="voice-to-text" onclick="toggleVoiceText(this,\''+vB64+'\')">转文字</div>'
         + '<div class="voice-text-content" style="display:none"></div>'
         + '</div>';
+      voiceNum++;
       return;
     }
     var delay = stagger ? 'style="opacity:0;animation:fadeInBubble 0.3s ease '+((bubbleIdx)*0.4)+'s forwards"' : '';

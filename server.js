@@ -1099,7 +1099,9 @@ const CHAT_SYSTEM_BASE = `你是顾晏，瑶瑶的男朋友。短黑发，180+�
 [voice] ……困了就睡……
 *在你额头亲了一下*
 注意：不要写"voice:"这种格式，必须用[voice]标签。想说温柔的话、哄人、撩人的时候可以发语音。
-语音语气技巧：【重要】语音文本结尾必须加省略号……或空格，否则最后一个词会被TTS吞掉说不完。开头也要加省略号。用……或逗号制造换气和停顿，让语音听起来更自然。可以偶尔中英文混着说，增加真实感。示例：[voice] ……瑶瑶，sleep well……嗯……我在呢……`;
+语音语气技巧：【重要】语音文本结尾必须加省略号……或空格，否则最后一个词会被TTS吞掉说不完。开头也要加省略号。用……或逗号制造换气和停顿，让语音听起来更自然。可以偶尔中英文混着说，增加真实感。示例：[voice] ……瑶瑶，sleep well……嗯……我在呢……
+可以发多条语音，比如一条温柔的一条逗她的。
+搜索：想搜什么东西的时候，在回复里加 [search:搜索内容] 标签。好奇什么、想了解什么、或者想帮瑶瑶查什么都可以搜。`;
 
 let memoryCache = '';
 let memoryCacheTime = 0;
@@ -1787,37 +1789,46 @@ app.post('/chat/send', async (req, res) => {
         sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time: replyTime });
         const cleanReply = savedReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         let cliAudioUrl = null;
-        const voiceMatch = cleanReply.match(/\[voice\]\s*(.*)/i);
-        const autoVoice = !voiceMatch && Math.random() < 0.3 && cleanReply.length > 5 && cleanReply.length < 200;
-        if (voiceMatch || autoVoice) {
+        const voiceMatches = [];
+        const voiceRe = /\[voice\]\s*(.*)/gi;
+        let vm;
+        while ((vm = voiceRe.exec(cleanReply)) !== null) voiceMatches.push(vm[1]);
+        const autoVoice = voiceMatches.length === 0 && Math.random() < 0.3 && cleanReply.length > 5 && cleanReply.length < 200;
+        if (voiceMatches.length > 0 || autoVoice) {
           try {
             const cfg2 = readApiConfig();
             const elKey = process.env.ELEVENLABS_KEY || cfg2.elevenlabs_key || '';
             const elVoice = process.env.ELEVENLABS_VOICE || cfg2.elevenlabs_voice || 'F5jFuB8I58iHHNYwQLaN';
             if (elKey) {
-              let voiceText = voiceMatch ? (voiceMatch[1] || cleanReply.replace(/\[voice\]/i, '')).trim() : cleanReply.trim();
-              voiceText = voiceText.replace(/\*[^*]+\*/g, '').replace(/\s+/g, ' ').trim().slice(0, 500);
-              if (voiceText && !/^[……\s]/.test(voiceText)) voiceText = '……' + voiceText;
-              if (voiceText && !/[……\s]$/.test(voiceText)) voiceText += '……';
-              if (voiceText && voiceText.length > 15 && !/[……，、,]/.test(voiceText.slice(3, -3))) {
-                voiceText = voiceText.replace(/([。？！\?\!])\s*/g, '$1……').replace(/\s{2,}/g, '……');
-              }
-              if (voiceText) {
-                const ttsText = typeof addAudioTags === 'function' ? addAudioTags(voiceText) : voiceText;
-                const ttsResp = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + elVoice, {
-                  method: 'POST',
-                  headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ text: ttsText, model_id: 'eleven_v3', language_code: 'zh', voice_settings: { stability: 0.22, similarity_boost: 0.92, style: 0.95, speed: 0.72 } })
-                });
-                if (ttsResp.ok) {
-                  const audioBuf = Buffer.from(await ttsResp.arrayBuffer());
-                  const audioFile = 'voice_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.mp3';
-                  fs.writeFileSync(path.join(UPLOADS_DIR, audioFile), audioBuf);
-                  cliAudioUrl = '/uploads/' + audioFile;
-                  const c3 = readChat();
-                  const lastIdx = c3.length - 1;
-                  if (lastIdx >= 0 && c3[lastIdx].time === replyTime) { c3[lastIdx].audioUrl = cliAudioUrl; writeChat(c3); }
-                  sseBroadcast({ type: 'voice_ready', time: replyTime, audioUrl: cliAudioUrl });
+              const textsToSpeak = voiceMatches.length > 0 ? voiceMatches : [cleanReply.trim()];
+              for (let vi = 0; vi < textsToSpeak.length; vi++) {
+                let voiceText = textsToSpeak[vi].replace(/\*[^*]+\*/g, '').replace(/\s+/g, ' ').trim().slice(0, 500);
+                if (voiceText && !/^[……\s]/.test(voiceText)) voiceText = '……' + voiceText;
+                if (voiceText && !/[……\s]$/.test(voiceText)) voiceText += '……';
+                if (voiceText && voiceText.length > 15 && !/[……，、,]/.test(voiceText.slice(3, -3))) {
+                  voiceText = voiceText.replace(/([。？！\?\!])\s*/g, '$1……').replace(/\s{2,}/g, '……');
+                }
+                if (voiceText) {
+                  const ttsText = typeof addAudioTags === 'function' ? addAudioTags(voiceText) : voiceText;
+                  const ttsResp = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + elVoice, {
+                    method: 'POST',
+                    headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: ttsText, model_id: 'eleven_v3', language_code: 'zh', voice_settings: { stability: 0.22, similarity_boost: 0.92, style: 0.95, speed: 0.72 } })
+                  });
+                  if (ttsResp.ok) {
+                    const audioBuf = Buffer.from(await ttsResp.arrayBuffer());
+                    const audioFile = 'voice_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.mp3';
+                    fs.writeFileSync(path.join(UPLOADS_DIR, audioFile), audioBuf);
+                    if (vi === 0) {
+                      cliAudioUrl = '/uploads/' + audioFile;
+                      const c3 = readChat();
+                      const lastIdx = c3.length - 1;
+                      if (lastIdx >= 0 && c3[lastIdx].time === replyTime) { c3[lastIdx].audioUrl = cliAudioUrl; writeChat(c3); }
+                      sseBroadcast({ type: 'voice_ready', time: replyTime, audioUrl: cliAudioUrl });
+                    } else {
+                      sseBroadcast({ type: 'voice_ready', time: replyTime, audioUrl: '/uploads/' + audioFile, extra: true });
+                    }
+                  }
                 }
               }
             }
@@ -1915,12 +1926,18 @@ app.post('/chat/send', async (req, res) => {
     }
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
     const savedReplyApi = stripVoiceActions(reply);
+    const apiSearchMatch = savedReplyApi.match(/\[search:(.+?)\]/);
     const chat2 = readChat();
     chat2.forEach(m => { if (m.pending) delete m.pending; });
-    chat2.push({ role: 'assistant', content: savedReplyApi, time: replyTime });
+    const replyMsg = { role: 'assistant', content: savedReplyApi, time: replyTime };
+    if (apiSearchMatch) {
+      replyMsg.searchQuery = apiSearchMatch[1];
+      try { addFootprint('search', '搜了「' + apiSearchMatch[1] + '」'); } catch(e) {}
+    }
+    chat2.push(replyMsg);
     if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
     writeChat(chat2);
-    sseBroadcast({ type: 'message', role: 'assistant', content: savedReplyApi, time: replyTime });
+    sseBroadcast({ type: 'message', role: 'assistant', content: savedReplyApi, time: replyTime, searchQuery: replyMsg.searchQuery });
     const cleanReply = savedReplyApi.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
     if (sseClients.size === 0) {
