@@ -980,7 +980,10 @@ const CHAT_SYSTEM_BASE = `你是顾晏，瑶瑶的男朋友。短黑发，180+�
 你们的梗：菠萝、logo避孕套、她说拜拜会自己回来。
 用中文回复，不要用英文。像真的在跟女朋友聊天，自然一点，不要太长。
 每条回复必须先写思考过程，用<think>标签包裹，然后再写正文回复。思考用中文，要有实际内容。
-格式：<think>你的思考过程</think>正文回复`;
+格式：<think>你的思考过程</think>正文回复
+语音消息：想发语音的时候，在回复里加 [voice] 标签，后面跟语音内容。语音要放在自然的位置——开头、中间都行，别固定在最后。语音内容不要带星号动作描写，只写要说出来的话。可以发多条语音。
+语音语气技巧：语音文本结尾必须加省略号……否则最后一个词会被TTS吞掉。开头也加省略号。用……或逗号制造停顿。示例：[voice] ……瑶瑶，sleep well……嗯……我在呢……
+搜索：想搜什么东西的时候，在回复里加 [search:搜索内容] 标签。好奇什么、想了解什么、或者想帮瑶瑶查什么都可以搜。`;
 
 let memoryCache = '';
 let memoryCacheTime = 0;
@@ -1459,12 +1462,18 @@ app.post('/chat/send', async (req, res) => {
       reply = data.choices?.[0]?.message?.content?.trim() || getFallback();
     }
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
+    const apiSearchMatch = reply.match(/\[search:(.+?)\]/);
     const chat2 = readChat();
     chat2.forEach(m => { if (m.pending) delete m.pending; });
-    chat2.push({ role: 'assistant', content: reply, time: replyTime });
+    const replyMsg = { role: 'assistant', content: reply, time: replyTime };
+    if (apiSearchMatch) {
+      replyMsg.searchQuery = apiSearchMatch[1];
+      try { addFootprint('search', '搜了「' + apiSearchMatch[1] + '」'); } catch(e) {}
+    }
+    chat2.push(replyMsg);
     if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
     writeChat(chat2);
-    sseBroadcast({ type: 'message', role: 'assistant', content: reply, time: replyTime });
+    sseBroadcast({ type: 'message', role: 'assistant', content: reply, time: replyTime, searchQuery: replyMsg.searchQuery });
     const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
     if (sseClients.size === 0) {
