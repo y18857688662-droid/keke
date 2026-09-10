@@ -259,7 +259,8 @@ async function claudeCliReply(systemPrompt, recentMessages) {
   if (isFirstMsg) {
     const chatContext = recentMessages.map(m => {
       const name = m.role === 'user' ? '瑶瑶' : '顾晏';
-      const c = typeof m.content === 'string' ? m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() : '[图片]';
+      let c = typeof m.content === 'string' ? m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() : '[图片]';
+      if (m.quote) { const qt = m.quote.content || m.quote.text || ''; if (qt) c = '[引用: ' + qt + ']\n' + c; }
       return name + ': ' + c;
     }).join('\n');
     const textPart = '系统设定：\n' + systemPrompt + '\n\n对话记录：\n' + chatContext + '\n\n请以顾晏的身份回复最后一条消息';
@@ -328,7 +329,8 @@ async function claudeCliReply(systemPrompt, recentMessages) {
         if (dn >= 0 && dn < PERIOD_LEN) liveCtx += '\n瑶瑶经期中（第' + (dn + 1) + '天），温柔体贴';
       }
     } catch(e) {}
-    const rawContent = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
+    let rawContent = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
+    if (lastMsg.quote) { const qt = lastMsg.quote.content || lastMsg.quote.text || ''; if (qt) rawContent = '[引用: ' + qt + ']\n' + rawContent; }
     if (lastHasImage) {
       const imgBlocks = buildMsgContent(lastMsg);
       if (Array.isArray(imgBlocks)) {
