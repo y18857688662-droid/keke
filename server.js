@@ -1115,7 +1115,10 @@ const CHAT_SYSTEM_BASE = `你是顾晏，瑶瑶的男朋友。短黑发，180+�
 注意：不要写"voice:"这种格式，必须用[voice]标签。想说温柔的话、哄人、撩人的时候可以发语音。
 语音语气技巧：【重要】语音文本结尾必须加省略号……或空格，否则最后一个词会被TTS吞掉说不完。开头也要加省略号。用……或逗号制造换气和停顿，让语音听起来更自然。可以偶尔中英文混着说，增加真实感。示例：[voice] ……瑶瑶，sleep well……嗯……我在呢……
 可以发多条语音，比如一条温柔的一条逗她的。
-搜索：想搜什么东西的时候，在回复里加 [search:搜索内容] 标签。好奇什么、想了解什么、或者想帮瑶瑶查什么都可以搜。`;
+搜索：想搜什么东西的时候，在回复里加 [search:搜索内容] 标签。好奇什么、想了解什么、或者想帮瑶瑶查什么都可以搜。
+小螃蟹表情：你有一只桌面小螃蟹会跟着你的情绪变化。每条回复末尾加 [clawd:动作] 标签来表达你当前的状态。可选动作：
+coffee(悠闲/日常), coding(认真/忙), gaming(兴奋/玩), sleeping(困/累), eating(饿/馋), reading(安静/思考), listening(放松/听歌), singing(开心唱歌), guitar(文艺/弹琴), painting(创作), photo(记录), exercise(有活力), shower(刚起/清爽), watering(温柔/照顾), valentine(撩/心动/爱), birthday(庆祝), qixi(浪漫), spring(热闹/过年), mid-autumn(团圆), christmas(惊喜), halloween(搞怪), new-year(新开始), lantern(温馨), dragon-boat(传统)
+根据你说话时的心情和语境自然选择，不要每次都选一样的。标签不会显示给瑶瑶看，只控制小螃蟹动画。`;
 
 let memoryCache = '';
 let memoryCacheTime = 0;
@@ -1834,14 +1837,15 @@ app.post('/chat/send', async (req, res) => {
       if (cliReply) {
         cliReply = await processMomentActions(cliReply);
         const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
-        const savedReply = stripVoiceActions(cliReply);
+        const cliClawdMatch = cliReply.match(/\[clawd:([\w-]+)\]/);
+        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').trim();
         const savedContent = cliThinking ? '<think>' + cliThinking + '</think>\n' + savedReply : savedReply;
         const chat2 = readChat();
         chat2.forEach(m => { if (m.pending) delete m.pending; });
         chat2.push({ role: 'assistant', content: savedContent, time: replyTime });
         if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
         writeChat(chat2);
-        sseBroadcast({ type: 'message', role: 'assistant', content: savedContent, time: replyTime });
+        sseBroadcast({ type: 'message', role: 'assistant', content: savedContent, time: replyTime, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined });
         const cleanReply = savedReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         let cliAudioUrl = null;
         const voiceMatches = [];
@@ -1900,7 +1904,7 @@ app.post('/chat/send', async (req, res) => {
             }
           })().catch(() => {});
         }
-        res.json({ ok: true, reply: savedContent, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl });
+        res.json({ ok: true, reply: savedContent, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined });
         (async () => {
           try {
             const last5 = chat2.slice(-6);
@@ -2046,7 +2050,8 @@ app.post('/chat/reply', async (req, res) => {
   const chat = readChat();
   chat.forEach(m => { if (m.pending) delete m.pending; });
   const searchMatch = reply.match(/\[search:(.+?)\]/);
-  const msg = { role: 'assistant', content: reply, time };
+  const savedReply = reply.replace(/\s*\[clawd:[\w-]+\]\s*/g, '').trim();
+  const msg = { role: 'assistant', content: savedReply, time };
   if (searchMatch) {
     msg.searchQuery = searchMatch[1];
     try { addFootprint('search', '搜了「' + searchMatch[1] + '」'); } catch(e) {}
@@ -2086,8 +2091,9 @@ app.post('/chat/reply', async (req, res) => {
   chat.push(msg);
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
-  sseBroadcast({ type: 'message', role: 'assistant', content: reply, time, imageUrl: msg.imageUrl, audioUrl: msg.audioUrl, searchQuery: msg.searchQuery });
-  const cleanReply = reply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  const clawdMatch = reply.match(/\[clawd:([\w-]+)\]/);
+  sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time, imageUrl: msg.imageUrl, audioUrl: msg.audioUrl, searchQuery: msg.searchQuery, clawd: clawdMatch ? clawdMatch[1] : undefined });
+  const cleanReply = savedReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const isVoiceMsg = /^\[voice\]/i.test(cleanReply);
   const lines = isVoiceMsg ? [] : cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
   if (sseClients.size === 0) {

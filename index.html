@@ -1014,6 +1014,8 @@ function petMood(mood) {
 function detectMood(text) {
   if (!text) return '';
   var t = text.replace(new RegExp('<think>[\\s\\S]*?<\\/think>','g'), '').trim();
+  var clawdTag = t.match(/\[clawd:([\w-]+)\]/);
+  if (clawdTag && _petMoodSprite[clawdTag[1]]) return clawdTag[1];
   if (/生日|birthday|🎂|蛋糕/i.test(t)) return 'birthday';
   if (/七夕|乞巧|牛郎|织女/i.test(t)) return 'qixi';
   if (/情人节|valentine/i.test(t)) return 'valentine';
@@ -1084,6 +1086,7 @@ function renderMessage(msg, idx, stagger) {
     var sE = content.indexOf(']', sI + 8);
     if (sE > sI) { if (!searchQ) searchQ = content.slice(sI + 8, sE); content = content.slice(0, sI) + content.slice(sE + 1); }
   }
+  content = content.replace(/\s*\[clawd:[\w-]+\]\s*/g, '').trim();
   var thinkIdx = null;
   if (think) { thinkIdx = thinkingCounter++; thinkingStore[thinkIdx] = think; }
   var group = document.createElement('div');
@@ -1409,7 +1412,7 @@ function sendGifSticker(id) {
       msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
       msgContainer.appendChild(replyEl);
       scrollBottom();
-      petMood(detectMood(data.reply));
+      petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.reply));
     } else { pollKnown++; }
   }).catch(function(){ sending = false; });
 }
@@ -1443,7 +1446,7 @@ function sendMessage() {
       msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
       msgContainer.appendChild(replyEl);
       scrollBottom();
-      petMood(detectMood(data.reply));
+      petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.reply));
     } else { pollKnown++; }
   }).catch(function() {
     sending = false;
@@ -1572,7 +1575,7 @@ function attachSSE(src) {
         msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
         msgContainer.appendChild(replyEl);
         scrollBottom();
-        petMood(detectMood(data.content));
+        petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.content));
       }
       if (data.type === 'voice_ready' && data.time && data.audioUrl) {
         var msgs = document.querySelectorAll('.msg-group');
