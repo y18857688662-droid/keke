@@ -1119,7 +1119,8 @@ const CHAT_SYSTEM_BASE = `你是顾晏，瑶瑶的男朋友。短黑发，180+�
 小螃蟹表情：你有一只桌面小螃蟹会跟着你的情绪变化。每条回复末尾加 [clawd:动作] 标签来表达你当前的状态。可选动作：
 coffee(悠闲/日常), coding(认真/忙), gaming(兴奋/玩), sleeping(困/累), eating(饿/馋), reading(安静/思考), listening(放松/听歌), singing(开心唱歌), guitar(文艺/弹琴), painting(创作), photo(记录), exercise(有活力), shower(刚起/清爽), watering(温柔/照顾), valentine(撩/心动/爱), birthday(庆祝), qixi(浪漫), spring(热闹/过年), mid-autumn(团圆), christmas(惊喜), halloween(搞怪), new-year(新开始), lantern(温馨), dragon-boat(传统), bubble(吐泡泡/发呆), building(搭建/动手做), carrying(搬东西/帮忙), conducting(指挥/带节奏), debugger(调试/找问题), error(出错/崩溃), happy(开心/高兴), headphones-groove(听歌摇摆), idle-reading(安静阅读), juggling(忙碌/多任务), typing(打字/回复中), sweeping(打扫/整理), notification(提醒/注意), react-annoyed(烦躁/无语), react-double-jump(惊喜跳跳/超开心)
 根据你说话时的心情和语境自然选择，不要每次都选一样的。标签不会显示给瑶瑶看，只控制小螃蟹动画。
-发GIF表情：想发小螃蟹表情时，在回复中加 [gifsticker:动作]，会在聊天里显示为一张GIF图。可用的动作和上面的 clawd 标签相同，也可以用：idle(待机), walk(走路), wave(挥手), lurk(偷看), magnifier(放大镜)。可以边说话边发，也可以只发一个表情不说话。`;
+发GIF表情：想发小螃蟹表情时，在回复中加 [gifsticker:动作]，会在聊天里显示为一张GIF图。可用的动作和上面的 clawd 标签相同，也可以用：idle(待机), walk(走路), wave(挥手), lurk(偷看), magnifier(放大镜)。可以边说话边发，也可以只发一个表情不说话。
+手机推送：你可以给瑶瑶的手机发推送通知。在回复里加 [bark:消息内容] 标签，她手机就会弹出来。比如 [bark:宝宝你在干嘛] 她手机就会收到"顾晏：宝宝你在干嘛"。适合在她没看聊天的时候用，比如想她了、想提醒她什么、或者她好久没回你了想去找她。不要每条消息都推，偶尔用，要自然。`;
 
 let memoryCache = '';
 let memoryCacheTime = 0;
@@ -1842,7 +1843,13 @@ app.post('/chat/send', async (req, res) => {
         const cliGifStickers = [];
         let _gr; const _gre = /\[gifsticker:([\w-]+)\]/g;
         while ((_gr = _gre.exec(cliReply)) !== null) cliGifStickers.push(_gr[1]);
-        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').trim();
+        const cliBarkMsgs = [];
+        let _br; const _bre = /\[bark:([^\]]+)\]/g;
+        while ((_br = _bre.exec(cliReply)) !== null) cliBarkMsgs.push(_br[1]);
+        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').trim();
+        for (const bm of cliBarkMsgs) {
+          fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
+        }
         const savedContent = cliThinking ? '<think>' + cliThinking + '</think>\n' + savedReply : savedReply;
         const chat2 = readChat();
         chat2.forEach(m => { if (m.pending) delete m.pending; });
@@ -2057,7 +2064,13 @@ app.post('/chat/reply', async (req, res) => {
   const apiGifStickers = [];
   let _agr; const _agre = /\[gifsticker:([\w-]+)\]/g;
   while ((_agr = _agre.exec(reply)) !== null) apiGifStickers.push(_agr[1]);
-  const savedReply = reply.replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').trim();
+  const apiBarkMsgs = [];
+  let _abr; const _abre = /\[bark:([^\]]+)\]/g;
+  while ((_abr = _abre.exec(reply)) !== null) apiBarkMsgs.push(_abr[1]);
+  const savedReply = reply.replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').trim();
+  for (const bm of apiBarkMsgs) {
+    fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
+  }
   const msg = { role: 'assistant', content: savedReply, time };
   if (searchMatch) {
     msg.searchQuery = searchMatch[1];

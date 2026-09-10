@@ -1096,7 +1096,7 @@ function renderMessage(msg, idx, stagger) {
     var sE = content.indexOf(']', sI + 8);
     if (sE > sI) { if (!searchQ) searchQ = content.slice(sI + 8, sE); content = content.slice(0, sI) + content.slice(sE + 1); }
   }
-  content = content.replace(/\s*\[clawd:[\w-]+\]\s*/g, '').trim();
+  content = content.replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').trim();
   var thinkIdx = null;
   if (think) { thinkIdx = thinkingCounter++; thinkingStore[thinkIdx] = think; }
   var group = document.createElement('div');
