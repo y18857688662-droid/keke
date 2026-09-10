@@ -1146,13 +1146,13 @@ function renderMessage(msg, idx, stagger) {
   }
   var gifMatch = content.match(/^\[gifsticker:([\w-]+)\]$/);
   if (gifMatch) {
-    var gf = CLAWD_GIFS.find(function(x){return x.id===gifMatch[1]});
-    if (gf) {
-      colHtml += '<div class="msg-gif-sticker" title="'+gf.name+'"><img src="/static/clawd-'+gf.id+'.gif" alt="'+gf.name+'"></div>';
-      colHtml += '</div>';
-      group.innerHTML = avaHtml + colHtml;
-      return group;
-    }
+    var gfId = gifMatch[1];
+    var gf = CLAWD_GIFS.find(function(x){return x.id===gfId});
+    var gfName = gf ? gf.name : gfId;
+    colHtml += '<div class="msg-gif-sticker" title="'+gfName+'"><img src="/static/clawd-'+gfId+'.gif" alt="'+gfName+'"></div>';
+    colHtml += '</div>';
+    group.innerHTML = avaHtml + colHtml;
+    return group;
   }
   if (/^\[sticker:\w+\]$/.test(content)) {
     colHtml += '<div class="msg-bubble">[表情]</div></div>';
@@ -1399,7 +1399,12 @@ var CLAWD_GIFS = [
   {id:'mini-enter',name:'迷你登场'},
   {id:'mini-happy',name:'迷你开心'},
   {id:'mini-idle',name:'迷你待机'},
-  {id:'mini-peek',name:'迷你偷看'}
+  {id:'mini-peek',name:'迷你偷看'},
+  {id:'idle',name:'待机'},
+  {id:'walk',name:'走路'},
+  {id:'wave',name:'挥手'},
+  {id:'lurk',name:'偷看'},
+  {id:'magnifier',name:'放大镜'}
 ];
 function toggleStickers() {
   var p = document.getElementById('stickerPanel');
@@ -1418,6 +1423,14 @@ function toggleStickers() {
       ct.innerHTML = html;
     }
   }
+}
+function renderAiGifStickers(stickers) {
+  if (!stickers || !stickers.length) return;
+  for (var i = 0; i < stickers.length; i++) {
+    var stkMsg = {role:'assistant', content:'[gifsticker:'+stickers[i]+']'};
+    msgContainer.appendChild(renderMessage(stkMsg, -1));
+  }
+  scrollBottom();
 }
 function sendGifSticker(id) {
   document.getElementById('stickerPanel').classList.remove('show');
@@ -1445,6 +1458,7 @@ function sendGifSticker(id) {
       msgContainer.appendChild(replyEl);
       scrollBottom();
       petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.reply));
+      renderAiGifStickers(data.gifStickers);
     } else { pollKnown++; }
   }).catch(function(){ sending = false; });
 }
@@ -1479,6 +1493,7 @@ function sendMessage() {
       msgContainer.appendChild(replyEl);
       scrollBottom();
       petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.reply));
+      renderAiGifStickers(data.gifStickers);
     } else { pollKnown++; }
   }).catch(function() {
     sending = false;
@@ -1608,6 +1623,7 @@ function attachSSE(src) {
         msgContainer.appendChild(replyEl);
         scrollBottom();
         petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.content));
+        renderAiGifStickers(data.gifStickers);
       }
       if (data.type === 'voice_ready' && data.time && data.audioUrl) {
         var msgs = document.querySelectorAll('.msg-group');
