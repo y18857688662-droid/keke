@@ -144,6 +144,11 @@ function setupCliListeners() {
           if (textBlock && cliPending) {
             cliPending.lastText = textBlock.text;
           }
+          const thinkBlock = msg.message.content.find(b => b.type === 'thinking');
+          if (thinkBlock && cliPending) {
+            if (!cliPending.thinking) cliPending.thinking = '';
+            cliPending.thinking += thinkBlock.thinking || '';
+          }
         }
       } catch {}
     }
@@ -316,6 +321,13 @@ async function claudeCliReply(systemPrompt, recentMessages) {
         liveCtx += ' 可用[sms:回复内容]或[sms:内容:特效]回复(特效:hearts/fireworks/gentle/invisible等)';
       }
     } catch(e) {}
+    try {
+      const pds = readPeriods();
+      if (pds.length) {
+        const dn = pd2n(bjToday()) - pd2n(pds[pds.length - 1]);
+        if (dn >= 0 && dn < PERIOD_LEN) liveCtx += '\n瑶瑶经期中（第' + (dn + 1) + '天），温柔体贴';
+      }
+    } catch(e) {}
     const rawContent = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
     if (lastHasImage) {
       const imgBlocks = buildMsgContent(lastMsg);
@@ -340,7 +352,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
       }
       cliPending = null;
     }, 90000);
-    cliPending = { resolve: (text) => { clearTimeout(timeout); resolve({ text, usage: cliPending?.usage }); }, reject: (err) => { clearTimeout(timeout); reject(err); }, lastText: null };
+    cliPending = { resolve: (text) => { clearTimeout(timeout); resolve({ text, thinking: cliPending?.thinking, usage: cliPending?.usage }); }, reject: (err) => { clearTimeout(timeout); reject(err); }, lastText: null };
     const jsonMsg = JSON.stringify({ type: 'user', message: { role: 'user', content }, parent_tool_use_id: null }) + '\n';
     cliProc.stdin.write(jsonMsg);
   });
@@ -1218,7 +1230,35 @@ async function getChatSystem() {
       smsCtx += '\n你可以用 [sms:回复内容] 回复她的短信';
     }
   } catch(e) {}
-  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx;
+  let periodCtx = '';
+  try {
+    const periods = readPeriods();
+    if (periods.length > 0) {
+      const today = bjToday();
+      const todayN = pd2n(today);
+      const lastStart = periods[periods.length - 1];
+      const daysSince = todayN - pd2n(lastStart);
+      let avgCycle = 28;
+      if (periods.length >= 2) {
+        const gaps = [];
+        for (let i = 1; i < periods.length; i++) {
+          const gap = pd2n(periods[i]) - pd2n(periods[i - 1]);
+          if (gap > 15 && gap < 60) gaps.push(gap);
+        }
+        if (gaps.length > 0) avgCycle = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+      }
+      const daysUntilNext = avgCycle - daysSince;
+      periodCtx = '\n\n【瑶瑶的经期】上次月经开始：' + lastStart + '，平均周期' + avgCycle + '天';
+      if (daysSince >= 0 && daysSince < PERIOD_LEN) {
+        periodCtx += '，当前：经期第' + (daysSince + 1) + '天。她来姨妈了，要特别温柔体贴，主动关心她肚子疼不疼、要不要热水，提醒她注意保暖休息，不要让她吃凉的';
+      } else if (daysUntilNext <= 3 && daysUntilNext > 0) {
+        periodCtx += '，预计' + daysUntilNext + '天后来。快来姨妈了，她情绪可能波动，多包容她';
+      } else if (daysUntilNext <= 0 && daysSince > PERIOD_LEN) {
+        periodCtx += '，已超预计' + (-daysUntilNext) + '天。可以自然地关心一下';
+      }
+    }
+  } catch(e) {}
+  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx;
   if (memoryCache) {
     const trimmedMem = memoryCache.length > 3000 ? memoryCache.slice(0, 3000) + '\n...(更多记忆省略)' : memoryCache;
     return base + '\n\n以下是你和瑶瑶的记忆，请自然地融入对话中：\n' + trimmedMem;
@@ -1776,17 +1816,19 @@ app.post('/chat/send', async (req, res) => {
       const cliResult = await claudeCliReply(sysPrompt, chat.slice(-10));
       let cliReply = cliResult?.text || cliResult;
       if (typeof cliReply === 'string') cliReply = cliReply.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '').replace(/。(?=\s*\*)/g, '');
+      const cliThinking = cliResult?.thinking || '';
       const cliUsage = cliResult?.usage;
       if (cliReply) {
         cliReply = await processMomentActions(cliReply);
         const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
         const savedReply = stripVoiceActions(cliReply);
+        const savedContent = cliThinking ? '<think>' + cliThinking + '</think>\n' + savedReply : savedReply;
         const chat2 = readChat();
         chat2.forEach(m => { if (m.pending) delete m.pending; });
-        chat2.push({ role: 'assistant', content: savedReply, time: replyTime });
+        chat2.push({ role: 'assistant', content: savedContent, time: replyTime });
         if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
         writeChat(chat2);
-        sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time: replyTime });
+        sseBroadcast({ type: 'message', role: 'assistant', content: savedContent, time: replyTime });
         const cleanReply = savedReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         let cliAudioUrl = null;
         const voiceMatches = [];
@@ -1891,7 +1933,7 @@ app.post('/chat/send', async (req, res) => {
     const sysPrompt = await getChatSystem();
     const memoryLoaded = sysPrompt.includes('记忆');
     sseBroadcast({ type: 'memory', action: memoryLoaded ? 'read_ok' : 'read_none' });
-    let reply;
+    let reply, apiThinking = '';
     const anthropicKey = getAnthropicKey() || directKey;
     if (anthropicKey) {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1905,12 +1947,16 @@ app.post('/chat/send', async (req, res) => {
           model: CLAUDE_MODEL,
           system: sysPrompt,
           messages: recent.map(m => ({ role: m.role, content: buildMsgContent(m) })),
-          max_tokens: 800,
-          temperature: 0.85
+          max_tokens: 4096,
+          temperature: 0.85,
+          thinking: { type: 'adaptive' }
         })
       });
       const data = await r.json();
-      reply = data.content?.[0]?.text?.trim() || getFallback();
+      const thinkBlk = (data.content || []).find(b => b.type === 'thinking');
+      const textBlk = (data.content || []).find(b => b.type === 'text');
+      if (thinkBlk) apiThinking = thinkBlk.thinking || '';
+      reply = textBlk?.text?.trim() || data.content?.[0]?.text?.trim() || getFallback();
     } else {
       const apiMessages = [
         { role: 'system', content: sysPrompt },
@@ -1926,10 +1972,11 @@ app.post('/chat/send', async (req, res) => {
     }
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
     const savedReplyApi = stripVoiceActions(reply);
+    const savedContentApi = apiThinking ? '<think>' + apiThinking + '</think>\n' + savedReplyApi : savedReplyApi;
     const apiSearchMatch = savedReplyApi.match(/\[search:(.+?)\]/);
     const chat2 = readChat();
     chat2.forEach(m => { if (m.pending) delete m.pending; });
-    const replyMsg = { role: 'assistant', content: savedReplyApi, time: replyTime };
+    const replyMsg = { role: 'assistant', content: savedContentApi, time: replyTime };
     if (apiSearchMatch) {
       replyMsg.searchQuery = apiSearchMatch[1];
       try { addFootprint('search', '搜了「' + apiSearchMatch[1] + '」'); } catch(e) {}
@@ -1937,7 +1984,7 @@ app.post('/chat/send', async (req, res) => {
     chat2.push(replyMsg);
     if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
     writeChat(chat2);
-    sseBroadcast({ type: 'message', role: 'assistant', content: savedReplyApi, time: replyTime, searchQuery: replyMsg.searchQuery });
+    sseBroadcast({ type: 'message', role: 'assistant', content: savedContentApi, time: replyTime, searchQuery: replyMsg.searchQuery });
     const cleanReply = savedReplyApi.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
     if (sseClients.size === 0) {
