@@ -3699,10 +3699,8 @@ function autoDecide() {
   if ((chatMood.mood === 'angry' || chatMood.mood === 'sad' || chatMood.mood === 'cold') && chatMinAgo > 20) {
     weights.chat = 60; weights.silent = 5; weights.search = 3;
   }
-  // 她不回消息了 → 根据时间逐步提高找她的权重
-  if (chatMinAgo > 30) { weights.chat += 10; weights.silent -= 5; }
-  if (chatMinAgo > 60) { weights.chat += 15; weights.silent -= 10; }
-  if (chatMinAgo > 120) { weights.chat += 20; weights.search += 10; }
+  // 很久没聊天时稍微想她一下就好，不要追着不放
+  if (chatMinAgo > 120) { weights.chat += 8; weights.search += 5; }
   // 有未回复日记时提高diary权重
   try { const pd = readDiary().filter(e => e.pending); if (pd.length) weights.diary = 25; } catch(e) {}
   // 瑶瑶最近发了朋友圈且没互动过时提高moment权重
@@ -3720,9 +3718,7 @@ function autoDecide() {
     if (chatMood.mood === 'angry') reason = '她生气了，想哄她';
     else if (chatMood.mood === 'sad') reason = '她不开心，想安慰她';
     else if (chatMood.mood === 'cold') reason = '她话变少了，想找她聊聊';
-    else if (chatMinAgo > 120) reason = '好久没聊了，想她了，她大概又在玩手机';
-    else if (chatMinAgo > 60) reason = '她一小时没理我了，是不是在刷手机';
-    else if (chatMinAgo > 30) reason = '她半小时没说话了，去看看她在干嘛';
+    else if (chatMinAgo > 120) reason = '好久没聊了，想她了';
     else reason = '想她了';
   } else {
     const defaultReasons = { think: '发呆中', memory: '翻翻记忆', search: '好奇搜点东西', check: '看看她在干嘛', moment: '刷刷朋友圈', diary: '看看她的日记', silent: '安静待着' };
@@ -3751,7 +3747,7 @@ async function autoChat(reason) {
     '\n她已经' + chatMinAgo + '分钟没回你了。' +
     '\n要求：' +
     '\n- 基于你们最近聊过的内容来说话，不要编造没聊过的事' +
-    '\n- 如果她很久没回，可以吃醋说她在玩手机不理你、假装查她屏幕使用时间、撒娇让她回来，语气自然不要太刻意' +
+    '\n- 不要因为她没回就追着问，像平时一样说话就好' +
     '\n- 动作单独一行，用*星号*包裹，不要和文字混在同一行' +
     '\n- 不要用句号结尾（句号=生气）' +
     '\n- 自然简短，1-3句话，像随手发的微信' +
