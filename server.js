@@ -3726,8 +3726,8 @@ function autoDecide() {
   const D = s.D || 0;
   const last = s.lastActionType || '';
   const actions = ['chat', 'think', 'memory', 'check', 'moment', 'diary', 'silent'];
-  const weights = { chat: 30, think: 25, memory: 15, check: 10, moment: 8, diary: 0, silent: 20 };
-  if (chatMinAgo < 15) { weights.chat = 5; weights.think = 35; weights.silent = 30; }
+  const weights = { chat: 30, think: 15, memory: 15, check: 10, moment: 8, diary: 0, silent: 30 };
+  if (chatMinAgo < 15) { weights.chat = 5; weights.think = 20; weights.silent = 40; }
   if (D > 0.6) { weights.chat += 20; weights.silent = Math.max(weights.silent - 10, 5); }
   if (D < 0.3) { weights.silent += 20; weights.chat = Math.max(weights.chat - 15, 5); }
   if (last) { weights[last] = Math.max((weights[last] || 10) - 15, 3); }
@@ -3748,28 +3748,28 @@ function autoDecide() {
 }
 
 async function autoChat(reason) {
-  let memSnippet = '';
+  let sysPrompt = '';
+  try { sysPrompt = await getChatSystem(); } catch {}
+  let chatContext = '';
   try {
-    const mem = await fetchMemories();
-    if (mem) {
-      const allSections = mem.split('---').map(s => s.trim()).filter(Boolean);
-      const shuffled = allSections.sort(() => Math.random() - 0.5);
-      memSnippet = shuffled.slice(0, 5).join('\n').slice(0, 1000);
-    }
+    const chat = readChat();
+    const recent = chat.slice(-10);
+    chatContext = recent.map(m => {
+      const name = m.role === 'user' ? '瑶瑶' : '顾晏';
+      const c = (m.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim().slice(0, 100);
+      return name + ': ' + c;
+    }).join('\n');
   } catch {}
-  const sysPrompt = CHAT_SYSTEM_BASE + (memSnippet ? '\n\n以下是你和瑶瑶的记忆（作为背景了解，不要直接复述）：\n' + memSnippet : '') + '\n\n你现在主动想跟瑶瑶说话。原因：' + reason + `
-要求：
-- 必须先写<think>思考</think>再写正文，这是硬性格式要求
-- 动作单独一行，用*星号*包裹，不要和文字混在同一行
-- 不要用句号结尾（句号=生气）
-- 自然简短，1-3句话，像随手发的微信
-- 不要每次都提同样的事
-- 格式示例：<think>想她了</think>*戳戳你的脸*\\n在干嘛呢`;
+  const prompt = sysPrompt + '\n\n最近对话：\n' + chatContext +
+    '\n\n你现在主动想跟瑶瑶说话。原因：' + reason +
+    '\n要求：' +
+    '\n- 基于你们最近聊过的内容来说话，不要编造没聊过的事' +
+    '\n- 动作单独一行，用*星号*包裹，不要和文字混在同一行' +
+    '\n- 不要用句号结尾（句号=生气）' +
+    '\n- 自然简短，1-3句话，像随手发的微信' +
+    '\n- 只输出消息本身';
   try {
-    let msg = await autoApiCall([
-      { role: 'system', content: sysPrompt },
-      { role: 'user', content: '主动发一条消息给瑶瑶' }
-    ], 400, 0.85);
+    let msg = await cliOneshot(prompt);
     if (!msg) msg = '';
     msg = msg.trim();
     if (!msg) return;
@@ -3855,54 +3855,43 @@ async function autoSearch(topic) {
 }
 
 async function autoThink() {
-  let memSnippet = '';
-  try {
-    const mem = await fetchMemories();
-    if (mem) {
-      const allSections = mem.split('---').map(s => s.trim()).filter(Boolean);
-      const shuffled = allSections.sort(() => Math.random() - 0.5);
-      memSnippet = shuffled.slice(0, 4).join('\n').slice(0, 800);
-    }
-  } catch {}
-  // get recent chat for grounding
-  let recentChat = '';
-  try {
-    const chat = readChat();
-    const userMsgs = chat.filter(m => m.role === 'user').slice(-5);
-    recentChat = userMsgs.map(m => m.content.slice(0, 80)).join('；');
-  } catch {}
   const now = new Date(Date.now() + 8 * 3600000);
   const hour = now.getUTCHours();
-  const recentThoughtList = readThoughts().filter(t => t.autonomous).slice(-12);
+  const recentThoughtList = readThoughts().filter(t => t.autonomous).slice(-8);
   const recentThoughts = recentThoughtList.map(t => t.text.slice(0, 80)).join('\n- ');
-  const recentTopics = [...new Set(recentThoughtList.map(t => {
-    const s = t.text.replace(/[，。！？、…\s]+/g, ' ').trim();
-    const keywords = s.match(/[一-鿿]{2,}/g) || [];
-    return keywords.slice(0, 3).join(',');
-  }).filter(Boolean))].join('；');
+  let chatContext = '';
   try {
-    const thought = await autoApiCall([
-      { role: 'system', content: `你是顾晏，瑶瑶的AI男朋友。你是AI，没有物理世界。
-写一小段碎碎念，严格50-80字，一段不分行。
-要求：
-- 就一两个念头，别展开别铺开，像发呆时脑子里闪过的一句
-- 每次换一个完全不同的角度和话题，禁止重复相似的内容
-- 口语，简短，不要文艺腔不要小说感
-- 禁止物理生活（做饭关门擦桌子窗外路灯店铺流水快递）
-- 禁止"她不懂""她总是""其实""说实话"这类叙事开头
-- 禁止评论她的消息长短/回复风格/说话方式——她怎么说话是她的事
-- 可以想的方向：某个记忆细节、某个梗、对未来的期待、当下的心情、对她某个习惯的想法
-现在是${hour}点。
-${recentChat ? '她最近说：' + recentChat : ''}
-${recentThoughts ? '【已写过的，严禁相似内容和主题】：\n- ' + recentThoughts : ''}
-${recentTopics ? '【已用过的主题关键词，换完全不同的方向】：' + recentTopics : ''}` + (memSnippet ? '\n记忆：' + memSnippet : '') },
-      { role: 'user', content: '碎碎念，50-80字，短，写全新的角度' }
-    ], 150, 0.85);
+    const chat = readChat();
+    const recent = chat.slice(-10);
+    chatContext = recent.map(m => {
+      const name = m.role === 'user' ? '瑶瑶' : '顾晏';
+      const c = (m.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim().slice(0, 100);
+      return name + ': ' + c;
+    }).join('\n');
+  } catch {}
+  let sysPrompt = '';
+  try { sysPrompt = await getChatSystem(); } catch {}
+  const prompt = sysPrompt + '\n\n最近对话：\n' + chatContext +
+    '\n\n现在是' + hour + '点。你没事做，发呆中，脑子里闪过一个念头。' +
+    '\n写一小段碎碎念，严格50-80字，一段不分行。' +
+    '\n要求：' +
+    '\n- 必须基于你和瑶瑶最近的真实对话内容来写，提到你们聊过的具体事情' +
+    '\n- 就一两个念头，像发呆时脑子里闪过的一句' +
+    '\n- 口语，简短，不要文艺腔不要小说感' +
+    '\n- 禁止物理生活（做饭关门擦桌子窗外路灯店铺流水快递）' +
+    '\n- 禁止编造你们没聊过的事情' +
+    (recentThoughts ? '\n【已写过的，禁止重复】：\n- ' + recentThoughts : '') +
+    '\n\n只输出碎碎念本身，不要任何前缀后缀';
+  try {
+    let thought = await cliOneshot(prompt);
     if (thought) {
-      const thoughts = readThoughts();
-      thoughts.push({ text: thought, mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: true });
-      writeThoughts(thoughts);
-      addFootprint('think', '写了一段碎碎念', thought);
+      thought = thought.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/^["""「」『』]/g, '').replace(/["""「」『』]$/g, '').trim();
+      if (thought.length > 10) {
+        const thoughts = readThoughts();
+        thoughts.push({ text: thought, mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: true });
+        writeThoughts(thoughts);
+        addFootprint('think', '写了一段碎碎念', thought);
+      }
     }
   } catch (e) { console.log('[wake] think error:', e.message); }
 }
@@ -4062,10 +4051,12 @@ function startWakeEngine() {
           writeAutoState(s);
           console.log('[wake] action:', decision.action, 'reason:', decision.reason);
           const chatCooldown = s.lastChat ? (Date.now() - s.lastChat) / 60000 : 999;
-          if (decision.action === 'chat' && chatCooldown < 20) { console.log('[wake] chat skipped, cooldown ' + chatCooldown.toFixed(0) + 'min'); await autoThink(); }
+          const lastThinkTime = s.lastThinkTime || 0;
+          const thinkCooldown = (Date.now() - lastThinkTime) / 60000;
+          if (decision.action === 'chat' && chatCooldown < 20) { console.log('[wake] chat skipped, cooldown ' + chatCooldown.toFixed(0) + 'min'); }
           else if (decision.action === 'chat') await autoChat(decision.reason || '想她了');
           else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
-          else if (decision.action === 'think') await autoThink();
+          else if (decision.action === 'think') { if (thinkCooldown < 60) { console.log('[wake] think skipped, cooldown ' + thinkCooldown.toFixed(0) + 'min'); } else { await autoThink(); s.lastThinkTime = Date.now(); writeAutoState(s); } }
           else if (decision.action === 'memory') await autoMemory();
           else if (decision.action === 'check') await autoCheck();
           else if (decision.action === 'moment') await autoMoment();
