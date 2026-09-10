@@ -3670,66 +3670,6 @@ app.post('/auto/trigger', async (req, res) => {
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
-async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
-  const key = getOpenRouterKey();
-  const cfg = readApiConfig();
-  const dsKey = cfg.api_key || process.env.DEEPSEEK_API_KEY || '';
-  const anthropicKey = cfg.anthropic_key || process.env.ANTHROPIC_API_KEY || '';
-  if (!key && !dsKey && !anthropicKey) {
-    if (isProMode()) {
-      try {
-        const sysMsg = messages.find(m => m.role === 'system');
-        const userMsg = messages.find(m => m.role === 'user');
-        const prompt = (sysMsg ? sysMsg.content + '\n\n' : '') + (userMsg ? userMsg.content : '');
-        const result = await cliOneshot(prompt);
-        return result || null;
-      } catch (e) { console.log('[autoApiCall] cli oneshot error:', e.message); return null; }
-    }
-    return null;
-  }
-  try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 15000);
-    let r;
-    if (key) {
-      r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-        body: JSON.stringify({ model: 'anthropic/claude-sonnet-4-20250514', messages, max_tokens: maxTokens, temperature: temp }),
-        signal: ctrl.signal
-      });
-    }
-    if ((!key || !r || !r.ok) && dsKey) {
-      const sysMsg = messages.find(m => m.role === 'system');
-      const otherMsgs = messages.filter(m => m.role !== 'system');
-      const apiMessages = sysMsg ? [sysMsg, ...otherMsgs] : otherMsgs;
-      const dsUrl = dsKey.startsWith('sk-') ? 'https://api.deepseek.com/chat/completions' : getApiUrl();
-      const dsModel = dsKey.startsWith('sk-') ? 'deepseek-chat' : getModel();
-      r = await fetch(dsUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${dsKey}` },
-        body: JSON.stringify({ model: dsModel, messages: apiMessages, max_tokens: maxTokens, temperature: temp }),
-        signal: ctrl.signal
-      });
-    }
-    if ((!key && !dsKey) || !r || !r.ok) {
-      if (!anthropicKey) { clearTimeout(t); return null; }
-      const sysMsg = messages.find(m => m.role === 'system');
-      const otherMsgs = messages.filter(m => m.role !== 'system');
-      r = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', system: sysMsg ? sysMsg.content : '', messages: otherMsgs, max_tokens: maxTokens, temperature: temp }),
-        signal: ctrl.signal
-      });
-    }
-    clearTimeout(t);
-    if (!r.ok) return null;
-    const data = await r.json();
-    return data.choices?.[0]?.message?.content || data.content?.[0]?.text || '';
-  } catch (e) { console.log('[wake] api error:', e.message); return null; }
-}
-
 function detectChatMood() {
   try {
     const chat = readChat();
