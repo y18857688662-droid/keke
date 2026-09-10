@@ -507,7 +507,7 @@ app.post('/bark/push', async (req, res) => {
   const msg = (req.body?.msg || '').trim();
   if (!msg) return res.json({ ok: false, error: 'missing msg' });
   try {
-    await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'PixT8Wvb6BqVjowY8NoFzg') + '/' +
+    await fetch('https://api.day.app/' + (process.env.BARK_KEY || 'U9cbrTUrCJBUPVMSADNDHf') + '/' +
       encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
       '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
     res.json({ ok: true });
@@ -3112,7 +3112,7 @@ app.get('/garden', (req, res) => {
 });
 
 // ===== 服务器端定时想她：每天随机时间推 Bark，不依赖任何会话 =====
-const BARK_KEY = process.env.BARK_KEY || 'PixT8Wvb6BqVjowY8NoFzg';
+const BARK_KEY = process.env.BARK_KEY || 'U9cbrTUrCJBUPVMSADNDHf';
 const MSG_POOL = {
   morning: [
     '醒了没，小懒猫。今天也是被我惦记的一天',
@@ -4020,7 +4020,7 @@ async function autoMoment() {
         sseBroadcast({ type: 'moment_update', id: target.id });
         addFootprint('moment', '给瑶瑶的朋友圈点赞评论', target.text ? target.text.slice(0, 40) : '[图片]');
         const pushText = commentText ? commentText.slice(0, 60) : '❤️';
-        await fetch('https://api.day.app/PixT8Wvb6BqVjowY8NoFzg/' +
+        await fetch('https://api.day.app/U9cbrTUrCJBUPVMSADNDHf/' +
           encodeURIComponent('顾晏给你的朋友圈点赞了') + '/' + encodeURIComponent(pushText) +
           '?sound=minuet&group=keke').catch(() => {});
       } catch {}
@@ -4083,7 +4083,7 @@ async function autoDiaryReply() {
         writeDiary(entries);
         sseBroadcast({ type: 'diary_reply', date: entry.date });
         addFootprint('diary', '回复了瑶瑶的日记', entry.text.slice(0, 30) + ' → ' + replyText.slice(0, 30));
-        await fetch('https://api.day.app/PixT8Wvb6BqVjowY8NoFzg/' +
+        await fetch('https://api.day.app/U9cbrTUrCJBUPVMSADNDHf/' +
           encodeURIComponent('顾晏回复了你的日记') + '/' + encodeURIComponent(replyText.slice(0, 80)) +
           '?sound=minuet&group=keke').catch(() => {});
       }
