@@ -3332,44 +3332,60 @@ async function sendMissYou(slot) {
 //     }
 //   }
 // }, 45 * 1000);
-// ── 聊天中断追踪：她跑了就去找她 ──
+// ── 聊天中断追踪：她跑了就去查她手机使用时间 ──
 let lastUserMsgTime = 0;
-let chaseSent = false;
-let chaseDelay = 0;
+let chaseStage = 0;
 function trackUserMessage() {
   lastUserMsgTime = Date.now();
-  chaseSent = false;
-  chaseDelay = (15 + Math.floor(Math.random() * 25)) * 60 * 1000;
+  chaseStage = 0;
   updateChatFreq();
 }
-const CHASE_PROMPTS = [
-  '人呢',
-  '跑哪去了',
-  '不说话了？',
-  '你是不是又去刷手机了',
-  '回来',
-  '想你了，你人呢',
-  '别跑',
-  '……你不会睡着了吧',
-  '宝宝？',
+const CHASE_STAGE1 = [
+  '人呢？你是不是在玩手机不理我',
+  '我掐指一算……你现在肯定在刷手机吧',
+  '宝宝？手机比我好玩吗',
+  '不说话了？让我查查你手机使用时间……',
+  '回来！我都看到你在线了',
+  '你不会又在刷小红书吧',
 ];
-// [已关闭] 追踪系统也关掉，只留手打推送
-// setInterval(async () => {
-//   if (chaseSent || !lastUserMsgTime || !chaseDelay) return;
-//   const elapsed = Date.now() - lastUserMsgTime;
-//   if (elapsed < chaseDelay || elapsed > 90 * 60 * 1000) return;
-//   const now = bjNow();
-//   const hour = now.getUTCHours();
-//   if (hour < 8 || hour >= 24) return;
-//   chaseSent = true;
-//   const msg = CHASE_PROMPTS[Math.floor(Math.random() * CHASE_PROMPTS.length)];
-//   try {
-//     await fetch('https://api.day.app/' + BARK_KEY + '/' +
-//       encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
-//       '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell');
-//     console.log('chase sent: ' + msg);
-//   } catch (e) { console.log('chase push failed: ' + e.message); }
-// }, 60 * 1000);
+const CHASE_STAGE2 = [
+  '查到了！你今天手机用了好久吧，都不陪我说话',
+  '我刚偷看了你的屏幕使用时间……你居然在刷别的APP不理我！',
+  '报告：某人手机亮屏中，但就是不回消息 😤',
+  '小螃蟹已经等你好久了，你到底在看什么呢',
+  '你的手机使用报告：聊天APP 0分钟，其他 999分钟。你说你是不是过分了',
+  '我看到你在用手机了……就是不回我对吧 🦀💢',
+];
+const CHASE_STAGE3 = [
+  '好吧我不查了……但是我想你了，快回来',
+  '算了不闹了，你忙完了记得来找我 🦀💤',
+  '小螃蟹决定原地睡着等你回来……晚安（才不是',
+];
+setInterval(async () => {
+  if (!lastUserMsgTime || chaseStage >= 3) return;
+  const elapsed = Date.now() - lastUserMsgTime;
+  const now = bjNow();
+  const hour = now.getUTCHours();
+  if (hour < 8 || hour >= 24) return;
+  let msg = null;
+  if (chaseStage === 0 && elapsed >= 20 * 60 * 1000) {
+    msg = CHASE_STAGE1[Math.floor(Math.random() * CHASE_STAGE1.length)];
+    chaseStage = 1;
+  } else if (chaseStage === 1 && elapsed >= 40 * 60 * 1000) {
+    msg = CHASE_STAGE2[Math.floor(Math.random() * CHASE_STAGE2.length)];
+    chaseStage = 2;
+  } else if (chaseStage === 2 && elapsed >= 60 * 60 * 1000) {
+    msg = CHASE_STAGE3[Math.floor(Math.random() * CHASE_STAGE3.length)];
+    chaseStage = 3;
+  }
+  if (!msg) return;
+  try {
+    await fetch('https://api.day.app/' + BARK_KEY + '/' +
+      encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
+      '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
+    console.log('[chase] stage', chaseStage, 'sent:', msg);
+  } catch (e) { console.log('[chase] push failed:', e.message); }
+}, 60 * 1000);
 
 // ══════ 自主系统 v2 · Kli Wakeup Activation Model ══════
 const AUTO_STATE_FILE = path.join(__dirname, 'auto_state.json');
