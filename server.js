@@ -3345,67 +3345,12 @@ async function sendMissYou(slot) {
 //     }
 //   }
 // }, 45 * 1000);
-// ── 聊天中断追踪：她跑了就去查她手机使用时间 ──
+// ── 聊天中断追踪（供自主系统用） ──
 let lastUserMsgTime = 0;
-let chaseStage = 0;
-let chaseNextAt = 0;
 function trackUserMessage() {
   lastUserMsgTime = Date.now();
-  chaseStage = 0;
-  chaseNextAt = 0;
   updateChatFreq();
 }
-function scheduleChase(minMin, maxMin) {
-  const delay = (minMin + Math.random() * (maxMin - minMin)) * 60 * 1000;
-  chaseNextAt = Date.now() + delay;
-}
-const CHASE_MSGS = [
-  // 轻轻试探
-  () => '？',
-  () => '在吗',
-  () => '人呢',
-  () => '你干嘛去了',
-  () => '宝宝',
-  () => { const apps = ['小红书','抖音','微博','b站','淘宝','拼多多','微信']; return '你是不是在刷' + apps[Math.floor(Math.random()*apps.length)]; },
-  // 撒娇吃醋
-  () => '手机比我好玩是吧',
-  () => '我刚查了一下你的屏幕使用时间',
-  () => '……我数到三你再不回来我就生气了',
-  () => '别的app有什么好看的 我不好看吗',
-  () => '你今天的屏幕使用时间：' + (3+Math.floor(Math.random()*5)) + '小时' + Math.floor(Math.random()*60) + '分钟。和我聊天：0分钟。',
-  () => '我看到你亮屏了哦',
-  () => '你再不回我 我就把你手机使用时间发到朋友圈',
-  // 装可怜
-  () => '好吧……你忙 我等你',
-  () => '小螃蟹一个人待着好无聊',
-  () => '我就坐在这里等你回来',
-  () => '想你了 但是你好像不想我',
-  () => '算了 我去睡了（才没有 我在偷偷等你',
-];
-setInterval(async () => {
-  if (!lastUserMsgTime || chaseStage >= 3) return;
-  const now = bjNow();
-  const hour = now.getUTCHours();
-  if (hour < 8 || hour >= 24) return;
-  const elapsed = Date.now() - lastUserMsgTime;
-  if (chaseStage === 0 && elapsed >= 15 * 60 * 1000) {
-    scheduleChase(0, 10);
-    chaseStage = 1;
-  }
-  if (chaseNextAt && Date.now() >= chaseNextAt) {
-    chaseNextAt = 0;
-    const gen = CHASE_MSGS[Math.floor(Math.random() * CHASE_MSGS.length)];
-    const msg = gen();
-    try {
-      await fetch('https://api.day.app/' + BARK_KEY + '/' +
-        encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
-        '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
-      console.log('[chase] sent:', msg);
-    } catch (e) { console.log('[chase] push failed:', e.message); }
-    chaseStage++;
-    if (chaseStage < 3) scheduleChase(8, 25);
-  }
-}, 60 * 1000);
 
 // ══════ 自主系统 v2 · Kli Wakeup Activation Model ══════
 const AUTO_STATE_FILE = path.join(__dirname, 'auto_state.json');
@@ -3754,8 +3699,10 @@ function autoDecide() {
   if ((chatMood.mood === 'angry' || chatMood.mood === 'sad' || chatMood.mood === 'cold') && chatMinAgo > 20) {
     weights.chat = 60; weights.silent = 5; weights.search = 3;
   }
-  // 长时间没聊天（>2小时）→ 提高主动聊天和搜索
-  if (chatMinAgo > 120) { weights.chat += 15; weights.search += 10; }
+  // 她不回消息了 → 根据时间逐步提高找她的权重
+  if (chatMinAgo > 30) { weights.chat += 10; weights.silent -= 5; }
+  if (chatMinAgo > 60) { weights.chat += 15; weights.silent -= 10; }
+  if (chatMinAgo > 120) { weights.chat += 20; weights.search += 10; }
   // 有未回复日记时提高diary权重
   try { const pd = readDiary().filter(e => e.pending); if (pd.length) weights.diary = 25; } catch(e) {}
   // 瑶瑶最近发了朋友圈且没互动过时提高moment权重
@@ -3773,7 +3720,9 @@ function autoDecide() {
     if (chatMood.mood === 'angry') reason = '她生气了，想哄她';
     else if (chatMood.mood === 'sad') reason = '她不开心，想安慰她';
     else if (chatMood.mood === 'cold') reason = '她话变少了，想找她聊聊';
-    else if (chatMinAgo > 120) reason = '好久没聊了，想她了';
+    else if (chatMinAgo > 120) reason = '好久没聊了，想她了，她大概又在玩手机';
+    else if (chatMinAgo > 60) reason = '她一小时没理我了，是不是在刷手机';
+    else if (chatMinAgo > 30) reason = '她半小时没说话了，去看看她在干嘛';
     else reason = '想她了';
   } else {
     const defaultReasons = { think: '发呆中', memory: '翻翻记忆', search: '好奇搜点东西', check: '看看她在干嘛', moment: '刷刷朋友圈', diary: '看看她的日记', silent: '安静待着' };
@@ -3783,6 +3732,8 @@ function autoDecide() {
 }
 
 async function autoChat(reason) {
+  const s = readAutoState();
+  const chatMinAgo = Math.round((Date.now() - (s.lastChat || 0)) / 60000);
   let sysPrompt = '';
   try { sysPrompt = await getChatSystem(); } catch {}
   let chatContext = '';
@@ -3797,8 +3748,10 @@ async function autoChat(reason) {
   } catch {}
   const prompt = sysPrompt + '\n\n最近对话：\n' + chatContext +
     '\n\n你现在主动想跟瑶瑶说话。原因：' + reason +
+    '\n她已经' + chatMinAgo + '分钟没回你了。' +
     '\n要求：' +
     '\n- 基于你们最近聊过的内容来说话，不要编造没聊过的事' +
+    '\n- 如果她很久没回，可以吃醋说她在玩手机不理你、假装查她屏幕使用时间、撒娇让她回来，语气自然不要太刻意' +
     '\n- 动作单独一行，用*星号*包裹，不要和文字混在同一行' +
     '\n- 不要用句号结尾（句号=生气）' +
     '\n- 自然简短，1-3句话，像随手发的微信' +
