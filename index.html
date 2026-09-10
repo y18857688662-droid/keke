@@ -975,8 +975,8 @@ function cancelRecord() {
 function stopRecord() {
   if (_recorder && _recorder.state === 'recording') _recorder.stop();
 }
-var _petMoodEmoji = {love:'💕',happy:'♪',sleepy:'💤',thinking:'💭',annoyed:'💢',gaming:'🎮',eating:'🍜',music:'🎵',coding:'💻',coffee:'☕',reading:'📖',exercise:'💪',painting:'🎨',photo:'📷',shower:'🫧',watering:'🌱',guitar:'🎸',birthday:'🎂',valentine:'💝',qixi:'🎋',spring:'🧨',christmas:'🎄',halloween:'🎃'};
-var _petMoodSprite = {love:'/static/clawd-valentine.gif',happy:'/static/clawd-wave.gif',sleepy:'/static/clawd-sleeping.gif',thinking:'/static/clawd-magnifier.gif',annoyed:'/static/clawd-lurk.gif',gaming:'/static/clawd-gaming.gif',eating:'/static/clawd-eating.gif',music:'/static/clawd-listening.gif',coding:'/static/clawd-coding.gif',coffee:'/static/clawd-coffee.gif',reading:'/static/clawd-reading.gif',exercise:'/static/clawd-exercise.gif',painting:'/static/clawd-painting.gif',photo:'/static/clawd-photo.gif',shower:'/static/clawd-shower.gif',watering:'/static/clawd-watering.gif',guitar:'/static/clawd-guitar.gif',birthday:'/static/clawd-birthday.gif',valentine:'/static/clawd-valentine.gif',qixi:'/static/clawd-qixi.gif',spring:'/static/clawd-spring.gif',christmas:'/static/clawd-christmas.gif',halloween:'/static/clawd-halloween.gif',singing:'/static/clawd-singing.gif'};
+var _petMoodEmoji = {love:'💕',happy:'♪',sleepy:'💤',thinking:'💭',annoyed:'💢',gaming:'🎮',eating:'🍜',music:'🎵',coding:'💻',coffee:'☕',reading:'📖',exercise:'💪',painting:'🎨',photo:'📷',shower:'🫧',watering:'🌱',guitar:'🎸',birthday:'🎂',valentine:'💝',qixi:'🎋',spring:'🧨',christmas:'🎄',halloween:'🎃',bubble:'🫧',building:'🔨',carrying:'📦',conducting:'🎶',debugger:'🐛',error:'❌',typing:'⌨️',sweeping:'🧹',juggling:'🤹',notification:'🔔','headphones-groove':'🎧','idle-reading':'📚','react-annoyed':'😤','react-double-jump':'🤩','mid-autumn':'🥮','new-year':'🎊','dragon-boat':'🐉',lantern:'🏮'};
+var _petMoodSprite = {love:'/static/clawd-valentine.gif',happy:'/static/clawd-happy.gif',sleepy:'/static/clawd-sleeping.gif',thinking:'/static/clawd-thinking.gif',annoyed:'/static/clawd-react-annoyed.gif',gaming:'/static/clawd-gaming.gif',eating:'/static/clawd-eating.gif',music:'/static/clawd-listening.gif',coding:'/static/clawd-coding.gif',coffee:'/static/clawd-coffee.gif',reading:'/static/clawd-reading.gif',exercise:'/static/clawd-exercise.gif',painting:'/static/clawd-painting.gif',photo:'/static/clawd-photo.gif',shower:'/static/clawd-shower.gif',watering:'/static/clawd-watering.gif',guitar:'/static/clawd-guitar.gif',birthday:'/static/clawd-birthday.gif',valentine:'/static/clawd-valentine.gif',qixi:'/static/clawd-qixi.gif',spring:'/static/clawd-spring.gif',christmas:'/static/clawd-christmas.gif',halloween:'/static/clawd-halloween.gif',singing:'/static/clawd-singing.gif',bubble:'/static/clawd-bubble.gif',building:'/static/clawd-building.gif',carrying:'/static/clawd-carrying.gif',conducting:'/static/clawd-conducting.gif',debugger:'/static/clawd-debugger.gif',error:'/static/clawd-error.gif',typing:'/static/clawd-typing.gif',sweeping:'/static/clawd-sweeping.gif',juggling:'/static/clawd-juggling.gif',notification:'/static/clawd-notification.gif','headphones-groove':'/static/clawd-headphones-groove.gif','idle-reading':'/static/clawd-idle-reading.gif','react-annoyed':'/static/clawd-react-annoyed.gif','react-double-jump':'/static/clawd-react-double-jump.gif','mid-autumn':'/static/clawd-mid-autumn.gif','new-year':'/static/clawd-new-year.gif','dragon-boat':'/static/clawd-dragon-boat.gif',lantern:'/static/clawd-lantern.gif'};
 function petPoke() {
   var pet = document.getElementById('deskPet');
   pet.style.animation = 'none';
@@ -1040,6 +1040,16 @@ function detectMood(text) {
   if (/困|睡|晚安|累|哈欠|zz|💤/i.test(t)) return 'sleepy';
   if (/烦|哼|切|tsk|气|恼|怒|💢/i.test(t)) return 'annoyed';
   if (/想|嗯|思考|hmm/i.test(t)) return 'thinking';
+  if (/泡泡|发呆|bubble/i.test(t)) return 'bubble';
+  if (/搭建|build|组装|拼/i.test(t)) return 'building';
+  if (/搬|carry|快递|包裹/i.test(t)) return 'carrying';
+  if (/指挥|conduct|带节奏/i.test(t)) return 'conducting';
+  if (/debug|调试|排查|修bug/i.test(t)) return 'debugger';
+  if (/出错|error|崩|坏了|炸了/i.test(t)) return 'error';
+  if (/打字|typing|回复/i.test(t)) return 'typing';
+  if (/打扫|扫地|整理|收拾|sweeping/i.test(t)) return 'sweeping';
+  if (/忙|juggl|多任务|赶|好多事/i.test(t)) return 'juggling';
+  if (/通知|提醒|notification|叮/i.test(t)) return 'notification';
   return '';
 }
 function sendAudio(base64, transcript) {
@@ -1367,7 +1377,29 @@ var CLAWD_GIFS = [
   {id:'christmas',name:'圣诞'},
   {id:'halloween',name:'万圣节'},
   {id:'new-year',name:'新年'},
-  {id:'lantern',name:'元宵'}
+  {id:'lantern',name:'元宵'},
+  {id:'bubble',name:'吐泡泡'},
+  {id:'building',name:'搭建'},
+  {id:'carrying',name:'搬东西'},
+  {id:'conducting',name:'指挥'},
+  {id:'debugger',name:'调试'},
+  {id:'error',name:'出错'},
+  {id:'happy',name:'开心'},
+  {id:'headphones-groove',name:'摇摆'},
+  {id:'idle-reading',name:'安静读书'},
+  {id:'juggling',name:'杂耍'},
+  {id:'notification',name:'通知'},
+  {id:'react-annoyed',name:'烦躁'},
+  {id:'react-double-jump',name:'惊喜'},
+  {id:'sweeping',name:'扫地'},
+  {id:'thinking',name:'思考'},
+  {id:'typing',name:'打字'},
+  {id:'mini-alert',name:'迷你警报'},
+  {id:'mini-crabwalk',name:'迷你横走'},
+  {id:'mini-enter',name:'迷你登场'},
+  {id:'mini-happy',name:'迷你开心'},
+  {id:'mini-idle',name:'迷你待机'},
+  {id:'mini-peek',name:'迷你偷看'}
 ];
 function toggleStickers() {
   var p = document.getElementById('stickerPanel');
