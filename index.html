@@ -745,6 +745,7 @@ body {
 </div>
 <script>
 var thinkingStore = {};
+var thinkingCounter = 0;
 var msgContainer = document.getElementById('messages');
 var inputField = document.querySelector('.input-field');
 var sending = false;
@@ -1047,7 +1048,8 @@ function renderMessage(msg, idx, stagger) {
     var sE = content.indexOf(']', sI + 8);
     if (sE > sI) { if (!searchQ) searchQ = content.slice(sI + 8, sE); content = content.slice(0, sI) + content.slice(sE + 1); }
   }
-  if (think) { thinkingStore[idx] = think; }
+  var thinkIdx = null;
+  if (think) { thinkIdx = thinkingCounter++; thinkingStore[thinkIdx] = think; }
   var group = document.createElement('div');
   group.className = 'msg-group ' + who;
   if (msg.time) group.setAttribute('data-time', msg.time);
@@ -1062,7 +1064,7 @@ function renderMessage(msg, idx, stagger) {
   avaHtml += '</div>';
   var colHtml = '<div class="msg-col">';
   if (think && isKe) {
-    group._thinkIdx = idx;
+    group._thinkIdx = thinkIdx;
   }
   if (searchQ) {
     group._searchQuery = searchQ;
