@@ -1887,7 +1887,7 @@ app.post('/chat/send', async (req, res) => {
             }
           })().catch(() => {});
         }
-        res.json({ ok: true, reply: savedReply, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl });
+        res.json({ ok: true, reply: savedContent, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl });
         (async () => {
           try {
             const last5 = chat2.slice(-6);
@@ -1997,7 +1997,7 @@ app.post('/chat/send', async (req, res) => {
         }
       })().catch(() => {});
     }
-    res.json({ ok: true, reply: savedReplyApi, time: replyTime, memoryLoaded });
+    res.json({ ok: true, reply: savedContentApi, time: replyTime, memoryLoaded });
     (async () => {
       try {
         const last5 = chat2.slice(-6);
