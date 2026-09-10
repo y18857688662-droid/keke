@@ -260,10 +260,25 @@ body {
 .sheet.dragging { transition: none; }
 .sheet-handle-area { flex-shrink: 0; cursor: grab; padding: 8px 0 0; display: flex; flex-direction: column; align-items: center; }
 .sheet-handle { width: 36px; height: 5px; border-radius: 3px; background: var(--border); }
-.sheet-header { padding: 10px 20px 8px; flex-shrink: 0; }
+.sheet-header { padding: 10px 20px 8px; flex-shrink: 0; position: relative; }
 .sheet-title { text-align: center; font-size: 16px; font-weight: 600; color: var(--text); }
+.sheet-close { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border-radius: 50%; background: rgba(127,127,127,.1); border: none; font-size: 18px; color: var(--text-mid); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .sheet-body { overflow-y: auto; padding: 4px 22px 28px; }
 .sheet-text { font-size: 15.5px; line-height: 1.75; color: var(--text); }
+.think-flow { display: flex; flex-direction: column; }
+.think-step { display: flex; align-items: flex-start; gap: 12px; }
+.think-step-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(127,127,127,.08); flex-shrink: 0; }
+.think-step-icon svg { width: 16px; height: 16px; stroke: var(--text-mid); }
+.think-connector { padding-left: 13px; }
+.think-connector-line { width: 2px; height: 22px; background: var(--border); border-radius: 1px; }
+.think-file-row { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 6px 0; min-width: 0; flex: 1; }
+.think-file { font-size: 13.5px; color: var(--text-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.think-chevron { color: var(--text-faint); font-size: 18px; flex-shrink: 0; }
+.think-preview-row { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 6px 0; min-width: 0; }
+.think-preview-text { font-size: 13.5px; color: var(--text-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.think-expand { color: var(--text-faint); font-size: 16px; flex-shrink: 0; transition: transform .2s; }
+.think-expand.open { transform: rotate(180deg); }
+.think-full-text { font-size: 15px; line-height: 1.75; color: var(--text); padding: 6px 0 0; }
 .msg-quote { font-size:12px; color:var(--text-soft); border-left:2px solid var(--accent); padding:2px 8px; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; cursor:default; }
 .msg-img { max-width:200px; border-radius:12px; display:block; cursor:pointer; }
 .msg-img-grid { display:grid; gap:3px; border-radius:12px; overflow:hidden; max-width:220px; }
@@ -709,7 +724,7 @@ body {
   <div class="sheet-overlay" id="sheetOverlay" onclick="closeThinking()"></div>
   <div class="sheet" id="sheet">
     <div class="sheet-handle-area" id="sheetHandleArea"><div class="sheet-handle"></div></div>
-    <div class="sheet-header"><div class="sheet-title">Thought process</div></div>
+    <div class="sheet-header"><button class="sheet-close" onclick="closeThinking()">&times;</button><div class="sheet-title">Thought process</div></div>
     <div class="sheet-body"><div class="sheet-text" id="sheetText"></div></div>
   </div>
 </div>
@@ -1148,7 +1163,7 @@ function renderTime(t, thinkIdx) {
   el.className = 'msg-time';
   var html = formatTimeDisplay(t);
   if (thinkIdx !== undefined && thinkIdx !== null) {
-    html += ' <span class="thinking-cloud" onclick="openThinking('+thinkIdx+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg></span>';
+    html += ' <span class="thinking-cloud" onclick="openThinking('+thinkIdx+',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg></span>';
   }
   el.innerHTML = html;
   return el;
@@ -1562,12 +1577,52 @@ setInterval(function() {
   if (!sending) syncNewMessages();
 }, 15000);
 
-function openThinking(idx) {
+function openThinking(idx, cloudEl) {
   var text = thinkingStore[idx] || '';
-  document.getElementById('sheetText').innerHTML = text.replace(/\n/g, '<br>');
+  var images = [];
+  if (cloudEl) {
+    var timeEl = cloudEl.parentElement;
+    var prev = timeEl ? timeEl.previousElementSibling : null;
+    while (prev) {
+      if (prev.classList && prev.classList.contains('msg-group') && prev.classList.contains('yao')) {
+        var imgs = prev.querySelectorAll('.msg-img, .msg-img-cell');
+        for (var ii = 0; ii < imgs.length; ii++) images.push(imgs[ii].src);
+        break;
+      }
+      prev = prev.previousElementSibling;
+    }
+  }
+  window._thinkImgs = images;
+  var html = '<div class="think-flow">';
+  if (images.length) {
+    var src = images[0];
+    var name = src.startsWith('data:') ? '上传的图片' : src.split('/').pop();
+    if (name.length > 40) name = name.slice(0, 37) + '...';
+    html += '<div class="think-step"><div class="think-step-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
+    html += '<div class="think-file-row" onclick="viewImg(window._thinkImgs[0])"><span class="think-file">' + escHtml(name) + '</span><span class="think-chevron">›</span></div></div>';
+    html += '<div class="think-connector"><div class="think-connector-line"></div></div>';
+  }
+  var firstLine = (text.split('\n')[0] || '').trim();
+  var preview = firstLine.length > 35 ? firstLine.slice(0, 35) + '...' : firstLine;
+  html += '<div class="think-step"><div class="think-step-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>';
+  html += '<div style="flex:1;min-width:0"><div class="think-preview-row" onclick="toggleThinkFull(this)"><span class="think-preview-text">' + escHtml(preview) + '</span><span class="think-expand open">⌄</span></div>';
+  html += '<div class="think-full-text">' + escHtml(text).replace(/\n/g, '<br>') + '</div></div></div>';
+  html += '</div>';
+  document.getElementById('sheetText').innerHTML = html;
   sheet.style.height = '';
   document.getElementById('sheetOverlay').classList.add('show');
   document.getElementById('sheet').classList.add('show');
+}
+function toggleThinkFull(row) {
+  var full = row.nextElementSibling;
+  var arrow = row.querySelector('.think-expand');
+  if (full.style.display === 'none') {
+    full.style.display = '';
+    if (arrow) { arrow.textContent = '⌄'; arrow.classList.add('open'); }
+  } else {
+    full.style.display = 'none';
+    if (arrow) { arrow.textContent = '›'; arrow.classList.remove('open'); }
+  }
 }
 function closeThinking() {
   document.getElementById('sheetOverlay').classList.remove('show');
