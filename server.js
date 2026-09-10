@@ -1646,7 +1646,7 @@ async function processMomentActions(text) {
       const thoughts = readThoughts();
       thoughts.push({ text: thinkMatch[1].trim(), mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: false });
       writeThoughts(thoughts);
-      addFootprint('think', '写了碎碎念', thinkMatch[1].trim().slice(0, 50));
+      addFootprint('think', '写了碎碎念', thinkMatch[1].trim());
     } catch(e) { console.log('[think] error:', e.message); }
     cleaned = cleaned.replace(/\[think:[^\]]+\]/g, '');
   }
