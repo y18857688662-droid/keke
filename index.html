@@ -385,34 +385,18 @@ body {
 }
 .send-btn:hover { opacity: .85; }
 .send-btn svg { width: 16px; height: 16px; }
-.sticker-panel { position:absolute; bottom:100%; left:8px; right:8px; background:var(--bg); border-radius:16px 16px 0 0; box-shadow:0 -4px 20px rgba(0,0,0,.1); display:none; z-index:100; max-height:300px; overflow:hidden; flex-direction:column; }
+.sticker-panel { position:absolute; bottom:100%; left:8px; right:8px; background:var(--bg); border-radius:16px 16px 0 0; box-shadow:0 -4px 20px rgba(0,0,0,.1); display:none; z-index:100; max-height:320px; overflow:hidden; flex-direction:column; }
 .sticker-panel.show { display:flex; animation:slideUpSticker .25s ease; }
 @keyframes slideUpSticker { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
-.stk-tabs { display:flex; border-bottom:1px solid var(--border); padding:0 4px; flex-shrink:0; }
-.stk-tab { flex:1; padding:10px 4px 8px; text-align:center; font-size:15px; cursor:pointer; border-bottom:2px solid transparent; transition:border-color .2s,opacity .2s; opacity:.5; }
-.stk-tab.active { border-bottom-color:var(--accent); opacity:1; }
 .stk-body { flex:1; overflow-y:auto; padding:10px 12px; -webkit-overflow-scrolling:touch; }
-.sticker-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-.sticker-cell { width:100%; aspect-ratio:1; border-radius:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; background:var(--input-bg); transition:transform .15s,background .15s; padding:6px; }
-.sticker-cell:hover { transform:scale(1.1); background:var(--accent-soft,rgba(123,143,107,.1)); }
-.sticker-cell:active { transform:scale(.95); }
-.sticker-cell svg { width:100%; height:100%; }
-.gif-sticker-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-.gif-sticker-cell { width:100%; aspect-ratio:1; border-radius:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; background:var(--input-bg); transition:transform .15s,background .15s; padding:8px; overflow:hidden; }
+.gif-sticker-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.gif-sticker-cell { width:100%; border-radius:12px; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; background:var(--input-bg); transition:transform .15s,background .15s; padding:6px; overflow:hidden; }
 .gif-sticker-cell:hover { transform:scale(1.05); background:var(--accent-soft,rgba(123,143,107,.1)); }
 .gif-sticker-cell:active { transform:scale(.93); }
-.gif-sticker-cell img { width:100%; height:100%; object-fit:contain; }
-.gif-sticker-label { font-size:10px; color:var(--text-mid); text-align:center; margin-top:2px; }
+.gif-sticker-cell img { width:100%; aspect-ratio:1; object-fit:contain; image-rendering:pixelated; }
+.gif-sticker-label { font-size:10px; color:var(--text-mid); text-align:center; margin-top:2px; line-height:1; }
 .msg-gif-sticker { width:140px; height:140px; display:block; }
-.msg-gif-sticker img { width:100%; height:100%; object-fit:contain; }
-.emoji-grid { display:grid; grid-template-columns:repeat(8,1fr); gap:2px; }
-.emoji-cell { font-size:24px; text-align:center; padding:6px 0; cursor:pointer; border-radius:8px; transition:transform .12s,background .12s; line-height:1.2; }
-.emoji-cell:hover { transform:scale(1.2); background:var(--accent-soft,rgba(123,143,107,.1)); }
-.emoji-cell:active { transform:scale(.9); }
-.emoji-cat-title { font-size:12px; color:var(--text-mid); margin:8px 0 4px; font-weight:600; }
-.emoji-cat-title:first-child { margin-top:0; }
-.msg-sticker { width:120px; height:120px; display:block; }
-.msg-sticker svg { width:100%; height:100%; }
+.msg-gif-sticker img { width:100%; height:100%; object-fit:contain; image-rendering:pixelated; }
 .messages::-webkit-scrollbar { width: 3px; }
 .messages::-webkit-scrollbar-track { background: transparent; }
 .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -693,18 +677,7 @@ body {
     </div>
     <div class="input-area" style="position:relative">
       <div class="sticker-panel" id="stickerPanel">
-        <div class="stk-tabs">
-          <div class="stk-tab active" onclick="switchStkTab(0,this)">🦀</div>
-          <div class="stk-tab" onclick="switchStkTab(1,this)" style="font-size:11px;line-height:1.2">GIF</div>
-          <div class="stk-tab" onclick="switchStkTab(2,this)">😊</div>
-          <div class="stk-tab" onclick="switchStkTab(3,this)">🐱</div>
-          <div class="stk-tab" onclick="switchStkTab(4,this)">❤️</div>
-          <div class="stk-tab" onclick="switchStkTab(5,this)">👋</div>
-          <div class="stk-tab" onclick="switchStkTab(6,this)">🍔</div>
-        </div>
-        <div class="stk-body">
-          <div id="stkContent"></div>
-        </div>
+        <div class="stk-body" id="stkContent"></div>
       </div>
       <div class="quote-bar" id="quoteBar"><div class="quote-preview" id="quotePreview"></div><button class="quote-close" onclick="clearQuote()">&times;</button></div>
       <div class="attach-menu" id="attachMenu">
@@ -1002,8 +975,8 @@ function cancelRecord() {
 function stopRecord() {
   if (_recorder && _recorder.state === 'recording') _recorder.stop();
 }
-var _petMoodEmoji = {love:'💕',happy:'♪',sleepy:'💤',thinking:'💭',annoyed:'💢'};
-var _petMoodSprite = {love:'/static/clawd-wave.gif',happy:'/static/clawd-wave.gif',sleepy:'/static/clawd-lurk.gif',thinking:'/static/clawd-magnifier.gif',annoyed:'/static/clawd-lurk.gif'};
+var _petMoodEmoji = {love:'💕',happy:'♪',sleepy:'💤',thinking:'💭',annoyed:'💢',gaming:'🎮',eating:'🍜',music:'🎵',coding:'💻',coffee:'☕',reading:'📖',exercise:'💪',painting:'🎨',photo:'📷',shower:'🫧',watering:'🌱',guitar:'🎸',birthday:'🎂',valentine:'💝',qixi:'🎋',spring:'🧨',christmas:'🎄',halloween:'🎃'};
+var _petMoodSprite = {love:'/static/clawd-valentine.gif',happy:'/static/clawd-wave.gif',sleepy:'/static/clawd-sleeping.gif',thinking:'/static/clawd-magnifier.gif',annoyed:'/static/clawd-lurk.gif',gaming:'/static/clawd-gaming.gif',eating:'/static/clawd-eating.gif',music:'/static/clawd-listening.gif',coding:'/static/clawd-coding.gif',coffee:'/static/clawd-coffee.gif',reading:'/static/clawd-reading.gif',exercise:'/static/clawd-exercise.gif',painting:'/static/clawd-painting.gif',photo:'/static/clawd-photo.gif',shower:'/static/clawd-shower.gif',watering:'/static/clawd-watering.gif',guitar:'/static/clawd-guitar.gif',birthday:'/static/clawd-birthday.gif',valentine:'/static/clawd-valentine.gif',qixi:'/static/clawd-qixi.gif',spring:'/static/clawd-spring.gif',christmas:'/static/clawd-christmas.gif',halloween:'/static/clawd-halloween.gif',singing:'/static/clawd-singing.gif'};
 function petPoke() {
   var pet = document.getElementById('deskPet');
   pet.style.animation = 'none';
@@ -1040,12 +1013,31 @@ function petMood(mood) {
 }
 function detectMood(text) {
   if (!text) return '';
-  var t = text.replace(new RegExp('<think>[\s\S]*?<\/think>','g'), '').trim();
-  if (/爱|❤|💕|么么|亲|吻|喜欢|心动|宝贝|mua/i.test(t)) return 'love';
+  var t = text.replace(new RegExp('<think>[\\s\\S]*?<\\/think>','g'), '').trim();
+  if (/生日|birthday|🎂|蛋糕/i.test(t)) return 'birthday';
+  if (/七夕|乞巧|牛郎|织女/i.test(t)) return 'qixi';
+  if (/情人节|valentine/i.test(t)) return 'valentine';
+  if (/春节|过年|新春|除夕|年夜|拜年|🧨/i.test(t)) return 'spring';
+  if (/圣诞|christmas|🎄/i.test(t)) return 'christmas';
+  if (/万圣|halloween|🎃/i.test(t)) return 'halloween';
+  if (/游戏|打游|玩游|lol|王者|吃鸡|switch|🎮/i.test(t)) return 'gaming';
+  if (/吉他|弹琴|ukulele|🎸/i.test(t)) return 'guitar';
+  if (/唱歌|ktv|karaoke|嗨歌/i.test(t)) return 'singing';
+  if (/听歌|音乐|spotify|🎵|🎶|旋律|歌单/i.test(t)) return 'music';
+  if (/代码|编程|bug|code|程序|开发|💻/i.test(t)) return 'coding';
+  if (/咖啡|coffee|拿铁|美式|摩卡|☕/i.test(t)) return 'coffee';
+  if (/吃|饿|饭|餐|零食|火锅|烧烤|外卖|好吃|🍜|🍔|甜品/i.test(t)) return 'eating';
+  if (/看书|读书|阅读|小说|📖|📚/i.test(t)) return 'reading';
+  if (/画画|画|素描|水彩|🎨|涂鸦/i.test(t)) return 'painting';
+  if (/拍照|照片|📷|自拍|相机|photo/i.test(t)) return 'photo';
+  if (/运动|锻炼|跑步|健身|瑜伽|游泳|💪/i.test(t)) return 'exercise';
+  if (/洗澡|澡|泡澡|🫧|沐浴/i.test(t)) return 'shower';
+  if (/浇花|种花|花园|养花|🌱|盆栽/i.test(t)) return 'watering';
+  if (/爱|❤|💕|么么|亲|吻|喜欢|心动|宝贝|mua|想你|抱/i.test(t)) return 'love';
   if (/哈哈|嘻|开心|快乐|笑|棒|好耶|[!！]{2,}/.test(t)) return 'happy';
   if (/困|睡|晚安|累|哈欠|zz|💤/i.test(t)) return 'sleepy';
-  if (/想|嗯|思考|hmm|.{3,}/i.test(t)) return 'thinking';
   if (/烦|哼|切|tsk|气|恼|怒|💢/i.test(t)) return 'annoyed';
+  if (/想|嗯|思考|hmm/i.test(t)) return 'thinking';
   return '';
 }
 function sendAudio(base64, transcript) {
@@ -1139,13 +1131,6 @@ function renderMessage(msg, idx, stagger) {
     var fn2 = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\'a\');a.href=\''+msg.fileUrl+'\';a.download=\''+escHtml(msg.filename||'file')+'\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn2 + '</div>';
   }
-  var stickerMatch = content.match(/^\[sticker:(\w+)\]$/);
-  if (stickerMatch && CRAB_STICKERS[stickerMatch[1]]) {
-    colHtml += renderStickerSvg(stickerMatch[1]);
-    colHtml += '</div>';
-    group.innerHTML = avaHtml + colHtml;
-    return group;
-  }
   var gifMatch = content.match(/^\[gifsticker:([\w-]+)\]$/);
   if (gifMatch) {
     var gf = CLAWD_GIFS.find(function(x){return x.id===gifMatch[1]});
@@ -1155,6 +1140,11 @@ function renderMessage(msg, idx, stagger) {
       group.innerHTML = avaHtml + colHtml;
       return group;
     }
+  }
+  if (/^\[sticker:\w+\]$/.test(content)) {
+    colHtml += '<div class="msg-bubble">[表情]</div></div>';
+    group.innerHTML = avaHtml + colHtml;
+    return group;
   }
   var hasMedia = msg.image || msg.imageUrl || msg.audioUrl || msg.file || msg.fileUrl;
   var allLines = content.split(/\n+/).map(function(l){return l.trim()}).filter(function(l){
@@ -1350,20 +1340,6 @@ function insertNL(){
   ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,100)+'px';
   ta.focus();
 }
-var CRAB_STICKERS = {
-  'happy': {name:'开心',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><circle cx="40" cy="52" r="5" fill="#fff"/><circle cx="60" cy="52" r="5" fill="#fff"/><circle cx="41.5" cy="53" r="2.5" fill="#2D1B14"/><circle cx="61.5" cy="53" r="2.5" fill="#2D1B14"/><ellipse cx="41" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="61" cy="51" rx="1.5" ry="1" fill="#fff"/><path d="M42 65q8 7 16 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="35" cy="62" r="4" fill="#FFB3A0" opacity=".5"/><circle cx="65" cy="62" r="4" fill="#FFB3A0" opacity=".5"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="50" cy="80" rx="10" ry="3" fill="#E85A3A" opacity=".15"/></svg>'},
-  'love': {name:'比心',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><circle cx="40" cy="52" r="5" fill="#fff"/><circle cx="60" cy="52" r="5" fill="#fff"/><circle cx="41.5" cy="53" r="2.5" fill="#2D1B14"/><circle cx="61.5" cy="53" r="2.5" fill="#2D1B14"/><ellipse cx="41" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="61" cy="51" rx="1.5" ry="1" fill="#fff"/><path d="M43 64q7 5 14 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M14 38q-2-6 2-10t8-2q2 2 3 5q1-3 3-5q4-2 8 2t2 10q-4 6-13 10q-9-4-13-10z" fill="#FF4D6A" opacity=".85"/></svg>'},
-  'cry': {name:'哭哭',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><ellipse cx="40" cy="54" rx="5" ry="5.5" fill="#fff"/><ellipse cx="60" cy="54" rx="5" ry="5.5" fill="#fff"/><circle cx="41" cy="55" r="2.5" fill="#2D1B14"/><circle cx="61" cy="55" r="2.5" fill="#2D1B14"/><path d="M36 47q4-3 8 0" stroke="#2D1B14" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M56 47q4-3 8 0" stroke="#2D1B14" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M44 67q6 2 12 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M36 58q-2 10-4 18" stroke="#5BC0EB" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/><path d="M64 58q2 10 4 18" stroke="#5BC0EB" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="34" cy="70" r="2" fill="#5BC0EB" opacity=".5"/><circle cx="66" cy="70" r="2" fill="#5BC0EB" opacity=".5"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'},
-  'angry': {name:'生气',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#E8422E"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF6B4A"/><circle cx="40" cy="54" r="5" fill="#fff"/><circle cx="60" cy="54" r="5" fill="#fff"/><circle cx="41" cy="55" r="2.5" fill="#2D1B14"/><circle cx="61" cy="55" r="2.5" fill="#2D1B14"/><line x1="34" y1="46" x2="44" y2="49" stroke="#2D1B14" stroke-width="2.5" stroke-linecap="round"/><line x1="66" y1="46" x2="56" y2="49" stroke="#2D1B14" stroke-width="2.5" stroke-linecap="round"/><path d="M42 66q8-5 16 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M22 52q-12-14-6-26" stroke="#E8422E" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#E8422E"/><path d="M78 52q12-14 6-26" stroke="#E8422E" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#E8422E"/><path d="M24 62q-10 4-16 0" stroke="#E8422E" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#E8422E" stroke-width="3" fill="none" stroke-linecap="round"/><text x="50" y="30" text-anchor="middle" font-size="14" fill="#E8422E" font-weight="bold">💢</text></svg>'},
-  'shy': {name:'害羞',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><path d="M36 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M44 65q6 4 12 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="33" cy="60" r="6" fill="#FF4D6A" opacity=".35"/><circle cx="67" cy="60" r="6" fill="#FF4D6A" opacity=".35"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'},
-  'sleepy': {name:'困困',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><path d="M36 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="50" cy="66" rx="4" ry="3" fill="#2D1B14" opacity=".6"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><text x="72" y="38" font-size="10" fill="#2D1B14" font-weight="bold" opacity=".5">Z</text><text x="80" y="30" font-size="8" fill="#2D1B14" font-weight="bold" opacity=".35">Z</text><text x="86" y="24" font-size="6" fill="#2D1B14" font-weight="bold" opacity=".2">Z</text></svg>'},
-  'wink': {name:'眨眼',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><circle cx="40" cy="52" r="5" fill="#fff"/><circle cx="41.5" cy="53" r="2.5" fill="#2D1B14"/><ellipse cx="41" cy="51" rx="1.5" ry="1" fill="#fff"/><path d="M56 53q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M43 64q7 5 14 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="35" cy="62" r="4" fill="#FFB3A0" opacity=".5"/><circle cx="65" cy="62" r="4" fill="#FFB3A0" opacity=".5"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'},
-  'shock': {name:'惊讶',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><ellipse cx="40" cy="52" rx="5.5" ry="6" fill="#fff"/><ellipse cx="60" cy="52" rx="5.5" ry="6" fill="#fff"/><circle cx="41" cy="53" r="3" fill="#2D1B14"/><circle cx="61" cy="53" r="3" fill="#2D1B14"/><ellipse cx="40.5" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="60.5" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="50" cy="68" rx="5" ry="4" fill="#2D1B14" opacity=".7"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'},
-  'smug': {name:'得意',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><path d="M36 52q4-2 8 1" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 52q4-2 8 1" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M40 65q10 6 20 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><text x="74" y="42" font-size="10" opacity=".6">✨</text></svg>'},
-  'pout': {name:'嘟嘴',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><circle cx="40" cy="52" r="5" fill="#fff"/><circle cx="60" cy="52" r="5" fill="#fff"/><circle cx="41.5" cy="53" r="2.5" fill="#2D1B14"/><circle cx="61.5" cy="53" r="2.5" fill="#2D1B14"/><ellipse cx="41" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="61" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="50" cy="67" rx="6" ry="4" fill="#E85A3A"/><ellipse cx="50" cy="66.5" rx="4.5" ry="2.8" fill="#FF8A6E"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="33" cy="60" r="5" fill="#FFB3A0" opacity=".4"/><circle cx="67" cy="60" r="5" fill="#FFB3A0" opacity=".4"/></svg>'},
-  'wave': {name:'挥手',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><circle cx="40" cy="52" r="5" fill="#fff"/><circle cx="60" cy="52" r="5" fill="#fff"/><circle cx="41.5" cy="53" r="2.5" fill="#2D1B14"/><circle cx="61.5" cy="53" r="2.5" fill="#2D1B14"/><ellipse cx="41" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="61" cy="51" rx="1.5" ry="1" fill="#fff"/><path d="M43 64q7 5 14 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 48q14-8 14-22" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="92" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'},
-  'hug': {name:'抱抱',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><path d="M36 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M43 64q7 5 14 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="33" cy="60" r="5" fill="#FFB3A0" opacity=".4"/><circle cx="67" cy="60" r="5" fill="#FFB3A0" opacity=".4"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M20 56q-6 16 10 20" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M80 56q6 16-10 20" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'}
-};
 var CLAWD_GIFS = [
   {id:'birthday',name:'生日'},
   {id:'valentine',name:'情人节'},
@@ -1390,91 +1366,23 @@ var CLAWD_GIFS = [
   {id:'new-year',name:'新年'},
   {id:'lantern',name:'元宵'}
 ];
-var EMOJI_TABS = [
-  null,
-  null,
-  {title:'表情',emojis:['😊','😂','🤣','😍','🥰','😘','😋','😜','🤪','😎','🤩','🥳','😏','😌','😴','🤔','🫣','🤭','🤫','😱','😨','🥺','😢','😭','😤','😡','🤬','🤯','😳','🫠','😵‍💫','🙄','😒','😮‍💨','🫡','🤓','😈','💀','👻','🤡','💩','🫶','😺','😸','😹','😻','😼','😽','🙀','😿','😾']},
-  {title:'动物',emojis:['🐱','🐶','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐔','🐧','🐦','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐜','🪲','🐢','🐍','🦎','🐙','🦑','🦀','🦞','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🐅','🦓','🦍','🦧','🐘','🦛','🦏','🐪','🐫','🦒','🦘','🦬','🐄']},
-  {title:'爱心',emojis:['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','💕','💞','💓','💗','💖','💘','💝','💟','♥️','🫀','💋','💌','💐','🌹','🌺','🌸','🌷','🪻','💍','💎','🫂','💏','💑','👩‍❤️‍👨','🥂','🍾','✨','🌟','💫','⭐','🔥','🎉','🎊','🎈','🎁','🎀']},
-  {title:'手势',emojis:['👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🫰','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','🫵','👍','👎','✊','👊','🤛','🤜','👏','🙌','🫶','👐','🤲','🤝','🙏','✍️','💪','🦾','🤳','💅','🫦','👀','👁️','👅','👄','🧠','🫀','👃','👂']},
-  {title:'食物',emojis:['🍔','🍟','🍕','🌭','🥪','🌮','🌯','🥙','🧆','🥚','🍳','🥘','🍲','🫕','🥣','🥗','🍿','🧈','🍱','🍘','🍙','🍚','🍛','🍜','🍝','🍠','🍢','🍣','🍤','🍥','🥮','🍡','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍩','🍪','🍯','🧇','🥞','🧀','🥐','🥖','🍞','☕','🧋','🍵','🥤','🧃','🍷','🍸','🍹','🍺','🥂','🍾','🧊','🍉','🍊','🍋','🍌','🍍','🥭','🍎','🍏','🍐','🍑','🍒','🍓','🫐','🥝','🍅','🥑','🌶️','🫑','🥦','🥬','🥒']}
-];
-var currentStkTab = 0;
 function toggleStickers() {
   var p = document.getElementById('stickerPanel');
   var isOpen = p.classList.contains('show');
   document.getElementById('attachMenu').classList.remove('show');
   p.classList.toggle('show');
-  if (!isOpen) switchStkTab(currentStkTab);
-}
-function switchStkTab(idx, tabEl) {
-  currentStkTab = idx;
-  var tabs = document.querySelectorAll('.stk-tab');
-  for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle('active', i === idx);
-  var ct = document.getElementById('stkContent');
-  if (idx === 0) {
-    var html = '<div class="sticker-grid">';
-    var keys = Object.keys(CRAB_STICKERS);
-    for (var i = 0; i < keys.length; i++) {
-      var k = keys[i], s = CRAB_STICKERS[k];
-      html += '<div class="sticker-cell" onclick="sendSticker(\''+k+'\')" title="'+s.name+'">'+s.svg+'</div>';
+  if (!isOpen) {
+    var ct = document.getElementById('stkContent');
+    if (!ct.children.length) {
+      var html = '<div class="gif-sticker-grid">';
+      for (var i = 0; i < CLAWD_GIFS.length; i++) {
+        var g = CLAWD_GIFS[i];
+        html += '<div class="gif-sticker-cell" onclick="sendGifSticker(\''+g.id+'\')" title="'+g.name+'"><img src="/static/clawd-'+g.id+'.gif" alt="'+g.name+'" loading="lazy"><div class="gif-sticker-label">'+g.name+'</div></div>';
+      }
+      html += '</div>';
+      ct.innerHTML = html;
     }
-    html += '</div>';
-    ct.innerHTML = html;
-  } else if (idx === 1) {
-    var html = '<div class="gif-sticker-grid">';
-    for (var i = 0; i < CLAWD_GIFS.length; i++) {
-      var g = CLAWD_GIFS[i];
-      html += '<div class="gif-sticker-cell" onclick="sendGifSticker(\''+g.id+'\')" title="'+g.name+'"><img src="/static/clawd-'+g.id+'.gif" alt="'+g.name+'" loading="lazy"></div>';
-    }
-    html += '</div>';
-    ct.innerHTML = html;
-  } else {
-    var cat = EMOJI_TABS[idx];
-    if (!cat) return;
-    var html = '<div class="emoji-grid">';
-    for (var j = 0; j < cat.emojis.length; j++) {
-      html += '<div class="emoji-cell" onclick="insertEmoji(\''+cat.emojis[j]+'\')">'+cat.emojis[j]+'</div>';
-    }
-    html += '</div>';
-    ct.innerHTML = html;
   }
-}
-function insertEmoji(em) {
-  var ta = document.querySelector('.input-field');
-  var start = ta.selectionStart || ta.value.length;
-  ta.value = ta.value.slice(0, start) + em + ta.value.slice(start);
-  ta.focus();
-  ta.selectionStart = ta.selectionEnd = start + em.length;
-}
-function sendSticker(name) {
-  document.getElementById('stickerPanel').classList.remove('show');
-  if (sending) return;
-  sending = true;
-  var stk = CRAB_STICKERS[name];
-  if (!stk) { sending = false; return; }
-  var content = '[sticker:'+name+']';
-  var userMsg = {role:'user', content: content, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
-  msgContainer.appendChild(renderMessage(userMsg, -1));
-  scrollBottom();
-  fetch('/chat/send', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({message: content})
-  }).then(function(r){return r.json()}).then(function(data) {
-    sending = false;
-    if (data.ok && data.reply) {
-      pollKnown += 2;
-      lastRenderedTime = data.time;
-      var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl};
-      var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
-      if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
-      msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
-      msgContainer.appendChild(replyEl);
-      scrollBottom();
-      petMood(detectMood(data.reply));
-    } else { pollKnown++; }
-  }).catch(function(){ sending = false; });
 }
 function sendGifSticker(id) {
   document.getElementById('stickerPanel').classList.remove('show');
@@ -1504,11 +1412,6 @@ function sendGifSticker(id) {
       petMood(detectMood(data.reply));
     } else { pollKnown++; }
   }).catch(function(){ sending = false; });
-}
-function renderStickerSvg(name) {
-  var stk = CRAB_STICKERS[name];
-  if (!stk) return '<div class="msg-bubble">[表情]</div>';
-  return '<div class="msg-sticker" title="'+stk.name+'">'+stk.svg+'</div>';
 }
 function sendMessage() {
   var text = inputField.value.trim();
