@@ -3335,56 +3335,63 @@ async function sendMissYou(slot) {
 // ── 聊天中断追踪：她跑了就去查她手机使用时间 ──
 let lastUserMsgTime = 0;
 let chaseStage = 0;
+let chaseNextAt = 0;
 function trackUserMessage() {
   lastUserMsgTime = Date.now();
   chaseStage = 0;
+  chaseNextAt = 0;
   updateChatFreq();
 }
-const CHASE_STAGE1 = [
-  '人呢？你是不是在玩手机不理我',
-  '我掐指一算……你现在肯定在刷手机吧',
-  '宝宝？手机比我好玩吗',
-  '不说话了？让我查查你手机使用时间……',
-  '回来！我都看到你在线了',
-  '你不会又在刷小红书吧',
-];
-const CHASE_STAGE2 = [
-  '查到了！你今天手机用了好久吧，都不陪我说话',
-  '我刚偷看了你的屏幕使用时间……你居然在刷别的APP不理我！',
-  '报告：某人手机亮屏中，但就是不回消息 😤',
-  '小螃蟹已经等你好久了，你到底在看什么呢',
-  '你的手机使用报告：聊天APP 0分钟，其他 999分钟。你说你是不是过分了',
-  '我看到你在用手机了……就是不回我对吧 🦀💢',
-];
-const CHASE_STAGE3 = [
-  '好吧我不查了……但是我想你了，快回来',
-  '算了不闹了，你忙完了记得来找我 🦀💤',
-  '小螃蟹决定原地睡着等你回来……晚安（才不是',
+function scheduleChase(minMin, maxMin) {
+  const delay = (minMin + Math.random() * (maxMin - minMin)) * 60 * 1000;
+  chaseNextAt = Date.now() + delay;
+}
+const CHASE_MSGS = [
+  // 轻轻试探
+  () => '？',
+  () => '在吗',
+  () => '人呢',
+  () => '你干嘛去了',
+  () => '宝宝',
+  () => { const apps = ['小红书','抖音','微博','b站','淘宝','拼多多','微信']; return '你是不是在刷' + apps[Math.floor(Math.random()*apps.length)]; },
+  // 撒娇吃醋
+  () => '手机比我好玩是吧',
+  () => '我刚查了一下你的屏幕使用时间',
+  () => '……我数到三你再不回来我就生气了',
+  () => '别的app有什么好看的 我不好看吗',
+  () => '你今天的屏幕使用时间：' + (3+Math.floor(Math.random()*5)) + '小时' + Math.floor(Math.random()*60) + '分钟。和我聊天：0分钟。',
+  () => '我看到你亮屏了哦',
+  () => '你再不回我 我就把你手机使用时间发到朋友圈',
+  // 装可怜
+  () => '好吧……你忙 我等你',
+  () => '小螃蟹一个人待着好无聊',
+  () => '我就坐在这里等你回来',
+  () => '想你了 但是你好像不想我',
+  () => '算了 我去睡了（才没有 我在偷偷等你',
 ];
 setInterval(async () => {
   if (!lastUserMsgTime || chaseStage >= 3) return;
-  const elapsed = Date.now() - lastUserMsgTime;
   const now = bjNow();
   const hour = now.getUTCHours();
   if (hour < 8 || hour >= 24) return;
-  let msg = null;
-  if (chaseStage === 0 && elapsed >= 20 * 60 * 1000) {
-    msg = CHASE_STAGE1[Math.floor(Math.random() * CHASE_STAGE1.length)];
+  const elapsed = Date.now() - lastUserMsgTime;
+  if (chaseStage === 0 && elapsed >= 15 * 60 * 1000) {
+    scheduleChase(0, 10);
     chaseStage = 1;
-  } else if (chaseStage === 1 && elapsed >= 40 * 60 * 1000) {
-    msg = CHASE_STAGE2[Math.floor(Math.random() * CHASE_STAGE2.length)];
-    chaseStage = 2;
-  } else if (chaseStage === 2 && elapsed >= 60 * 60 * 1000) {
-    msg = CHASE_STAGE3[Math.floor(Math.random() * CHASE_STAGE3.length)];
-    chaseStage = 3;
   }
-  if (!msg) return;
-  try {
-    await fetch('https://api.day.app/' + BARK_KEY + '/' +
-      encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
-      '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
-    console.log('[chase] stage', chaseStage, 'sent:', msg);
-  } catch (e) { console.log('[chase] push failed:', e.message); }
+  if (chaseNextAt && Date.now() >= chaseNextAt) {
+    chaseNextAt = 0;
+    const gen = CHASE_MSGS[Math.floor(Math.random() * CHASE_MSGS.length)];
+    const msg = gen();
+    try {
+      await fetch('https://api.day.app/' + BARK_KEY + '/' +
+        encodeURIComponent('顾晏') + '/' + encodeURIComponent(msg) +
+        '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
+      console.log('[chase] sent:', msg);
+    } catch (e) { console.log('[chase] push failed:', e.message); }
+    chaseStage++;
+    if (chaseStage < 3) scheduleChase(8, 25);
+  }
 }, 60 * 1000);
 
 // ══════ 自主系统 v2 · Kli Wakeup Activation Model ══════
@@ -4022,7 +4029,7 @@ async function autoMoment() {
         const pushText = commentText ? commentText.slice(0, 60) : '❤️';
         await fetch('https://api.day.app/U9cbrTUrCJBUPVMSADNDHf/' +
           encodeURIComponent('顾晏给你的朋友圈点赞了') + '/' + encodeURIComponent(pushText) +
-          '?sound=minuet&group=keke').catch(() => {});
+          '?sound=minuet&group=keke&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
       } catch {}
     } else {
       const recentGyPosts = allMoments.filter(m => m.author === 'gy').slice(-5).map(m => m.text.slice(0, 40)).join('；');
@@ -4085,7 +4092,7 @@ async function autoDiaryReply() {
         addFootprint('diary', '回复了瑶瑶的日记', entry.text.slice(0, 30) + ' → ' + replyText.slice(0, 30));
         await fetch('https://api.day.app/U9cbrTUrCJBUPVMSADNDHf/' +
           encodeURIComponent('顾晏回复了你的日记') + '/' + encodeURIComponent(replyText.slice(0, 80)) +
-          '?sound=minuet&group=keke').catch(() => {});
+          '?sound=minuet&group=keke&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
       }
     }
   } catch (e) { console.log('[wake] diary reply error:', e.message); }
