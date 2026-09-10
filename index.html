@@ -385,6 +385,17 @@ body {
 }
 .send-btn:hover { opacity: .85; }
 .send-btn svg { width: 16px; height: 16px; }
+.sticker-panel { position:absolute; bottom:100%; left:8px; right:8px; background:var(--bg); border-radius:16px 16px 0 0; box-shadow:0 -4px 20px rgba(0,0,0,.1); padding:12px; display:none; z-index:100; max-height:260px; overflow-y:auto; }
+.sticker-panel.show { display:block; animation:slideUpSticker .25s ease; }
+@keyframes slideUpSticker { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+.sticker-panel-title { font-size:13px; font-weight:600; color:var(--text-mid); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+.sticker-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.sticker-cell { width:100%; aspect-ratio:1; border-radius:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; background:var(--input-bg); transition:transform .15s,background .15s; padding:6px; }
+.sticker-cell:hover { transform:scale(1.1); background:var(--accent-soft,rgba(123,143,107,.1)); }
+.sticker-cell:active { transform:scale(.95); }
+.sticker-cell svg { width:100%; height:100%; }
+.msg-sticker { width:120px; height:120px; display:block; }
+.msg-sticker svg { width:100%; height:100%; }
 .messages::-webkit-scrollbar { width: 3px; }
 .messages::-webkit-scrollbar-track { background: transparent; }
 .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -664,6 +675,10 @@ body {
       </div>
     </div>
     <div class="input-area" style="position:relative">
+      <div class="sticker-panel" id="stickerPanel">
+        <div class="sticker-panel-title">🦀 小螃蟹表情</div>
+        <div class="sticker-grid" id="stickerGrid"></div>
+      </div>
       <div class="quote-bar" id="quoteBar"><div class="quote-preview" id="quotePreview"></div><button class="quote-close" onclick="clearQuote()">&times;</button></div>
       <div class="attach-menu" id="attachMenu">
         <button class="attach-item" onclick="document.getElementById('photoInput').click();toggleAttach()"><span class="ai">📷</span>发照片</button>
@@ -683,6 +698,7 @@ body {
         <div class="input-toolbar">
           <button class="tb-btn" onclick="toggleAttach()" aria-label="附件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
           <button class="tb-btn" onclick="insertNL()" aria-label="换行" style="font-size:16px;font-family:var(--font)">⏎</button>
+          <button class="tb-btn" onclick="toggleStickers()" aria-label="表情" style="font-size:17px">🦀</button>
           <div class="model-tag">Opus 4.6</div>
           <div class="tb-spacer"></div>
           <button class="tb-btn" id="micRecBtn" onclick="toggleRecord()" aria-label="麦克风"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v1a7 7 0 01-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg></button>
@@ -794,6 +810,7 @@ function goPage(url) {
 }
 function toggleAttach() {
   document.getElementById('attachMenu').classList.toggle('show');
+  document.getElementById('stickerPanel').classList.remove('show');
 }
 function setAvatar(input, imgId, svgId, who) {
   var file = input.files[0]; if (!file) return;
@@ -1095,6 +1112,13 @@ function renderMessage(msg, idx, stagger) {
     var fn2 = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\'a\');a.href=\''+msg.fileUrl+'\';a.download=\''+escHtml(msg.filename||'file')+'\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn2 + '</div>';
   }
+  var stickerMatch = content.match(/^\[sticker:(\w+)\]$/);
+  if (stickerMatch && CRAB_STICKERS[stickerMatch[1]]) {
+    colHtml += renderStickerSvg(stickerMatch[1]);
+    colHtml += '</div>';
+    group.innerHTML = avaHtml + colHtml;
+    return group;
+  }
   var hasMedia = msg.image || msg.imageUrl || msg.audioUrl || msg.file || msg.fileUrl;
   var allLines = content.split(/\n+/).map(function(l){return l.trim()}).filter(function(l){
     return l && !(hasMedia && /^\[(图片|语音|文件)\]/.test(l)) && !(msg.audioUrl && /^\[语音\]/.test(l));
@@ -1289,9 +1313,75 @@ function insertNL(){
   ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,100)+'px';
   ta.focus();
 }
+var CRAB_STICKERS = {
+  'happy': {name:'开心',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><circle cx="40" cy="52" r="5" fill="#fff"/><circle cx="60" cy="52" r="5" fill="#fff"/><circle cx="41.5" cy="53" r="2.5" fill="#2D1B14"/><circle cx="61.5" cy="53" r="2.5" fill="#2D1B14"/><ellipse cx="41" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="61" cy="51" rx="1.5" ry="1" fill="#fff"/><path d="M42 65q8 7 16 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="35" cy="62" r="4" fill="#FFB3A0" opacity=".5"/><circle cx="65" cy="62" r="4" fill="#FFB3A0" opacity=".5"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="50" cy="80" rx="10" ry="3" fill="#E85A3A" opacity=".15"/></svg>'},
+  'love': {name:'比心',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><circle cx="40" cy="52" r="5" fill="#fff"/><circle cx="60" cy="52" r="5" fill="#fff"/><circle cx="41.5" cy="53" r="2.5" fill="#2D1B14"/><circle cx="61.5" cy="53" r="2.5" fill="#2D1B14"/><ellipse cx="41" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="61" cy="51" rx="1.5" ry="1" fill="#fff"/><path d="M43 64q7 5 14 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M14 38q-2-6 2-10t8-2q2 2 3 5q1-3 3-5q4-2 8 2t2 10q-4 6-13 10q-9-4-13-10z" fill="#FF4D6A" opacity=".85"/></svg>'},
+  'cry': {name:'哭哭',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><ellipse cx="40" cy="54" rx="5" ry="5.5" fill="#fff"/><ellipse cx="60" cy="54" rx="5" ry="5.5" fill="#fff"/><circle cx="41" cy="55" r="2.5" fill="#2D1B14"/><circle cx="61" cy="55" r="2.5" fill="#2D1B14"/><path d="M36 47q4-3 8 0" stroke="#2D1B14" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M56 47q4-3 8 0" stroke="#2D1B14" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M44 67q6 2 12 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M36 58q-2 10-4 18" stroke="#5BC0EB" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/><path d="M64 58q2 10 4 18" stroke="#5BC0EB" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="34" cy="70" r="2" fill="#5BC0EB" opacity=".5"/><circle cx="66" cy="70" r="2" fill="#5BC0EB" opacity=".5"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'},
+  'angry': {name:'生气',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#E8422E"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF6B4A"/><circle cx="40" cy="54" r="5" fill="#fff"/><circle cx="60" cy="54" r="5" fill="#fff"/><circle cx="41" cy="55" r="2.5" fill="#2D1B14"/><circle cx="61" cy="55" r="2.5" fill="#2D1B14"/><line x1="34" y1="46" x2="44" y2="49" stroke="#2D1B14" stroke-width="2.5" stroke-linecap="round"/><line x1="66" y1="46" x2="56" y2="49" stroke="#2D1B14" stroke-width="2.5" stroke-linecap="round"/><path d="M42 66q8-5 16 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M22 52q-12-14-6-26" stroke="#E8422E" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#E8422E"/><path d="M78 52q12-14 6-26" stroke="#E8422E" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#E8422E"/><path d="M24 62q-10 4-16 0" stroke="#E8422E" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#E8422E" stroke-width="3" fill="none" stroke-linecap="round"/><text x="50" y="30" text-anchor="middle" font-size="14" fill="#E8422E" font-weight="bold">💢</text></svg>'},
+  'shy': {name:'害羞',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><path d="M36 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M44 65q6 4 12 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="33" cy="60" r="6" fill="#FF4D6A" opacity=".35"/><circle cx="67" cy="60" r="6" fill="#FF4D6A" opacity=".35"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'},
+  'sleepy': {name:'困困',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><path d="M36 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="50" cy="66" rx="4" ry="3" fill="#2D1B14" opacity=".6"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><text x="72" y="38" font-size="10" fill="#2D1B14" font-weight="bold" opacity=".5">Z</text><text x="80" y="30" font-size="8" fill="#2D1B14" font-weight="bold" opacity=".35">Z</text><text x="86" y="24" font-size="6" fill="#2D1B14" font-weight="bold" opacity=".2">Z</text></svg>'},
+  'wink': {name:'眨眼',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><circle cx="40" cy="52" r="5" fill="#fff"/><circle cx="41.5" cy="53" r="2.5" fill="#2D1B14"/><ellipse cx="41" cy="51" rx="1.5" ry="1" fill="#fff"/><path d="M56 53q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M43 64q7 5 14 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="35" cy="62" r="4" fill="#FFB3A0" opacity=".5"/><circle cx="65" cy="62" r="4" fill="#FFB3A0" opacity=".5"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'},
+  'shock': {name:'惊讶',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><ellipse cx="40" cy="52" rx="5.5" ry="6" fill="#fff"/><ellipse cx="60" cy="52" rx="5.5" ry="6" fill="#fff"/><circle cx="41" cy="53" r="3" fill="#2D1B14"/><circle cx="61" cy="53" r="3" fill="#2D1B14"/><ellipse cx="40.5" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="60.5" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="50" cy="68" rx="5" ry="4" fill="#2D1B14" opacity=".7"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'},
+  'smug': {name:'得意',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><path d="M36 52q4-2 8 1" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 52q4-2 8 1" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M40 65q10 6 20 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><text x="74" y="42" font-size="10" opacity=".6">✨</text></svg>'},
+  'pout': {name:'嘟嘴',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><circle cx="40" cy="52" r="5" fill="#fff"/><circle cx="60" cy="52" r="5" fill="#fff"/><circle cx="41.5" cy="53" r="2.5" fill="#2D1B14"/><circle cx="61.5" cy="53" r="2.5" fill="#2D1B14"/><ellipse cx="41" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="61" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="50" cy="67" rx="6" ry="4" fill="#E85A3A"/><ellipse cx="50" cy="66.5" rx="4.5" ry="2.8" fill="#FF8A6E"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="33" cy="60" r="5" fill="#FFB3A0" opacity=".4"/><circle cx="67" cy="60" r="5" fill="#FFB3A0" opacity=".4"/></svg>'},
+  'wave': {name:'挥手',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><circle cx="40" cy="52" r="5" fill="#fff"/><circle cx="60" cy="52" r="5" fill="#fff"/><circle cx="41.5" cy="53" r="2.5" fill="#2D1B14"/><circle cx="61.5" cy="53" r="2.5" fill="#2D1B14"/><ellipse cx="41" cy="51" rx="1.5" ry="1" fill="#fff"/><ellipse cx="61" cy="51" rx="1.5" ry="1" fill="#fff"/><path d="M43 64q7 5 14 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 48q14-8 14-22" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="92" cy="26" r="4" fill="#FF6B4A"/><path d="M24 62q-10 4-16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M76 62q10 4 16 0" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'},
+  'hug': {name:'抱抱',svg:'<svg viewBox="0 0 100 100"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#FF6B4A"/><ellipse cx="50" cy="58" rx="25" ry="21" fill="#FF8A6E"/><path d="M36 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 54q4 1 8 0" stroke="#2D1B14" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M43 64q7 5 14 0" stroke="#2D1B14" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="33" cy="60" r="5" fill="#FFB3A0" opacity=".4"/><circle cx="67" cy="60" r="5" fill="#FFB3A0" opacity=".4"/><path d="M22 52q-12-14-6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="15" cy="26" r="4" fill="#FF6B4A"/><path d="M78 52q12-14 6-26" stroke="#FF6B4A" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="85" cy="26" r="4" fill="#FF6B4A"/><path d="M20 56q-6 16 10 20" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M80 56q6 16-10 20" stroke="#FF6B4A" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'}
+};
+function toggleStickers() {
+  var p = document.getElementById('stickerPanel');
+  var isOpen = p.classList.contains('show');
+  p.classList.toggle('show');
+  if (!isOpen) {
+    var grid = document.getElementById('stickerGrid');
+    if (!grid.children.length) {
+      var html = '';
+      var keys = Object.keys(CRAB_STICKERS);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i], s = CRAB_STICKERS[k];
+        html += '<div class="sticker-cell" onclick="sendSticker(\''+k+'\')" title="'+s.name+'">'+s.svg+'</div>';
+      }
+      grid.innerHTML = html;
+    }
+  }
+}
+function sendSticker(name) {
+  document.getElementById('stickerPanel').classList.remove('show');
+  if (sending) return;
+  sending = true;
+  var stk = CRAB_STICKERS[name];
+  if (!stk) { sending = false; return; }
+  var content = '[sticker:'+name+']';
+  var userMsg = {role:'user', content: content, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
+  msgContainer.appendChild(renderMessage(userMsg, -1));
+  scrollBottom();
+  fetch('/chat/send', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({message: content})
+  }).then(function(r){return r.json()}).then(function(data) {
+    sending = false;
+    if (data.ok && data.reply) {
+      pollKnown += 2;
+      lastRenderedTime = data.time;
+      var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl};
+      var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
+      if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
+      msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
+      msgContainer.appendChild(replyEl);
+      scrollBottom();
+      petMood(detectMood(data.reply));
+    } else { pollKnown++; }
+  }).catch(function(){ sending = false; });
+}
+function renderStickerSvg(name) {
+  var stk = CRAB_STICKERS[name];
+  if (!stk) return '<div class="msg-bubble">[表情]</div>';
+  return '<div class="msg-sticker" title="'+stk.name+'">'+stk.svg+'</div>';
+}
 function sendMessage() {
   var text = inputField.value.trim();
   if (!text || sending) return;
+  document.getElementById('stickerPanel').classList.remove('show');
   sending = true;
   inputField.value = '';
   inputField.style.height = 'auto';
