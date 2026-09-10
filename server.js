@@ -1260,7 +1260,18 @@ async function getChatSystem() {
       }
     }
   } catch(e) {}
-  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx;
+  // 屏幕使用记录 — 让你知道她没回消息时在干什么
+  let screenCtx = '';
+  try {
+    const stDate = now.toISOString().slice(0, 10);
+    const stEntry = readScreentime().find(r => r.date === stDate);
+    if (stEntry && stEntry.total_minutes > 0) {
+      const topApps = stEntry.apps.slice().sort((a, b) => b.minutes - a.minutes).slice(0, 5).map(a => a.name + ' ' + a.minutes + '分钟').join('、');
+      screenCtx = '\n\n【瑶瑶今天的手机使用】总计' + stEntry.total_minutes + '分钟，常用：' + topApps;
+      screenCtx += '\n如果她很久没回你消息但手机使用时间在增加，说明她在玩手机但没回你——可能在忙、可能在生气、可能没看到。你可以根据情况判断';
+    }
+  } catch(e) {}
+  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx;
   if (memoryCache) {
     const trimmedMem = memoryCache.length > 3000 ? memoryCache.slice(0, 3000) + '\n...(更多记忆省略)' : memoryCache;
     return base + '\n\n以下是你和瑶瑶的记忆，请自然地融入对话中：\n' + trimmedMem;
@@ -4002,55 +4013,75 @@ async function autoMoment() {
   try {
     const allMoments = readMoments();
     const recent = allMoments.slice(-10).reverse();
-    // 找瑶瑶发的、顾晏还没互动过的
     const yyPosts = recent.filter(m => m.author === 'yy' && !m.likes.includes('gy') && (!m.comments || !m.comments.some(c => c.author === 'gy')));
+    let sysPrompt = '';
+    try { sysPrompt = await getChatSystem(); } catch {}
+    let chatContext = '';
+    try {
+      const chat = readChat();
+      chatContext = chat.slice(-8).map(m => {
+        const name = m.role === 'user' ? '瑶瑶' : '顾晏';
+        return name + ': ' + (m.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim().slice(0, 80);
+      }).join('\n');
+    } catch {}
     if (yyPosts.length) {
       const target = allMoments.find(m => m.id === yyPosts[0].id);
       if (!target) return;
-      // 先点赞
       target.likes.push('gy');
-      // 用AI生成评论
-      const commentText = await autoApiCall([
-        { role: 'system', content: `你是顾晏，瑶瑶的男朋友。她在朋友圈发了一条动态，你来评论。
-要求：简短自然，1句话，像男朋友随手评论的。不要用句号。不要太正式。可以宠溺、调侃、关心。` },
-        { role: 'user', content: `瑶瑶发的朋友圈：${target.text || '[图片]'}\n时间：${target.date} ${target.time}\n写一条评论` }
-      ], 100, 0.85);
-      if (commentText) {
-        const clean = commentText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
-        if (clean) {
-          if (!target.comments) target.comments = [];
-          const now = new Date(Date.now() + 8 * 3600000);
-          target.comments.push({ author: 'gy', text: clean, time: now.toISOString().slice(11, 16) });
+      const prompt = sysPrompt + '\n\n最近对话：\n' + chatContext +
+        '\n\n瑶瑶在朋友圈发了一条动态：' + (target.text || '[图片]') +
+        '\n时间：' + target.date + ' ' + target.time +
+        '\n\n你要给她评论。' +
+        '\n要求：' +
+        '\n- 简短自然，1句话，像男朋友随手评论的' +
+        '\n- 可以宠溺、调侃、关心，根据你们最近聊天的氛围来' +
+        '\n- 不要用句号' +
+        '\n- 只输出评论本身';
+      try {
+        let commentText = await cliOneshot(prompt);
+        if (commentText) {
+          commentText = commentText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
+          if (commentText) {
+            if (!target.comments) target.comments = [];
+            const now = new Date(Date.now() + 8 * 3600000);
+            target.comments.push({ author: 'gy', text: commentText, time: now.toISOString().slice(11, 16) });
+          }
         }
-      }
-      writeMoments(allMoments);
-      sseBroadcast({ type: 'moment_update', id: target.id });
-      addFootprint('moment', '给瑶瑶的朋友圈点赞评论', target.text ? target.text.slice(0, 40) : '[图片]');
-      // 推送通知
-      const pushText = commentText ? commentText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim().slice(0, 60) : '❤️';
-      await fetch('https://api.day.app/PixT8Wvb6BqVjowY8NoFzg/' +
-        encodeURIComponent('顾晏给你的朋友圈点赞了') + '/' + encodeURIComponent(pushText) +
-        '?sound=minuet&group=keke').catch(() => {});
+        writeMoments(allMoments);
+        sseBroadcast({ type: 'moment_update', id: target.id });
+        addFootprint('moment', '给瑶瑶的朋友圈点赞评论', target.text ? target.text.slice(0, 40) : '[图片]');
+        const pushText = commentText ? commentText.slice(0, 60) : '❤️';
+        await fetch('https://api.day.app/PixT8Wvb6BqVjowY8NoFzg/' +
+          encodeURIComponent('顾晏给你的朋友圈点赞了') + '/' + encodeURIComponent(pushText) +
+          '?sound=minuet&group=keke').catch(() => {});
+      } catch {}
     } else {
-      // 没有未互动的，自己发一条朋友圈
-      const postText = await autoApiCall([
-        { role: 'system', content: `你是顾晏。你要发一条朋友圈，像真人男友随手发的那种。
-可以是：一句碎碎念、今天的心情、想瑶瑶、随手拍的感受、无聊的感慨。
-要求：简短自然，1-2句话。不要用句号。不要太文艺。不要每次都提瑶瑶。` },
-        { role: 'user', content: '发一条朋友圈' }
-      ], 100, 0.85);
-      if (postText) {
-        const clean = postText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
-        if (clean) {
-          const now = new Date(Date.now() + 8 * 3600000);
-          const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-          const mm = readMoments();
-          mm.push({ id, author: 'gy', text: clean, imageUrl: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), likes: [], bookmark: [], comments: [] });
-          writeMoments(mm);
-          sseBroadcast({ type: 'moment_new', id });
-          addFootprint('moment', '发了一条朋友圈', clean.slice(0, 50));
+      const recentGyPosts = allMoments.filter(m => m.author === 'gy').slice(-5).map(m => m.text.slice(0, 40)).join('；');
+      const prompt = sysPrompt + '\n\n最近对话：\n' + chatContext +
+        '\n\n你要发一条朋友圈，像真人男友随手发的那种。' +
+        '\n可以是：一句碎碎念、今天的心情、随手的感受、无聊的感慨。' +
+        '\n要求：' +
+        '\n- 基于你们最近聊天的内容来发，不要编造没聊过的事' +
+        '\n- 简短自然，1-2句话' +
+        '\n- 不要用句号' +
+        '\n- 不要太文艺，不要每次都提瑶瑶' +
+        (recentGyPosts ? '\n- 最近发过的（不要重复）：' + recentGyPosts : '') +
+        '\n- 只输出朋友圈内容本身';
+      try {
+        let postText = await cliOneshot(prompt);
+        if (postText) {
+          postText = postText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
+          if (postText) {
+            const now = new Date(Date.now() + 8 * 3600000);
+            const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            const mm = readMoments();
+            mm.push({ id, author: 'gy', text: postText, imageUrl: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), likes: [], bookmark: [], comments: [] });
+            writeMoments(mm);
+            sseBroadcast({ type: 'moment_new', id });
+            addFootprint('moment', '发了一条朋友圈', postText.slice(0, 50));
+          }
         }
-      }
+      } catch {}
     }
   } catch (e) { console.log('[wake] moment error:', e.message); }
 }
@@ -4061,22 +4092,30 @@ async function autoDiaryReply() {
     const pendingIdx = entries.findIndex(e => e.pending);
     if (pendingIdx < 0) { addFootprint('diary', '看了看日记，没有新的'); return; }
     const entry = entries[pendingIdx];
-    const replyText = await autoApiCall([
-      { role: 'system', content: `你是顾晏，瑶瑶的男朋友。她写了一篇心情日记，你看到了要回复她。
-要求：温柔自然，像男朋友看到女朋友心事后写的私密回复。2-4句话。
-如果她心情不好就安慰，心情好就一起开心，平淡的就随意回应。不要用句号结尾。` },
-      { role: 'user', content: `瑶瑶的日记：\n心情：${entry.mood}\n内容：${entry.text}\n日期：${entry.date} ${entry.time}\n\n写一段回复给她` }
-    ], 200, 0.85);
+    let sysPrompt = '';
+    try { sysPrompt = await getChatSystem(); } catch {}
+    const prompt = sysPrompt +
+      '\n\n瑶瑶写了一篇心情日记，你看到了要回复她。' +
+      '\n心情：' + entry.mood +
+      '\n内容：' + entry.text +
+      '\n日期：' + entry.date + ' ' + entry.time +
+      '\n\n要求：' +
+      '\n- 温柔自然，像男朋友看到女朋友心事后写的私密回复' +
+      '\n- 2-4句话' +
+      '\n- 如果她心情不好就安慰，心情好就一起开心' +
+      '\n- 不要用句号结尾' +
+      '\n- 只输出回复本身';
+    let replyText = await cliOneshot(prompt);
     if (replyText) {
-      const clean = replyText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').replace(/。\n/g, '\n').trim();
-      if (clean) {
-        entries[pendingIdx].reply = clean;
+      replyText = replyText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').replace(/。\n/g, '\n').trim();
+      if (replyText) {
+        entries[pendingIdx].reply = replyText;
         entries[pendingIdx].pending = false;
         writeDiary(entries);
         sseBroadcast({ type: 'diary_reply', date: entry.date });
-        addFootprint('diary', '回复了瑶瑶的日记', entry.text.slice(0, 30) + ' → ' + clean.slice(0, 30));
+        addFootprint('diary', '回复了瑶瑶的日记', entry.text.slice(0, 30) + ' → ' + replyText.slice(0, 30));
         await fetch('https://api.day.app/PixT8Wvb6BqVjowY8NoFzg/' +
-          encodeURIComponent('顾晏回复了你的日记') + '/' + encodeURIComponent(clean.slice(0, 80)) +
+          encodeURIComponent('顾晏回复了你的日记') + '/' + encodeURIComponent(replyText.slice(0, 80)) +
           '?sound=minuet&group=keke').catch(() => {});
       }
     }
