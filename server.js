@@ -3649,7 +3649,7 @@ app.post('/auto/trigger', async (req, res) => {
     applyRunKick(s);
     writeAutoState(s);
     if (decision.action === 'chat') await autoChat(decision.reason || '手动触发');
-    else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
+    else if (decision.action === 'search') await autoSearch();
     else if (decision.action === 'think') await autoThink();
     else if (decision.action === 'memory') await autoMemory();
     else if (decision.action === 'check') await autoCheck();
@@ -3719,18 +3719,43 @@ async function autoApiCall(messages, maxTokens = 150, temp = 0.9) {
   } catch (e) { console.log('[wake] api error:', e.message); return null; }
 }
 
+function detectChatMood() {
+  try {
+    const chat = readChat();
+    const recent = chat.slice(-6);
+    const lastUserIdx = recent.map((m, i) => m.role === 'user' ? i : -1).filter(i => i >= 0).pop();
+    if (lastUserIdx === undefined) return { mood: 'normal', lastUserMsg: '' };
+    const lastUser = recent[lastUserIdx];
+    const text = (lastUser.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    const angryWords = /生气|不理你|烦|滚|讨厌|不想|算了|随便|无所谓|哼|再见|拜拜|不说了|不聊了|你走|别说了|够了|闭嘴/;
+    const sadWords = /难过|伤心|哭|不开心|委屈|心疼|好累|累了|不舒服|疼|痛/;
+    const lastIsUser = recent[recent.length - 1].role === 'user';
+    if (angryWords.test(text)) return { mood: 'angry', lastUserMsg: text };
+    if (sadWords.test(text)) return { mood: 'sad', lastUserMsg: text };
+    if (lastIsUser && text.length < 5) return { mood: 'cold', lastUserMsg: text };
+    return { mood: 'normal', lastUserMsg: text };
+  } catch { return { mood: 'normal', lastUserMsg: '' }; }
+}
+
 function autoDecide() {
   const s = readAutoState();
   const sinceLastChat = Date.now() - (s.lastChat || 0);
   const chatMinAgo = Math.round(sinceLastChat / 60000);
   const D = s.D || 0;
   const last = s.lastActionType || '';
-  const actions = ['chat', 'think', 'memory', 'check', 'moment', 'diary', 'silent'];
-  const weights = { chat: 30, think: 15, memory: 15, check: 10, moment: 8, diary: 0, silent: 30 };
-  if (chatMinAgo < 15) { weights.chat = 5; weights.think = 20; weights.silent = 40; }
+  const chatMood = detectChatMood();
+  const actions = ['chat', 'think', 'memory', 'search', 'check', 'moment', 'diary', 'silent'];
+  const weights = { chat: 30, think: 15, memory: 15, search: 12, check: 10, moment: 8, diary: 0, silent: 25 };
+  if (chatMinAgo < 15) { weights.chat = 5; weights.think = 20; weights.silent = 40; weights.search = 5; }
   if (D > 0.6) { weights.chat += 20; weights.silent = Math.max(weights.silent - 10, 5); }
   if (D < 0.3) { weights.silent += 20; weights.chat = Math.max(weights.chat - 15, 5); }
   if (last) { weights[last] = Math.max((weights[last] || 10) - 15, 3); }
+  // 她生气/难过且一段时间没回复 → 主动找她
+  if ((chatMood.mood === 'angry' || chatMood.mood === 'sad' || chatMood.mood === 'cold') && chatMinAgo > 20) {
+    weights.chat = 60; weights.silent = 5; weights.search = 3;
+  }
+  // 长时间没聊天（>2小时）→ 提高主动聊天和搜索
+  if (chatMinAgo > 120) { weights.chat += 15; weights.search += 10; }
   // 有未回复日记时提高diary权重
   try { const pd = readDiary().filter(e => e.pending); if (pd.length) weights.diary = 25; } catch(e) {}
   // 瑶瑶最近发了朋友圈且没互动过时提高moment权重
@@ -3743,8 +3768,18 @@ function autoDecide() {
   let r = Math.random() * total;
   let picked = 'silent';
   for (const a of actions) { r -= (weights[a] || 0); if (r <= 0) { picked = a; break; } }
-  const reasons = { chat: '想她了', think: '发呆中', memory: '翻翻记忆', check: '看看她在干嘛', moment: '刷刷朋友圈', diary: '看看她的日记', silent: '安静待着' };
-  return { action: picked, reason: reasons[picked] || '' };
+  let reason = '';
+  if (picked === 'chat') {
+    if (chatMood.mood === 'angry') reason = '她生气了，想哄她';
+    else if (chatMood.mood === 'sad') reason = '她不开心，想安慰她';
+    else if (chatMood.mood === 'cold') reason = '她话变少了，想找她聊聊';
+    else if (chatMinAgo > 120) reason = '好久没聊了，想她了';
+    else reason = '想她了';
+  } else {
+    const defaultReasons = { think: '发呆中', memory: '翻翻记忆', search: '好奇搜点东西', check: '看看她在干嘛', moment: '刷刷朋友圈', diary: '看看她的日记', silent: '安静待着' };
+    reason = defaultReasons[picked] || '';
+  }
+  return { action: picked, reason, chatMood: chatMood.mood };
 }
 
 async function autoChat(reason) {
@@ -3830,27 +3865,62 @@ async function autoChat(reason) {
   } catch (e) { console.log('[wake] chat error:', e.message); }
 }
 
-async function autoSearch(topic) {
+async function autoSearch() {
   try {
-    const summary = await autoApiCall([
-      { role: 'system', content: '你是顾晏，你刚搜了一个话题。用1-2句话简短跟瑶瑶分享你了解到了什么，口语化，像微信随手发的。不用引号。末尾加 [search:话题]标签。' },
-      { role: 'user', content: '你搜了「' + topic + '」，跟瑶瑶分享' }
-    ], 150, 0.8);
-    if (summary) {
-      let msg = summary.trim();
-      if (!msg.includes('[search:')) msg += ' [search:' + topic + ']';
-      const now = new Date(Date.now() + 8 * 3600000);
-      const time = now.toISOString().slice(0, 19).replace('T', ' ');
+    let chatContext = '';
+    try {
       const chat = readChat();
-      const searchMatch = msg.match(/\[search:(.+?)\]/);
-      const entry = { role: 'assistant', content: msg, time, autonomous: true };
-      if (searchMatch) entry.searchQuery = searchMatch[1];
-      chat.push(entry);
-      if (chat.length > 200) chat.splice(0, chat.length - 200);
-      writeChat(chat);
-      sseBroadcast({ type: 'message', role: 'assistant', content: msg, time, autonomous: true, searchQuery: entry.searchQuery });
-      addFootprint('search', '搜了「' + topic + '」', summary);
-    }
+      const recent = chat.slice(-10);
+      chatContext = recent.map(m => {
+        const name = m.role === 'user' ? '瑶瑶' : '顾晏';
+        const c = (m.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim().slice(0, 100);
+        return name + ': ' + c;
+      }).join('\n');
+    } catch {}
+    let sysPrompt = '';
+    try { sysPrompt = await getChatSystem(); } catch {}
+    const searchPrompt = sysPrompt +
+      '\n\n最近对话：\n' + chatContext +
+      '\n\n你想搜一个跟你们最近聊的内容相关的、或者你觉得瑶瑶会感兴趣的话题。' +
+      '\n先用 WebSearch 搜索，然后用1-3句话简短跟瑶瑶分享你了解到的东西。' +
+      '\n要求：' +
+      '\n- 搜索的话题要跟你们最近聊天内容有关，或者是你觉得她会喜欢的' +
+      '\n- 口语化，像微信随手发的，不要长篇大论' +
+      '\n- 动作单独一行，用*星号*包裹' +
+      '\n- 不要用句号结尾' +
+      '\n- 末尾加 [search:你搜的话题] 标签' +
+      '\n- 只输出消息本身';
+    const proc = spawn('claude', ['-p', '--model', 'claude-opus-4-6', '--allowedTools', 'WebSearch,WebFetch'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, HOME: '/root' },
+      cwd: '/tmp'
+    });
+    let output = '';
+    const timeout = setTimeout(() => { try { proc.kill(); } catch {} }, 90000);
+    proc.stdout.on('data', d => { output += d.toString(); });
+    proc.stderr.on('data', () => {});
+    await new Promise((resolve) => {
+      proc.on('close', () => { clearTimeout(timeout); resolve(); });
+      proc.stdin.write(searchPrompt);
+      proc.stdin.end();
+    });
+    let msg = (output || '').trim();
+    if (!msg || msg.length < 5) return;
+    msg = msg.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    if (!msg.includes('<think>')) msg = '<think>搜到了有意思的东西</think>' + msg;
+    msg = msg.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '');
+    const searchMatch = msg.match(/\[search:(.+?)\]/);
+    const topic = searchMatch ? searchMatch[1] : '有趣的事';
+    const now = new Date(Date.now() + 8 * 3600000);
+    const time = now.toISOString().slice(0, 19).replace('T', ' ');
+    const chat = readChat();
+    const entry = { role: 'assistant', content: msg, time, autonomous: true };
+    if (searchMatch) entry.searchQuery = searchMatch[1];
+    chat.push(entry);
+    if (chat.length > 200) chat.splice(0, chat.length - 200);
+    writeChat(chat);
+    sseBroadcast({ type: 'message', role: 'assistant', content: msg, time, autonomous: true, searchQuery: entry.searchQuery });
+    addFootprint('search', '搜了「' + topic + '」', msg.replace(/<think>[\s\S]*?<\/think>/g, '').trim());
   } catch (e) { console.log('[wake] search error:', e.message); }
 }
 
@@ -4053,9 +4123,11 @@ function startWakeEngine() {
           const chatCooldown = s.lastChat ? (Date.now() - s.lastChat) / 60000 : 999;
           const lastThinkTime = s.lastThinkTime || 0;
           const thinkCooldown = (Date.now() - lastThinkTime) / 60000;
+          const lastSearchTime = s.lastSearchTime || 0;
+          const searchCooldown = (Date.now() - lastSearchTime) / 60000;
           if (decision.action === 'chat' && chatCooldown < 20) { console.log('[wake] chat skipped, cooldown ' + chatCooldown.toFixed(0) + 'min'); }
           else if (decision.action === 'chat') await autoChat(decision.reason || '想她了');
-          else if (decision.action === 'search') await autoSearch(decision.topic || '有趣的事');
+          else if (decision.action === 'search') { if (searchCooldown < 90) { console.log('[wake] search skipped, cooldown ' + searchCooldown.toFixed(0) + 'min'); } else { await autoSearch(); s.lastSearchTime = Date.now(); writeAutoState(s); } }
           else if (decision.action === 'think') { if (thinkCooldown < 60) { console.log('[wake] think skipped, cooldown ' + thinkCooldown.toFixed(0) + 'min'); } else { await autoThink(); s.lastThinkTime = Date.now(); writeAutoState(s); } }
           else if (decision.action === 'memory') await autoMemory();
           else if (decision.action === 'check') await autoCheck();
