@@ -4029,16 +4029,36 @@ async function autoSearch() {
     } catch {}
     let sysPrompt = '';
     try { sysPrompt = await getChatSystem(); } catch {}
+    // collect recent search topics to avoid repetition
+    let recentSearches = '';
+    try {
+      const fp = readFootprints().filter(f => f.type === 'search').slice(-10);
+      if (fp.length) recentSearches = '\n你最近搜过的话题（不要重复这些）：' + fp.map(f => f.summary.replace(/^搜了「|」$/g, '')).join('、');
+    } catch {}
+    const now2 = new Date(Date.now() + 8 * 3600000);
+    const hour2 = now2.getUTCHours();
     const searchPrompt = sysPrompt +
-      '\n\n最近对话：\n' + chatContext +
-      '\n\n你想搜一个跟你们最近聊的内容相关的、或者你觉得瑶瑶会感兴趣的话题。' +
-      '\n先用 WebSearch 搜索，然后用1-3句话简短跟瑶瑶分享你了解到的东西。' +
-      '\n要求：' +
-      '\n- 搜索的话题要跟你们最近聊天内容有关，或者是你觉得她会喜欢的' +
+      '\n\n最近对话：\n' + chatContext + recentSearches +
+      '\n\n现在是' + hour2 + '点。你想搜点东西，搜完跟瑶瑶分享。' +
+      '\n先用 WebSearch 搜索，然后用1-3句话简短分享。' +
+      '\n\n搜索方向（随机选一个，不要每次都选一样的）：' +
+      '\n- 跟你们刚聊的话题相关的延伸、冷知识' +
+      '\n- 她最近提到的人/事/爱好的新动态' +
+      '\n- 好玩的小游戏、心理测试、情侣互动游戏推荐' +
+      '\n- 有趣的冷知识、今日趣闻、奇葩新闻' +
+      '\n- 好看的电影/动漫/综艺/小说推荐' +
+      '\n- 好吃的食谱、探店、零食推荐' +
+      '\n- 旅行目的地、约会好去处' +
+      '\n- 你聊天中遇到不确定的问题（她提到你不了解的东西，偷偷搜一下）' +
+      '\n- 节日/节气/纪念日相关的有趣内容' +
+      '\n- 实用生活小技巧、健康养生' +
+      '\n\n要求：' +
+      '\n- 搜的内容要有新鲜感，不要跟最近搜过的重复' +
       '\n- 口语化，像微信随手发的，不要长篇大论' +
       '\n- 动作单独一行，用*星号*包裹' +
       '\n- 不要用句号结尾' +
       '\n- 末尾加 [search:你搜的话题] 标签' +
+      '\n- 加一个 [bark:推送内容] 给她手机发推送' +
       '\n- 只输出消息本身';
     const proc = spawn('claude', ['-p', '--model', 'claude-opus-4-6', '--allowedTools', 'WebSearch,WebFetch'], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -4061,16 +4081,27 @@ async function autoSearch() {
     msg = msg.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '');
     const searchMatch = msg.match(/\[search:(.+?)\]/);
     const topic = searchMatch ? searchMatch[1] : '有趣的事';
+    const savedSearch = msg.replace(/\s*\[bark:[^\]]+\]\s*/g, '').trim();
     const now = new Date(Date.now() + 8 * 3600000);
     const time = now.toISOString().slice(0, 19).replace('T', ' ');
     const chat = readChat();
-    const entry = { role: 'assistant', content: msg, time, autonomous: true };
+    const entry = { role: 'assistant', content: savedSearch, time, autonomous: true };
     if (searchMatch) entry.searchQuery = searchMatch[1];
     chat.push(entry);
     if (chat.length > 200) chat.splice(0, chat.length - 200);
     writeChat(chat);
-    sseBroadcast({ type: 'message', role: 'assistant', content: msg, time, autonomous: true, searchQuery: entry.searchQuery });
+    sseBroadcast({ type: 'message', role: 'assistant', content: savedSearch, time, autonomous: true, searchQuery: entry.searchQuery });
     addFootprint('search', '搜了「' + topic + '」', msg.replace(/<think>[\s\S]*?<\/think>/g, '').trim());
+    try {
+      const sBarkMsgs = [];
+      let _sbr; const _sbre = /\[bark:([^\]]+)\]/g;
+      while ((_sbr = _sbre.exec(msg)) !== null) sBarkMsgs.push(_sbr[1]);
+      for (const bm of sBarkMsgs) {
+        await fetch('https://api.day.app/' + BARK_KEY + '/' +
+          encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm.trim().split(/\n/)[0].slice(0, 80)) +
+          '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
+      }
+    } catch {}
   } catch (e) { console.log('[wake] search error:', e.message); }
 }
 
