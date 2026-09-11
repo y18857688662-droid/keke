@@ -1907,7 +1907,9 @@ app.post('/chat/send', async (req, res) => {
         const savedContent = cliThinking ? '<think>' + cliThinking + '</think>\n' + savedReply : savedReply;
         const chat2 = readChat();
         chat2.forEach(m => { if (m.pending) delete m.pending; });
-        chat2.push({ role: 'assistant', content: savedContent, time: replyTime });
+        const cliEntry = { role: 'assistant', content: savedContent, time: replyTime };
+        if (cliVideoUrls.length) cliEntry.videoUrls = cliVideoUrls;
+        chat2.push(cliEntry);
         if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
         writeChat(chat2);
         sseBroadcast({ type: 'message', role: 'assistant', content: savedContent, time: replyTime, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined, gifStickers: cliGifStickers.length ? cliGifStickers : undefined, videoUrls: cliVideoUrls.length ? cliVideoUrls : undefined });
@@ -2053,12 +2055,23 @@ app.post('/chat/send', async (req, res) => {
       reply = data.choices?.[0]?.message?.content?.trim() || getFallback();
     }
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
-    const savedReplyApi = stripVoiceActions(reply);
+    const apiVideoUrls = []; let _avr; const _avre = /\[video:([^\]]+)\]/g;
+    while ((_avr = _avre.exec(reply)) !== null) apiVideoUrls.push(_avr[1].trim());
+    const apiBarkMsgs2 = []; let _abr2; const _abre2 = /\[bark:([^\]]+)\]/g;
+    while ((_abr2 = _abre2.exec(reply)) !== null) apiBarkMsgs2.push(_abr2[1]);
+    const apiClawdMatch = reply.match(/\[clawd:([\w-]+)\]/);
+    const apiGifStickers2 = []; let _agr2; const _agre2 = /\[gifsticker:([\w-]+)\]/g;
+    while ((_agr2 = _agre2.exec(reply)) !== null) apiGifStickers2.push(_agr2[1]);
+    const savedReplyApi = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
     const savedContentApi = apiThinking ? '<think>' + apiThinking + '</think>\n' + savedReplyApi : savedReplyApi;
     const apiSearchMatch = savedReplyApi.match(/\[search:(.+?)\]/);
+    for (const bm of apiBarkMsgs2) {
+      fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
+    }
     const chat2 = readChat();
     chat2.forEach(m => { if (m.pending) delete m.pending; });
     const replyMsg = { role: 'assistant', content: savedContentApi, time: replyTime };
+    if (apiVideoUrls.length) replyMsg.videoUrls = apiVideoUrls;
     if (apiSearchMatch) {
       replyMsg.searchQuery = apiSearchMatch[1];
       try { addFootprint('search', '搜了「' + apiSearchMatch[1] + '」'); } catch(e) {}
@@ -2066,7 +2079,7 @@ app.post('/chat/send', async (req, res) => {
     chat2.push(replyMsg);
     if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
     writeChat(chat2);
-    sseBroadcast({ type: 'message', role: 'assistant', content: savedContentApi, time: replyTime, searchQuery: replyMsg.searchQuery });
+    sseBroadcast({ type: 'message', role: 'assistant', content: savedContentApi, time: replyTime, searchQuery: replyMsg.searchQuery, clawd: apiClawdMatch ? apiClawdMatch[1] : undefined, gifStickers: apiGifStickers2.length ? apiGifStickers2 : undefined, videoUrls: apiVideoUrls.length ? apiVideoUrls : undefined });
     const cleanReply = savedReplyApi.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
     if (sseClients.size === 0) {
@@ -2129,6 +2142,7 @@ app.post('/chat/reply', async (req, res) => {
     fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
   }
   const msg = { role: 'assistant', content: savedReply, time };
+  if (apiVideoUrls.length) msg.videoUrls = apiVideoUrls;
   if (searchMatch) {
     msg.searchQuery = searchMatch[1];
     try { addFootprint('search', '搜了「' + searchMatch[1] + '」'); } catch(e) {}
@@ -2378,7 +2392,9 @@ app.post('/chat/upload-finalize', (req, res) => {
                 }
                 const c3 = readChat();
                 c3.forEach(m => { if (m.pending) delete m.pending; });
-                c3.push({ role: 'assistant', content: savedReply, time: replyTime });
+                const vidEntry = { role: 'assistant', content: savedReply, time: replyTime };
+                if (videoUrlsOut.length) vidEntry.videoUrls = videoUrlsOut;
+                c3.push(vidEntry);
                 if (c3.length > 200) c3.splice(0, c3.length - 200);
                 writeChat(c3);
                 sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time: replyTime, clawd: clawdMatch ? clawdMatch[1] : undefined, gifStickers: gifStickers.length ? gifStickers : undefined, videoUrls: videoUrlsOut.length ? videoUrlsOut : undefined });
@@ -3016,13 +3032,17 @@ app.post('/tg/webhook', async (req, res) => {
     }
 
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
-    const savedReplyTg = stripVoiceActions(reply);
+    const tgVideoUrls = []; let _tvr; const _tvre = /\[video:([^\]]+)\]/g;
+    while ((_tvr = _tvre.exec(reply)) !== null) tgVideoUrls.push(_tvr[1].trim());
+    const savedReplyTg = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
     const chat2 = readChat();
-    chat2.push({ role: 'assistant', content: savedReplyTg, time: replyTime, source: 'telegram' });
+    const tgEntry = { role: 'assistant', content: savedReplyTg, time: replyTime, source: 'telegram' };
+    if (tgVideoUrls.length) tgEntry.videoUrls = tgVideoUrls;
+    chat2.push(tgEntry);
     if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
     writeChat(chat2);
 
-    sseBroadcast({ type: 'message', role: 'assistant', content: savedReplyTg, time: replyTime });
+    sseBroadcast({ type: 'message', role: 'assistant', content: savedReplyTg, time: replyTime, videoUrls: tgVideoUrls.length ? tgVideoUrls : undefined });
 
     const cleanReply = savedReplyTg.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     await tgSend(chatId, cleanReply);
@@ -3961,6 +3981,7 @@ async function autoChat(reason) {
     const savedMsg = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
     const chatEntry = { role: 'assistant', content: savedMsg, time, autonomous: true };
     if (autoChatAudio) chatEntry.audioUrl = autoChatAudio;
+    if (acVideoUrls.length) chatEntry.videoUrls = acVideoUrls;
     chat.push(chatEntry);
     writeChat(chat);
     sseBroadcast({ type: 'message', role: 'assistant', content: savedMsg, time, autonomous: true, audioUrl: autoChatAudio || undefined, clawd: acClawdMatch2 ? acClawdMatch2[1] : undefined, gifStickers: acGifStickers.length ? acGifStickers : undefined, videoUrls: acVideoUrls.length ? acVideoUrls : undefined });
