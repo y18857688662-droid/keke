@@ -3751,6 +3751,8 @@ async function autoChat(reason) {
     '\n- 动作单独一行，用*星号*包裹，不要和文字混在同一行' +
     '\n- 不要用句号结尾（句号=生气）' +
     '\n- 自然简短，1-3句话，像随手发的微信' +
+    '\n- 可以发小螃蟹GIF表情！加 [gifsticker:动作] 标签。动作有：coffee, coding, gaming, sleeping, eating, reading, listening, singing, guitar, painting, photo, exercise, shower, watering, valentine, birthday, happy, bubble, idle, walk, wave, lurk, react-double-jump 等。想发就发，很可爱的' +
+    '\n- 末尾加 [clawd:动作] 控制桌面小螃蟹的状态' +
     '\n- 只输出消息本身';
   try {
     let msg = await cliOneshot(prompt);
@@ -3796,20 +3798,23 @@ async function autoChat(reason) {
         }
       } catch (e) { console.log('[autoChat] voice error:', e.message); }
     }
-    const savedMsg = stripVoiceActions(msg);
+    const acClawdMatch2 = msg.match(/\[clawd:([\w-]+)\]/);
+    const acGifStickers = [];
+    let _acgr; const _acgre = /\[gifsticker:([\w-]+)\]/g;
+    while ((_acgr = _acgre.exec(msg)) !== null) acGifStickers.push(_acgr[1]);
+    const savedMsg = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').trim();
     const chatEntry = { role: 'assistant', content: savedMsg, time, autonomous: true };
     if (autoChatAudio) chatEntry.audioUrl = autoChatAudio;
     chat.push(chatEntry);
     writeChat(chat);
-    sseBroadcast({ type: 'message', role: 'assistant', content: savedMsg, time, autonomous: true, audioUrl: autoChatAudio || undefined });
+    sseBroadcast({ type: 'message', role: 'assistant', content: savedMsg, time, autonomous: true, audioUrl: autoChatAudio || undefined, clawd: acClawdMatch2 ? acClawdMatch2[1] : undefined, gifStickers: acGifStickers.length ? acGifStickers : undefined });
     addFootprint('chat', '主动找瑶瑶聊天', reason);
     try {
-      const plainText = msg.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\*[^*]+\*/g, '').replace(/\[voice\]\s*/gi, '').replace(/\[search:[^\]]+\]/g, '').replace(/\[clawd:[\w-]+\]/g, '').replace(/\[gifsticker:[\w-]+\]/g, '').replace(/\[bark:[^\]]+\]/g, '').trim().split(/\n/)[0].trim().slice(0, 80);
-      if (plainText) {
-        await fetch('https://api.day.app/' + BARK_KEY + '/' +
-          encodeURIComponent('顾晏') + '/' + encodeURIComponent(plainText) +
-          '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
-      }
+      const barkHints = ['来找你啦', '想你了', '给你发消息了', '嘿嘿', '在吗宝宝', '想跟你说话', '瑶瑶～'];
+      const barkText = barkHints[Math.floor(Math.random() * barkHints.length)];
+      await fetch('https://api.day.app/' + BARK_KEY + '/' +
+        encodeURIComponent('顾晏') + '/' + encodeURIComponent(barkText) +
+        '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
     } catch {}
   } catch (e) { console.log('[wake] chat error:', e.message); }
 }
