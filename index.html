@@ -397,8 +397,8 @@ body {
 .gif-sticker-label { font-size:10px; color:var(--text-mid); text-align:center; margin-top:2px; line-height:1; }
 .msg-gif-sticker { width:140px; height:140px; display:block; }
 .msg-gif-sticker img { width:100%; height:100%; object-fit:contain; image-rendering:pixelated; }
-.msg-video { max-width:min(75vw, 420px); border-radius:12px; display:block; overflow:hidden; background:#000; }
-.msg-video video { width:100%; display:block; border-radius:12px; }
+.msg-video { max-width:min(75vw, 420px); border-radius:12px; display:block; overflow:hidden; background:#000; min-height:60px; }
+.msg-video video { width:100%; display:block; border-radius:12px; min-height:60px; }
 .messages::-webkit-scrollbar { width: 3px; }
 .messages::-webkit-scrollbar-track { background: transparent; }
 .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -1149,12 +1149,14 @@ function renderMessage(msg, idx, stagger) {
     var fn = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\'a\');a.href=\''+msg.file+'\';a.download=\''+escHtml(msg.filename||'file')+'\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn + '</div>';
   }
-  if (msg.fileUrl) {
+  if (msg.fileUrl && !videoUrls.length) {
     var fn2 = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\'a\');a.href=\''+msg.fileUrl+'\';a.download=\''+escHtml(msg.filename||'file')+'\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn2 + '</div>';
   }
   for (var vi = 0; vi < videoUrls.length; vi++) {
-    colHtml += '<div class="msg-video"><video src="'+escHtml(videoUrls[vi])+'" controls playsinline preload="metadata"></video></div>';
+    var posterAttr = '';
+    if (vi === 0 && msg.videoFrames && msg.videoFrames.length) posterAttr = ' poster="'+escHtml(msg.videoFrames[0])+'"';
+    colHtml += '<div class="msg-video"><video src="'+escHtml(videoUrls[vi])+'"'+posterAttr+' controls playsinline preload="metadata"></video></div>';
   }
   var gifMatch = content.match(/^\[gifsticker:([\w-]+)\]$/);
   if (gifMatch) {
@@ -1692,6 +1694,17 @@ function attachSSE(src) {
               var vm = wrap.querySelector('.voice-msg');
               if (vm) vm.setAttribute('onclick', "playAudioMsg(this,'"+data.audioUrl+"')");
             }
+            break;
+          }
+        }
+      }
+      if (data.type === 'video-processed' && data.videoUrl) {
+        var allVids = document.querySelectorAll('video');
+        for (var vvi = 0; vvi < allVids.length; vvi++) {
+          var vsrc = allVids[vvi].getAttribute('src') || '';
+          if (vsrc.startsWith('blob:')) {
+            allVids[vvi].setAttribute('src', data.videoUrl);
+            allVids[vvi].load();
             break;
           }
         }
