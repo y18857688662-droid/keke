@@ -3808,9 +3808,10 @@ app.post('/auto/trigger', async (req, res) => {
   try {
     const cfg2 = readApiConfig();
     const debugKeys = { openrouter: !!OPENROUTER_KEY, dsKey: !!(cfg2.api_key || process.env.DEEPSEEK_API_KEY), anthropicKey: !!(cfg2.anthropic_key || process.env.ANTHROPIC_API_KEY), proMode: isProMode(), apiUrl: getApiUrl(), model: getModel() };
-    const decision = await autoDecide();
+    const forceAction = req.body && req.body.force;
+    const decision = forceAction ? { action: forceAction, reason: '强制触发' } : await autoDecide();
     if (!decision) return res.json({ ok: false, error: 'autoDecide returned null', debug: debugKeys });
-    if (decision.action === 'silent') return res.json({ ok: true, decision, note: 'chose silent' });
+    if (decision.action === 'silent' && !forceAction) return res.json({ ok: true, decision, note: 'chose silent' });
     const s = readAutoState();
     s.lastAction = Date.now();
     s.lastActionType = decision.action;
@@ -3919,8 +3920,32 @@ async function autoChat(reason) {
     '\n- 加一个 [bark:推送内容] 标签给她手机发推送提醒。推送内容要跟你这次想说的话相关，但不要跟聊天消息一模一样——推送是"敲门"，聊天才是正文。比如聊天说"刚看到一个好好笑的视频"，推送可以写"快来看！"；聊天说"你吃饭了没"，推送可以写"饿了吗宝宝"。一句话就好，简短自然' +
     '\n- 只输出消息本身';
   try {
-    let msg = await cliOneshot(prompt);
-    if (!msg) msg = '';
+    // check if last user message has video frames — use API directly for vision
+    const chatForVideo = readChat();
+    const lastUser = chatForVideo.length ? chatForVideo[chatForVideo.length - 1] : null;
+    const hasVideoFrames = lastUser && lastUser.role === 'user' && lastUser.videoFrames && lastUser.videoFrames.length;
+    let msg = '';
+    if (hasVideoFrames) {
+      const cfgV = readApiConfig();
+      const vKey = cfgV.anthropic_key || process.env.ANTHROPIC_API_KEY || '';
+      if (vKey) {
+        const vSys = sysPrompt + '\n\n你现在主动想跟瑶瑶说话。原因：' + reason +
+          '\n要求：基于视频内容自然回复，1-3句话，不要用句号结尾' +
+          '\n动作单独一行用*星号*包裹' +
+          '\n末尾加 [clawd:动作] [bark:推送内容]';
+        const vMsgs = chatForVideo.slice(-20).map(m => ({ role: m.role, content: buildMsgContent(m) }));
+        const vr = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': vKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({ model: CLAUDE_MODEL, system: vSys, messages: vMsgs, max_tokens: 4096, temperature: 0.85, thinking: { type: 'adaptive' } })
+        });
+        const vd = await vr.json();
+        if (vd.error) console.log('[autoChat] API error:', vd.error.message || JSON.stringify(vd.error));
+        const vtb = (vd.content || []).find(b => b.type === 'text');
+        msg = vtb?.text?.trim() || '';
+      }
+    }
+    if (!msg) msg = await cliOneshot(prompt) || '';
     msg = msg.trim();
     if (!msg) return;
     if (!msg.includes('<think>')) msg = '<think>想她了</think>' + msg;
