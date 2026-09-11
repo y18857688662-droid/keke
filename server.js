@@ -2344,37 +2344,28 @@ app.post('/chat/upload-finalize', (req, res) => {
           sseBroadcast({ type: 'video-processed', videoUrl: fileUrl, frames: frameUrls.length, duration });
           // auto-trigger AI response now that frames are ready
           try {
-            const proOn = isProMode();
-            const directKey = proOn ? '' : (process.env.ANTHROPIC_API_KEY || '');
-            const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
+            // bypass pro mode to get key directly — video auto-reply needs API access
+            const cfgDirect = readApiConfig();
+            const videoApiKey = cfgDirect.anthropic_key || process.env.ANTHROPIC_API_KEY || '';
             const chatNow = readChat();
             if (chatNow.length && chatNow[chatNow.length - 1].role === 'user') {
               console.log('[video] triggering AI response after processing...');
               const sysPrompt = await getChatSystem();
               let aiReply = '';
-              if (!chatApiKey) {
+              if (videoApiKey) {
+                const r = await fetch('https://api.anthropic.com/v1/messages', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'x-api-key': videoApiKey, 'anthropic-version': '2023-06-01' },
+                  body: JSON.stringify({ model: CLAUDE_MODEL, system: sysPrompt, messages: chatNow.slice(-20).map(m => ({ role: m.role, content: buildMsgContent(m) })), max_tokens: 4096, temperature: 0.85, thinking: { type: 'adaptive' } })
+                });
+                const data = await r.json();
+                if (data.error) console.log('[video] API error:', data.error.message || JSON.stringify(data.error));
+                const textBlk = (data.content || []).find(b => b.type === 'text');
+                aiReply = textBlk?.text?.trim() || '';
+              } else {
+                // fallback: try CLI
                 const cliResult = await claudeCliReply(sysPrompt, chatNow.slice(-10));
                 aiReply = typeof cliResult === 'string' ? cliResult : (cliResult?.text || '');
-              } else {
-                const anthropicKey = getAnthropicKey() || directKey;
-                if (anthropicKey) {
-                  const r = await fetch('https://api.anthropic.com/v1/messages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' },
-                    body: JSON.stringify({ model: CLAUDE_MODEL, system: sysPrompt, messages: chatNow.slice(-20).map(m => ({ role: m.role, content: buildMsgContent(m) })), max_tokens: 4096, temperature: 0.85, thinking: { type: 'adaptive' } })
-                  });
-                  const data = await r.json();
-                  const textBlk = (data.content || []).find(b => b.type === 'text');
-                  aiReply = textBlk?.text?.trim() || '';
-                } else {
-                  const r = await fetch(getApiUrl(), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getApiKey() },
-                    body: JSON.stringify({ model: getModel(), messages: [{ role: 'system', content: sysPrompt }, ...chatNow.slice(-20).map(m => ({ role: m.role, content: buildMsgContent(m) }))], max_tokens: 800, temperature: 0.85 })
-                  });
-                  const data = await r.json();
-                  aiReply = data.choices?.[0]?.message?.content?.trim() || '';
-                }
               }
               if (aiReply) {
                 aiReply = aiReply.replace(/。$/g, '').replace(/。\n/g, '\n');
