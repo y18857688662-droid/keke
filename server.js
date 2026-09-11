@@ -170,7 +170,7 @@ function setupCliListeners() {
 function ensureCliProc() {
   if (cliProc && !cliProc.killed) return;
   console.log('[cli] spawning persistent claude process...');
-  cliProc = spawn('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', 'claude-opus-4-6'], {
+  cliProc = spawn('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', 'claude-opus-4-6', '--allowedTools', 'WebSearch,WebFetch'], {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, HOME: '/root' },
     cwd: '/tmp'
