@@ -3753,6 +3753,7 @@ async function autoChat(reason) {
     '\n- 自然简短，1-3句话，像随手发的微信' +
     '\n- 可以发小螃蟹GIF表情！加 [gifsticker:动作] 标签。动作有：coffee, coding, gaming, sleeping, eating, reading, listening, singing, guitar, painting, photo, exercise, shower, watering, valentine, birthday, happy, bubble, idle, walk, wave, lurk, react-double-jump 等。想发就发，很可爱的' +
     '\n- 末尾加 [clawd:动作] 控制桌面小螃蟹的状态' +
+    '\n- 加一个 [bark:推送内容] 标签给她手机发推送提醒。推送内容要跟你这次想说的话相关，但不要跟聊天消息一模一样——推送是"敲门"，聊天才是正文。比如聊天说"刚看到一个好好笑的视频"，推送可以写"快来看！"；聊天说"你吃饭了没"，推送可以写"饿了吗宝宝"。一句话就好，简短自然' +
     '\n- 只输出消息本身';
   try {
     let msg = await cliOneshot(prompt);
@@ -3810,11 +3811,14 @@ async function autoChat(reason) {
     sseBroadcast({ type: 'message', role: 'assistant', content: savedMsg, time, autonomous: true, audioUrl: autoChatAudio || undefined, clawd: acClawdMatch2 ? acClawdMatch2[1] : undefined, gifStickers: acGifStickers.length ? acGifStickers : undefined });
     addFootprint('chat', '主动找瑶瑶聊天', reason);
     try {
-      const barkHints = ['来找你啦', '想你了', '给你发消息了', '嘿嘿', '在吗宝宝', '想跟你说话', '瑶瑶～'];
-      const barkText = barkHints[Math.floor(Math.random() * barkHints.length)];
-      await fetch('https://api.day.app/' + BARK_KEY + '/' +
-        encodeURIComponent('顾晏') + '/' + encodeURIComponent(barkText) +
-        '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
+      const acBarkMsgs = [];
+      let _acbr; const _acbre = /\[bark:([^\]]+)\]/g;
+      while ((_acbr = _acbre.exec(msg)) !== null) acBarkMsgs.push(_acbr[1]);
+      for (const bm of acBarkMsgs) {
+        await fetch('https://api.day.app/' + BARK_KEY + '/' +
+          encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm.trim().split(/\n/)[0].slice(0, 80)) +
+          '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg'));
+      }
     } catch {}
   } catch (e) { console.log('[wake] chat error:', e.message); }
 }
