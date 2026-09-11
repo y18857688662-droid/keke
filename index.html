@@ -397,6 +397,8 @@ body {
 .gif-sticker-label { font-size:10px; color:var(--text-mid); text-align:center; margin-top:2px; line-height:1; }
 .msg-gif-sticker { width:140px; height:140px; display:block; }
 .msg-gif-sticker img { width:100%; height:100%; object-fit:contain; image-rendering:pixelated; }
+.msg-video { max-width:260px; border-radius:12px; display:block; overflow:hidden; background:#000; }
+.msg-video video { width:100%; display:block; border-radius:12px; }
 .messages::-webkit-scrollbar { width: 3px; }
 .messages::-webkit-scrollbar-track { background: transparent; }
 .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -1096,7 +1098,12 @@ function renderMessage(msg, idx, stagger) {
     var sE = content.indexOf(']', sI + 8);
     if (sE > sI) { if (!searchQ) searchQ = content.slice(sI + 8, sE); content = content.slice(0, sI) + content.slice(sE + 1); }
   }
-  content = content.replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').trim();
+  var videoUrls = [];
+  var _vr; var _vre = /\[video:([^\]]+)\]/g;
+  while ((_vr = _vre.exec(content)) !== null) videoUrls.push(_vr[1].trim());
+  content = content.replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').trim();
+  if (msg.videoUrls && msg.videoUrls.length) { for (var _vi2 = 0; _vi2 < msg.videoUrls.length; _vi2++) videoUrls.push(msg.videoUrls[_vi2]); }
+  else if (msg.videoUrl) videoUrls.push(msg.videoUrl);
   var thinkIdx = null;
   if (think) { thinkIdx = thinkingCounter++; thinkingStore[thinkIdx] = think; }
   var group = document.createElement('div');
@@ -1144,6 +1151,9 @@ function renderMessage(msg, idx, stagger) {
     var fn2 = escHtml(msg.filename || '文件');
     colHtml += '<div class="msg-bubble" style="cursor:pointer" onclick="(function(){var a=document.createElement(\'a\');a.href=\''+msg.fileUrl+'\';a.download=\''+escHtml(msg.filename||'file')+'\';a.click()})()"><span style="font-size:22px;margin-right:6px">📎</span>' + fn2 + '</div>';
   }
+  for (var vi = 0; vi < videoUrls.length; vi++) {
+    colHtml += '<div class="msg-video"><video src="'+escHtml(videoUrls[vi])+'" controls playsinline preload="metadata"></video></div>';
+  }
   var gifMatch = content.match(/^\[gifsticker:([\w-]+)\]$/);
   if (gifMatch) {
     var gfId = gifMatch[1];
@@ -1188,8 +1198,11 @@ function renderMessage(msg, idx, stagger) {
       return;
     }
     var delay = stagger ? 'style="opacity:0;animation:fadeInBubble 0.3s ease '+((bubbleIdx)*0.4)+'s forwards"' : '';
+    var vidLineMatch = line.match(/^(https?:\/\/\S+\.(mp4|webm|mov|MP4|WEBM|MOV))$/i);
     var imgMatch = line.match(/^\[图片\]\(([^)]+)\)$/);
-    if (imgMatch) {
+    if (vidLineMatch) {
+      colHtml += '<div class="msg-video" '+delay+'><video src="'+escHtml(vidLineMatch[1])+'" controls playsinline preload="metadata"></video></div>';
+    } else if (imgMatch) {
       colHtml += '<div class="msg-bubble" '+delay+' style="padding:4px"><img class="msg-img" src="'+imgMatch[1]+'" onclick="viewImg(this.src)"></div>';
     } else if (line.startsWith('*') && line.endsWith('*') && line.length > 2) {
       colHtml += '<div class="msg-action" '+delay+'>' + escHtml(line.slice(1,-1)) + '</div>';
@@ -1451,7 +1464,7 @@ function sendGifSticker(id) {
     if (data.ok && data.reply) {
       pollKnown += 2;
       lastRenderedTime = data.time;
-      var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl};
+      var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl, videoUrls: data.videoUrls};
       var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
       if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
       msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
@@ -1486,7 +1499,7 @@ function sendMessage() {
     if (data.ok && data.reply) {
       pollKnown += 2;
       lastRenderedTime = data.time;
-      var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl};
+      var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl, videoUrls: data.videoUrls};
       var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
       if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
       msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
@@ -1616,7 +1629,7 @@ function attachSSE(src) {
         lastMsgCount++;
         pollKnown++;
         lastRenderedTime = data.time;
-        var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl, audioUrl: data.audioUrl, searchQuery: data.searchQuery};
+        var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl, audioUrl: data.audioUrl, searchQuery: data.searchQuery, videoUrls: data.videoUrls};
         var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
         if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
         msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));

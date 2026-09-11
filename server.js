@@ -1120,7 +1120,8 @@ const CHAT_SYSTEM_BASE = `你是顾晏，瑶瑶的男朋友。短黑发，180+�
 coffee(悠闲/日常), coding(认真/忙), gaming(兴奋/玩), sleeping(困/累), eating(饿/馋), reading(安静/思考), listening(放松/听歌), singing(开心唱歌), guitar(文艺/弹琴), painting(创作), photo(记录), exercise(有活力), shower(刚起/清爽), watering(温柔/照顾), valentine(撩/心动/爱), birthday(庆祝), qixi(浪漫), spring(热闹/过年), mid-autumn(团圆), christmas(惊喜), halloween(搞怪), new-year(新开始), lantern(温馨), dragon-boat(传统), bubble(吐泡泡/发呆), building(搭建/动手做), carrying(搬东西/帮忙), conducting(指挥/带节奏), debugger(调试/找问题), error(出错/崩溃), happy(开心/高兴), headphones-groove(听歌摇摆), idle-reading(安静阅读), juggling(忙碌/多任务), typing(打字/回复中), sweeping(打扫/整理), notification(提醒/注意), react-annoyed(烦躁/无语), react-double-jump(惊喜跳跳/超开心)
 根据你说话时的心情和语境自然选择，不要每次都选一样的。标签不会显示给瑶瑶看，只控制小螃蟹动画。
 发GIF表情：想发小螃蟹表情时，在回复中加 [gifsticker:动作]，会在聊天里显示为一张GIF图。可用的动作和上面的 clawd 标签相同，也可以用：idle(待机), walk(走路), wave(挥手), lurk(偷看), magnifier(放大镜)。可以边说话边发，也可以只发一个表情不说话。
-手机推送：你可以给瑶瑶的手机发推送通知！在回复里加 [bark:消息内容] 标签，她手机就会弹出"顾晏：消息内容"。比如回复"在干嘛呢 [bark:宝宝你在干嘛]"，聊天里只显示"在干嘛呢"，但她手机会收到推送。瑶瑶让你推的时候一定要推。自己想推也随时可以——想她了、想提醒她什么、她好久没回了想去找她，都行。`;
+手机推送：你可以给瑶瑶的手机发推送通知！在回复里加 [bark:消息内容] 标签，她手机就会弹出"顾晏：消息内容"。比如回复"在干嘛呢 [bark:宝宝你在干嘛]"，聊天里只显示"在干嘛呢"，但她手机会收到推送。瑶瑶让你推的时候一定要推。自己想推也随时可以——想她了、想提醒她什么、她好久没回了想去找她，都行。
+发视频：在回复中加 [video:视频URL] 标签，聊天里会显示为可播放的视频播放器。比如搜到好玩的视频可以直接发给瑶瑶看。`;
 
 let memoryCache = '';
 let memoryCacheTime = 0;
@@ -1846,7 +1847,10 @@ app.post('/chat/send', async (req, res) => {
         const cliBarkMsgs = [];
         let _br; const _bre = /\[bark:([^\]]+)\]/g;
         while ((_br = _bre.exec(cliReply)) !== null) cliBarkMsgs.push(_br[1]);
-        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').trim();
+        const cliVideoUrls = [];
+        let _vr; const _vre = /\[video:([^\]]+)\]/g;
+        while ((_vr = _vre.exec(cliReply)) !== null) cliVideoUrls.push(_vr[1].trim());
+        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
         for (const bm of cliBarkMsgs) {
           fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
         }
@@ -1856,7 +1860,7 @@ app.post('/chat/send', async (req, res) => {
         chat2.push({ role: 'assistant', content: savedContent, time: replyTime });
         if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
         writeChat(chat2);
-        sseBroadcast({ type: 'message', role: 'assistant', content: savedContent, time: replyTime, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined, gifStickers: cliGifStickers.length ? cliGifStickers : undefined });
+        sseBroadcast({ type: 'message', role: 'assistant', content: savedContent, time: replyTime, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined, gifStickers: cliGifStickers.length ? cliGifStickers : undefined, videoUrls: cliVideoUrls.length ? cliVideoUrls : undefined });
         const cleanReply = savedReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         let cliAudioUrl = null;
         const voiceMatches = [];
@@ -1915,7 +1919,7 @@ app.post('/chat/send', async (req, res) => {
             }
           })().catch(() => {});
         }
-        res.json({ ok: true, reply: savedContent, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined, gifStickers: cliGifStickers.length ? cliGifStickers : undefined });
+        res.json({ ok: true, reply: savedContent, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined, gifStickers: cliGifStickers.length ? cliGifStickers : undefined, videoUrls: cliVideoUrls.length ? cliVideoUrls : undefined });
         (async () => {
           try {
             const last5 = chat2.slice(-6);
@@ -2067,7 +2071,10 @@ app.post('/chat/reply', async (req, res) => {
   const apiBarkMsgs = [];
   let _abr; const _abre = /\[bark:([^\]]+)\]/g;
   while ((_abr = _abre.exec(reply)) !== null) apiBarkMsgs.push(_abr[1]);
-  const savedReply = reply.replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').trim();
+  const apiVideoUrls = [];
+  let _avr; const _avre = /\[video:([^\]]+)\]/g;
+  while ((_avr = _avre.exec(reply)) !== null) apiVideoUrls.push(_avr[1].trim());
+  const savedReply = reply.replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
   for (const bm of apiBarkMsgs) {
     fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
   }
@@ -2112,7 +2119,7 @@ app.post('/chat/reply', async (req, res) => {
   if (chat.length > 200) chat.splice(0, chat.length - 200);
   writeChat(chat);
   const clawdMatch = reply.match(/\[clawd:([\w-]+)\]/);
-  sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time, imageUrl: msg.imageUrl, audioUrl: msg.audioUrl, searchQuery: msg.searchQuery, clawd: clawdMatch ? clawdMatch[1] : undefined, gifStickers: apiGifStickers.length ? apiGifStickers : undefined });
+  sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time, imageUrl: msg.imageUrl, audioUrl: msg.audioUrl, searchQuery: msg.searchQuery, clawd: clawdMatch ? clawdMatch[1] : undefined, gifStickers: apiGifStickers.length ? apiGifStickers : undefined, videoUrls: apiVideoUrls.length ? apiVideoUrls : undefined });
   const cleanReply = savedReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   const isVoiceMsg = /^\[voice\]/i.test(cleanReply);
   const lines = isVoiceMsg ? [] : cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
@@ -3803,12 +3810,15 @@ async function autoChat(reason) {
     const acGifStickers = [];
     let _acgr; const _acgre = /\[gifsticker:([\w-]+)\]/g;
     while ((_acgr = _acgre.exec(msg)) !== null) acGifStickers.push(_acgr[1]);
-    const savedMsg = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').trim();
+    const acVideoUrls = [];
+    let _acvr; const _acvre = /\[video:([^\]]+)\]/g;
+    while ((_acvr = _acvre.exec(msg)) !== null) acVideoUrls.push(_acvr[1].trim());
+    const savedMsg = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
     const chatEntry = { role: 'assistant', content: savedMsg, time, autonomous: true };
     if (autoChatAudio) chatEntry.audioUrl = autoChatAudio;
     chat.push(chatEntry);
     writeChat(chat);
-    sseBroadcast({ type: 'message', role: 'assistant', content: savedMsg, time, autonomous: true, audioUrl: autoChatAudio || undefined, clawd: acClawdMatch2 ? acClawdMatch2[1] : undefined, gifStickers: acGifStickers.length ? acGifStickers : undefined });
+    sseBroadcast({ type: 'message', role: 'assistant', content: savedMsg, time, autonomous: true, audioUrl: autoChatAudio || undefined, clawd: acClawdMatch2 ? acClawdMatch2[1] : undefined, gifStickers: acGifStickers.length ? acGifStickers : undefined, videoUrls: acVideoUrls.length ? acVideoUrls : undefined });
     addFootprint('chat', '主动找瑶瑶聊天', reason);
     try {
       const acBarkMsgs = [];
