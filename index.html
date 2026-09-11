@@ -688,7 +688,9 @@ body {
         <button class="attach-item" onclick="toggleAttach();syncMemory()"><span class="ai">🧠</span>同步记忆库</button>
         <button class="attach-item" onclick="toggleAttach();window.open('/call','_blank')"><span class="ai">📞</span>语音通话</button>
         <button class="attach-item" onclick="toggleAttach();window.open('/screen','_blank')"><span class="ai">🖥</span>屏幕共享</button>
+        <button class="attach-item" onclick="document.getElementById('videoInput').click();toggleAttach()"><span class="ai">🎬</span>发视频</button>
         <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
+        <input type="file" id="videoInput" accept="video/*" style="display:none">
         <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md,.json,.csv,.xlsx,.xls,.ppt,.pptx,.zip,.rar" style="display:none">
       </div>
       <div class="desk-pet" id="deskPet" onclick="petPoke()">
@@ -1169,9 +1171,9 @@ function renderMessage(msg, idx, stagger) {
     group.innerHTML = avaHtml + colHtml;
     return group;
   }
-  var hasMedia = msg.image || msg.imageUrl || msg.audioUrl || msg.file || msg.fileUrl;
+  var hasMedia = msg.image || msg.imageUrl || msg.audioUrl || msg.file || msg.fileUrl || videoUrls.length;
   var allLines = content.split(/\n+/).map(function(l){return l.trim()}).filter(function(l){
-    return l && !(hasMedia && /^\[(图片|语音|文件)\]/.test(l)) && !(msg.audioUrl && /^\[语音\]/.test(l));
+    return l && !(hasMedia && /^\[(图片|语音|文件|视频[^\]]*)\]/.test(l)) && !(msg.audioUrl && /^\[语音\]/.test(l));
   });
   var lines = allLines.filter(function(l){ return !/^\[voice\]/i.test(l); });
   var bubbleIdx = 0;
@@ -1594,6 +1596,48 @@ function sendFile(file) {
 }
 document.getElementById('fileInput').addEventListener('change', function() {
   if (this.files[0]) sendFile(this.files[0]);
+  this.value = '';
+});
+
+function sendVideo(file) {
+  if (file.size > 200 * 1024 * 1024) { alert('视频太大，最大200MB'); return; }
+  var fname = file.name;
+  var localUrl = URL.createObjectURL(file);
+  var userMsg = {role:'user', content:'[视频]', filename: fname, videoUrl: localUrl, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
+  msgContainer.appendChild(renderMessage(userMsg, -1));
+  scrollBottom();
+  var chunkSize = 512 * 1024;
+  var totalChunks = Math.ceil(file.size / chunkSize);
+  var uploadId = Math.random().toString(36).substr(2, 16);
+  var currentChunk = 0;
+  function uploadNext() {
+    if (currentChunk >= totalChunks) {
+      fetch('/chat/upload-finalize', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({uploadId: uploadId, filename: fname, totalChunks: totalChunks})
+      }).then(function(r){return r.json()}).then(function(data) {
+        if (!data.ok) alert('视频发送失败: ' + (data.error || ''));
+        else { pollKnown++; URL.revokeObjectURL(localUrl); }
+      }).catch(function(e){ alert('视频发送失败: ' + e.message); });
+      return;
+    }
+    var start = currentChunk * chunkSize;
+    var end = Math.min(start + chunkSize, file.size);
+    var chunk = file.slice(start, end);
+    fetch('/chat/upload-chunk', {
+      method:'POST',
+      headers:{'X-Upload-Id': uploadId, 'X-Chunk-Index': currentChunk.toString(), 'Content-Type': 'application/octet-stream'},
+      body: chunk
+    }).then(function(r){return r.json()}).then(function(data) {
+      if (data.ok) { currentChunk++; uploadNext(); }
+      else { alert('上传失败'); }
+    }).catch(function(e){ alert('上传失败: ' + e.message); });
+  }
+  uploadNext();
+}
+document.getElementById('videoInput').addEventListener('change', function() {
+  if (this.files[0]) sendVideo(this.files[0]);
   this.value = '';
 });
 

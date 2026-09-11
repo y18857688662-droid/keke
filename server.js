@@ -221,6 +221,45 @@ function cliOneshot(prompt) {
 
 const TEXT_EXTS = new Set(['.txt','.md','.json','.csv','.js','.ts','.py','.html','.css','.xml','.yaml','.yml','.toml','.ini','.sh','.log','.sql','.java','.c','.cpp','.h','.rb','.go','.rs','.swift','.kt']);
 const IMG_EXTS = new Set(['.png','.jpg','.jpeg','.gif','.webp']);
+const VIDEO_EXTS = new Set(['.mp4','.webm','.mov','.avi','.mkv','.m4v']);
+
+function extractVideoFrames(videoPath, maxFrames = 6) {
+  return new Promise((resolve) => {
+    const { execSync } = require('child_process');
+    const frames = [];
+    try {
+      const durStr = execSync(`ffprobe -v error -show_entries format=duration -of csv=p=0 "${videoPath}"`, { timeout: 10000 }).toString().trim();
+      const duration = parseFloat(durStr) || 0;
+      if (duration <= 0) { resolve({ frames: [], duration: 0 }); return; }
+      const count = Math.min(maxFrames, Math.max(2, Math.ceil(duration / 5)));
+      const interval = duration / (count + 1);
+      for (let i = 1; i <= count; i++) {
+        const t = Math.min(interval * i, duration - 0.1);
+        const frameFile = videoPath + '_frame_' + i + '.jpg';
+        try {
+          execSync(`ffmpeg -y -ss ${t.toFixed(2)} -i "${videoPath}" -vframes 1 -q:v 3 -vf "scale='min(800,iw)':'-1'" "${frameFile}"`, { timeout: 15000, stdio: 'pipe' });
+          if (fs.existsSync(frameFile)) frames.push(frameFile);
+        } catch {}
+      }
+      resolve({ frames, duration: Math.round(duration) });
+    } catch (e) {
+      console.log('[video] ffprobe/ffmpeg error:', e.message);
+      resolve({ frames: [], duration: 0 });
+    }
+  });
+}
+
+function extractVideoAudio(videoPath) {
+  return new Promise((resolve) => {
+    const { execSync } = require('child_process');
+    const audioFile = videoPath + '_audio.wav';
+    try {
+      execSync(`ffmpeg -y -i "${videoPath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 -t 120 "${audioFile}"`, { timeout: 30000, stdio: 'pipe' });
+      if (fs.existsSync(audioFile) && fs.statSync(audioFile).size > 1000) resolve(audioFile);
+      else resolve(null);
+    } catch { resolve(null); }
+  });
+}
 function buildFileContent(msg) {
   if (!msg.fileUrl) return null;
   const fp = path.join(__dirname, msg.fileUrl);
@@ -1705,6 +1744,12 @@ function buildMsgContent(m) {
   if (m.imageUrls && m.imageUrls.length && !m.images) {
     m.imageUrls.forEach(u => { try { const fp = path.join(__dirname, u); if (fs.existsSync(fp)) { const ext = u.endsWith('.png') ? 'image/png' : 'image/jpeg'; imgSources.push('data:' + ext + ';base64,' + fs.readFileSync(fp).toString('base64')); } } catch(e) {} });
   }
+  if (m.videoFrames && m.videoFrames.length) {
+    m.videoFrames.forEach(u => { try { const fp = path.join(__dirname, u); if (fs.existsSync(fp)) imgSources.push('data:image/jpeg;base64,' + fs.readFileSync(fp).toString('base64')); } catch(e) {} });
+    let desc = '[瑶瑶发了一个视频' + (m.videoDuration ? '，时长' + m.videoDuration + '秒' : '') + ']';
+    if (m.videoTranscript) desc += '\n视频中的声音内容：' + m.videoTranscript;
+    c = desc;
+  }
   if (imgSources.length > 0) {
     const parts = imgSources.map(img => { const b64 = img.includes(',') ? img.split(',')[1] : img; const mt = img.includes('image/png') ? 'image/png' : 'image/jpeg'; return { type: 'image', source: { type: 'base64', media_type: mt, data: b64 } }; });
     parts.push({ type: 'text', text: c || '[图片]' });
@@ -2245,10 +2290,46 @@ app.post('/chat/upload-finalize', (req, res) => {
     const now = new Date(Date.now() + 8 * 3600000);
     const time = now.toISOString().slice(0, 19).replace('T', ' ');
     const chat = readChat();
-    chat.push({ role: 'user', content: '[文件] ' + filename, filename: filename, fileUrl: fileUrl, time });
-    writeChat(chat);
-    sseBroadcast({ type: 'message', role: 'user', content: '[文件] ' + filename, filename: filename, fileUrl: fileUrl, time });
-    res.json({ ok: true, fileUrl });
+    const fileExt = ext.toLowerCase();
+    if (VIDEO_EXTS.has(fileExt)) {
+      const entry = { role: 'user', content: '[视频]', filename, fileUrl, videoUrl: fileUrl, time, pending: true };
+      chat.push(entry);
+      writeChat(chat);
+      sseBroadcast({ type: 'message', role: 'user', content: '[视频]', filename, videoUrl: fileUrl, time });
+      res.json({ ok: true, fileUrl, isVideo: true });
+      (async () => {
+        try {
+          const { frames, duration } = await extractVideoFrames(filePath);
+          const audioFile = await extractVideoAudio(filePath);
+          let transcript = '';
+          if (audioFile) {
+            const cfg = readApiConfig();
+            const wKey = cfg.whisper_key || cfg.openai_key || '';
+            if (wKey) {
+              try { transcript = await transcribeAudio(audioFile, wKey); } catch (e) { console.log('[video] whisper error:', e.message); }
+              try { fs.unlinkSync(audioFile); } catch {}
+            }
+          }
+          const frameUrls = frames.map(f => '/uploads/' + path.basename(f));
+          const c2 = readChat();
+          const vi = c2.findIndex(m => m.videoUrl === fileUrl && m.role === 'user');
+          if (vi !== -1) {
+            c2[vi].videoFrames = frameUrls;
+            c2[vi].videoDuration = duration;
+            if (transcript) c2[vi].videoTranscript = transcript;
+            c2[vi].content = '[视频' + (duration ? ' ' + duration + '秒' : '') + ']' + (transcript ? ' ' + transcript.slice(0, 100) : '');
+            delete c2[vi].pending;
+            writeChat(c2);
+          }
+          console.log('[video] processed:', frames.length, 'frames,', duration + 's, transcript:', transcript ? transcript.slice(0, 50) + '...' : '(none)');
+        } catch (e) { console.log('[video] processing error:', e.message); }
+      })();
+    } else {
+      chat.push({ role: 'user', content: '[文件] ' + filename, filename: filename, fileUrl: fileUrl, time });
+      writeChat(chat);
+      sseBroadcast({ type: 'message', role: 'user', content: '[文件] ' + filename, filename: filename, fileUrl: fileUrl, time });
+      res.json({ ok: true, fileUrl });
+    }
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
