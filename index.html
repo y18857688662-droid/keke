@@ -1600,13 +1600,13 @@ document.getElementById('fileInput').addEventListener('change', function() {
 });
 
 function sendVideo(file) {
-  if (file.size > 200 * 1024 * 1024) { alert('视频太大，最大200MB'); return; }
+  if (file.size > 2 * 1024 * 1024 * 1024) { alert('视频太大，最大2GB'); return; }
   var fname = file.name;
   var localUrl = URL.createObjectURL(file);
   var userMsg = {role:'user', content:'[视频]', filename: fname, videoUrl: localUrl, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
-  var chunkSize = 512 * 1024;
+  var chunkSize = 2 * 1024 * 1024;
   var totalChunks = Math.ceil(file.size / chunkSize);
   var uploadId = Math.random().toString(36).substr(2, 16);
   var currentChunk = 0;

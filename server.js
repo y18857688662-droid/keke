@@ -2258,7 +2258,7 @@ app.post('/chat/delete', (req, res) => {
 const CHUNK_DIR = path.join(__dirname, 'chunks');
 if (!fs.existsSync(CHUNK_DIR)) fs.mkdirSync(CHUNK_DIR, { recursive: true });
 
-app.post('/chat/upload-chunk', express.raw({ type: 'application/octet-stream', limit: '1mb' }), (req, res) => {
+app.post('/chat/upload-chunk', express.raw({ type: 'application/octet-stream', limit: '3mb' }), (req, res) => {
   const uploadId = req.headers['x-upload-id'];
   const chunkIndex = req.headers['x-chunk-index'];
   if (!uploadId || chunkIndex === undefined) return res.json({ ok: false, error: 'missing headers' });
