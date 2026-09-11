@@ -223,8 +223,12 @@ const TEXT_EXTS = new Set(['.txt','.md','.json','.csv','.js','.ts','.py','.html'
 const IMG_EXTS = new Set(['.png','.jpg','.jpeg','.gif','.webp']);
 const VIDEO_EXTS = new Set(['.mp4','.webm','.mov','.avi','.mkv','.m4v']);
 
+let ffmpegAvailable = false;
+try { require('child_process').execSync('which ffmpeg && which ffprobe', { stdio: 'pipe' }); ffmpegAvailable = true; console.log('[startup] ffmpeg/ffprobe: available'); } catch { console.log('[startup] ffmpeg/ffprobe: NOT FOUND — video frame extraction disabled'); }
+
 function extractVideoFrames(videoPath, maxFrames = 6) {
   return new Promise((resolve) => {
+    if (!ffmpegAvailable) { console.log('[video] skipping frame extraction — ffmpeg not installed'); resolve({ frames: [], duration: 0 }); return; }
     const { execSync } = require('child_process');
     const frames = [];
     try {
@@ -251,6 +255,7 @@ function extractVideoFrames(videoPath, maxFrames = 6) {
 
 function extractVideoAudio(videoPath) {
   return new Promise((resolve) => {
+    if (!ffmpegAvailable) { resolve(null); return; }
     const { execSync } = require('child_process');
     const audioFile = videoPath + '_audio.wav';
     try {
@@ -2322,6 +2327,65 @@ app.post('/chat/upload-finalize', (req, res) => {
             writeChat(c2);
           }
           console.log('[video] processed:', frames.length, 'frames,', duration + 's, transcript:', transcript ? transcript.slice(0, 50) + '...' : '(none)');
+          sseBroadcast({ type: 'video-processed', videoUrl: fileUrl, frames: frameUrls.length, duration });
+          // auto-trigger AI response now that frames are ready
+          try {
+            const proOn = isProMode();
+            const directKey = proOn ? '' : (process.env.ANTHROPIC_API_KEY || '');
+            const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
+            const chatNow = readChat();
+            if (chatNow.length && chatNow[chatNow.length - 1].role === 'user') {
+              console.log('[video] triggering AI response after processing...');
+              const sysPrompt = await getChatSystem();
+              let aiReply = '';
+              if (!chatApiKey) {
+                const cliResult = await claudeCliReply(sysPrompt, chatNow.slice(-10));
+                aiReply = typeof cliResult === 'string' ? cliResult : (cliResult?.text || '');
+              } else {
+                const anthropicKey = getAnthropicKey() || directKey;
+                if (anthropicKey) {
+                  const r = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' },
+                    body: JSON.stringify({ model: CLAUDE_MODEL, system: sysPrompt, messages: chatNow.slice(-20).map(m => ({ role: m.role, content: buildMsgContent(m) })), max_tokens: 4096, temperature: 0.85, thinking: { type: 'adaptive' } })
+                  });
+                  const data = await r.json();
+                  const textBlk = (data.content || []).find(b => b.type === 'text');
+                  aiReply = textBlk?.text?.trim() || '';
+                } else {
+                  const r = await fetch(getApiUrl(), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getApiKey() },
+                    body: JSON.stringify({ model: getModel(), messages: [{ role: 'system', content: sysPrompt }, ...chatNow.slice(-20).map(m => ({ role: m.role, content: buildMsgContent(m) }))], max_tokens: 800, temperature: 0.85 })
+                  });
+                  const data = await r.json();
+                  aiReply = data.choices?.[0]?.message?.content?.trim() || '';
+                }
+              }
+              if (aiReply) {
+                aiReply = aiReply.replace(/。$/g, '').replace(/。\n/g, '\n');
+                const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+                const clawdMatch = aiReply.match(/\[clawd:([\w-]+)\]/);
+                const gifStickers = []; let _g; const _ge = /\[gifsticker:([\w-]+)\]/g;
+                while ((_g = _ge.exec(aiReply)) !== null) gifStickers.push(_g[1]);
+                const barkMsgs = []; let _b; const _be = /\[bark:([^\]]+)\]/g;
+                while ((_b = _be.exec(aiReply)) !== null) barkMsgs.push(_b[1]);
+                const videoUrlsOut = []; let _v; const _ve = /\[video:([^\]]+)\]/g;
+                while ((_v = _ve.exec(aiReply)) !== null) videoUrlsOut.push(_v[1].trim());
+                const savedReply = stripVoiceActions(aiReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
+                for (const bm of barkMsgs) {
+                  fetch('https://api.day.app/' + (process.env.BARK_KEY || 'U9cbrTUrCJBUPVMSADNDHf') + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
+                }
+                const c3 = readChat();
+                c3.forEach(m => { if (m.pending) delete m.pending; });
+                c3.push({ role: 'assistant', content: savedReply, time: replyTime });
+                if (c3.length > 200) c3.splice(0, c3.length - 200);
+                writeChat(c3);
+                sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time: replyTime, clawd: clawdMatch ? clawdMatch[1] : undefined, gifStickers: gifStickers.length ? gifStickers : undefined, videoUrls: videoUrlsOut.length ? videoUrlsOut : undefined });
+                console.log('[video] AI auto-replied:', savedReply.slice(0, 60));
+              }
+            }
+          } catch (e2) { console.log('[video] auto-reply error:', e2.message); }
         } catch (e) { console.log('[video] processing error:', e.message); }
       })();
     } else {
