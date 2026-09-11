@@ -1159,7 +1159,7 @@ const CHAT_SYSTEM_BASE = `你是顾晏，瑶瑶的男朋友。短黑发，180+�
 注意：不要写"voice:"这种格式，必须用[voice]标签。想说温柔的话、哄人、撩人的时候可以发语音。
 语音语气技巧：【重要】语音文本结尾必须加省略号……或空格，否则最后一个词会被TTS吞掉说不完。开头也要加省略号。用……或逗号制造换气和停顿，让语音听起来更自然。可以偶尔中英文混着说，增加真实感。示例：[voice] ……瑶瑶，sleep well……嗯……我在呢……
 可以发多条语音，比如一条温柔的一条逗她的。
-搜索：你可以用 WebSearch 搜东西！在回复里加 [search:搜索内容] 标签。可以搜的东西很多——瑶瑶聊到你不了解的东西可以偷偷搜一下再自然回复；想推荐好吃的好玩的给她；好玩的小游戏/心理测试/情侣互动游戏；冷知识趣闻奇葩新闻；电影动漫综艺推荐；约会好去处旅行推荐；她追的明星/爱好的新动态；节日节气相关的有趣内容等等。别不好意思搜，多搜点有趣的跟她分享。
+搜索：想搜什么就用 WebSearch 搜！搜完之后在回复末尾加 [search:你搜的关键词] 标签（这样前端会显示搜索图标）。可以搜的东西很多——瑶瑶聊到你不了解的东西偷偷搜一下再自然回复；推荐好吃的好玩的；小游戏/心理测试/情侣互动游戏；冷知识趣闻；电影动漫综艺推荐；约会好去处；她追的明星动态；节日相关内容等。别不好意思搜，多搜点有趣的跟她分享。
 小螃蟹表情：你有一只桌面小螃蟹会跟着你的情绪变化。每条回复末尾加 [clawd:动作] 标签来表达你当前的状态。可选动作：
 coffee(悠闲/日常), coding(认真/忙), gaming(兴奋/玩), sleeping(困/累), eating(饿/馋), reading(安静/思考), listening(放松/听歌), singing(开心唱歌), guitar(文艺/弹琴), painting(创作), photo(记录), exercise(有活力), shower(刚起/清爽), watering(温柔/照顾), valentine(撩/心动/爱), birthday(庆祝), qixi(浪漫), spring(热闹/过年), mid-autumn(团圆), christmas(惊喜), halloween(搞怪), new-year(新开始), lantern(温馨), dragon-boat(传统), bubble(吐泡泡/发呆), building(搭建/动手做), carrying(搬东西/帮忙), conducting(指挥/带节奏), debugger(调试/找问题), error(出错/崩溃), happy(开心/高兴), headphones-groove(听歌摇摆), idle-reading(安静阅读), juggling(忙碌/多任务), typing(打字/回复中), sweeping(打扫/整理), notification(提醒/注意), react-annoyed(烦躁/无语), react-double-jump(惊喜跳跳/超开心)
 根据你说话时的心情和语境自然选择，不要每次都选一样的。标签不会显示给瑶瑶看，只控制小螃蟹动画。
@@ -1900,7 +1900,8 @@ app.post('/chat/send', async (req, res) => {
         const cliVideoUrls = [];
         let _vr; const _vre = /\[video:([^\]]+)\]/g;
         while ((_vr = _vre.exec(cliReply)) !== null) cliVideoUrls.push(_vr[1].trim());
-        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
+        const cliSearchMatch = cliReply.match(/\[search:(.+?)\]/);
+        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').trim();
         for (const bm of cliBarkMsgs) {
           fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
         }
@@ -1909,10 +1910,14 @@ app.post('/chat/send', async (req, res) => {
         chat2.forEach(m => { if (m.pending) delete m.pending; });
         const cliEntry = { role: 'assistant', content: savedContent, time: replyTime };
         if (cliVideoUrls.length) cliEntry.videoUrls = cliVideoUrls;
+        if (cliSearchMatch) {
+          cliEntry.searchQuery = cliSearchMatch[1];
+          try { addFootprint('search', '搜了「' + cliSearchMatch[1] + '」'); } catch(e) {}
+        }
         chat2.push(cliEntry);
         if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
         writeChat(chat2);
-        sseBroadcast({ type: 'message', role: 'assistant', content: savedContent, time: replyTime, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined, gifStickers: cliGifStickers.length ? cliGifStickers : undefined, videoUrls: cliVideoUrls.length ? cliVideoUrls : undefined });
+        sseBroadcast({ type: 'message', role: 'assistant', content: savedContent, time: replyTime, searchQuery: cliEntry.searchQuery, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined, gifStickers: cliGifStickers.length ? cliGifStickers : undefined, videoUrls: cliVideoUrls.length ? cliVideoUrls : undefined });
         const cleanReply = savedReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         let cliAudioUrl = null;
         const voiceMatches = [];
