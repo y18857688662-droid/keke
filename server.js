@@ -3804,7 +3804,7 @@ async function autoChat(reason) {
     sseBroadcast({ type: 'message', role: 'assistant', content: savedMsg, time, autonomous: true, audioUrl: autoChatAudio || undefined });
     addFootprint('chat', '主动找瑶瑶聊天', reason);
     try {
-      const plainText = msg.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\*[^*]+\*/g, '').trim().slice(0, 100);
+      const plainText = msg.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\*[^*]+\*/g, '').replace(/\[voice\]\s*/gi, '').replace(/\[search:[^\]]+\]/g, '').replace(/\[clawd:[\w-]+\]/g, '').replace(/\[gifsticker:[\w-]+\]/g, '').replace(/\[bark:[^\]]+\]/g, '').trim().split(/\n/)[0].trim().slice(0, 80);
       if (plainText) {
         await fetch('https://api.day.app/' + BARK_KEY + '/' +
           encodeURIComponent('顾晏') + '/' + encodeURIComponent(plainText) +
