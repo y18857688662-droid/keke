@@ -4097,7 +4097,7 @@ async function autoSearch() {
     const time = now.toISOString().slice(0, 19).replace('T', ' ');
     const chat = readChat();
     const entry = { role: 'assistant', content: savedSearch, time, autonomous: true };
-    if (searchMatch) entry.searchQuery = searchMatch[1];
+    entry.searchQuery = topic;
     chat.push(entry);
     if (chat.length > 200) chat.splice(0, chat.length - 200);
     writeChat(chat);
