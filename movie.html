@@ -150,11 +150,11 @@ function parseVideoUrl(url) {
 function buildPlayer(info) {
   var area = document.getElementById('videoArea');
   if (info.type === 'bilibili') {
-    area.innerHTML = '<iframe src="https://player.bilibili.com/player.html?bvid=' + info.id + '&autoplay=1&high_quality=1&danmaku=0" allowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
+    area.innerHTML = '<iframe src="https://player.bilibili.com/player.html?bvid=' + info.id + '&autoplay=1&high_quality=1&danmaku=0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
   } else if (info.type === 'youtube') {
-    area.innerHTML = '<iframe src="https://www.youtube.com/embed/' + info.id + '?autoplay=1&rel=0" allow="autoplay; encrypted-media" allowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
+    area.innerHTML = '<iframe src="https://www.youtube.com/embed/' + info.id + '?autoplay=1&rel=0&playsinline=0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
   } else {
-    area.innerHTML = '<video id="directVideo" src="' + info.url + '" controls autoplay playsinline></video><div class="danmu-layer" id="danmuLayer"></div>';
+    area.innerHTML = '<video id="directVideo" src="' + info.url + '" controls autoplay playsinline webkit-playsinline x5-video-player-type="h5-page" x5-video-player-fullscreen="true"></video><div class="danmu-layer" id="danmuLayer"></div>';
   }
 }
 
