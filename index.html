@@ -1680,6 +1680,10 @@ function attachSSE(src) {
         var hs = document.querySelector('.header-status');
         if (hs) hs.innerHTML = '<span class="status-dot"></span>正在输入中...';
       }
+      if (data.type === 'searching') {
+        var hs3 = document.querySelector('.header-status');
+        if (hs3) hs3.innerHTML = '<span class="status-dot"></span>搜索中...';
+      }
       if (data.type === 'message' && data.role === 'assistant') {
         var hs2 = document.querySelector('.header-status');
         if (hs2) hs2.innerHTML = '<span class="status-dot"></span>在线';

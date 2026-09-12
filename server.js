@@ -149,6 +149,12 @@ function setupCliListeners() {
             if (!cliPending.thinking) cliPending.thinking = '';
             cliPending.thinking += thinkBlock.thinking || '';
           }
+          const toolBlock = msg.message.content.find(b => b.type === 'tool_use' && b.name === 'WebSearch');
+          if (toolBlock && cliPending) {
+            const q = toolBlock.input?.query || toolBlock.input?.search_query || '';
+            if (q) cliPending.webSearchQuery = q;
+            sseBroadcast({ type: 'searching', query: q });
+          }
         }
       } catch {}
     }
@@ -398,7 +404,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
       }
       cliPending = null;
     }, 90000);
-    cliPending = { resolve: (text) => { clearTimeout(timeout); resolve({ text, thinking: cliPending?.thinking, usage: cliPending?.usage }); }, reject: (err) => { clearTimeout(timeout); reject(err); }, lastText: null };
+    cliPending = { resolve: (text) => { clearTimeout(timeout); resolve({ text, thinking: cliPending?.thinking, usage: cliPending?.usage, webSearchQuery: cliPending?.webSearchQuery }); }, reject: (err) => { clearTimeout(timeout); reject(err); }, lastText: null };
     const jsonMsg = JSON.stringify({ type: 'user', message: { role: 'user', content }, parent_tool_use_id: null }) + '\n';
     cliProc.stdin.write(jsonMsg);
   });
@@ -1892,6 +1898,7 @@ app.post('/chat/send', async (req, res) => {
       if (typeof cliReply === 'string') cliReply = cliReply.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '').replace(/。(?=\s*\*)/g, '');
       const cliThinking = cliResult?.thinking || '';
       const cliUsage = cliResult?.usage;
+      const cliWebSearchQuery = cliResult?.webSearchQuery || '';
       if (cliReply) {
         cliReply = await processMomentActions(cliReply);
         const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
@@ -1906,6 +1913,7 @@ app.post('/chat/send', async (req, res) => {
         let _vr; const _vre = /\[video:([^\]]+)\]/g;
         while ((_vr = _vre.exec(cliReply)) !== null) cliVideoUrls.push(_vr[1].trim());
         const cliSearchMatch = cliReply.match(/\[search:(.+?)\]/);
+        const cliSearchTopic = cliSearchMatch ? cliSearchMatch[1] : cliWebSearchQuery;
         const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').trim();
         for (const bm of cliBarkMsgs) {
           fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
@@ -1915,9 +1923,9 @@ app.post('/chat/send', async (req, res) => {
         chat2.forEach(m => { if (m.pending) delete m.pending; });
         const cliEntry = { role: 'assistant', content: savedContent, time: replyTime };
         if (cliVideoUrls.length) cliEntry.videoUrls = cliVideoUrls;
-        if (cliSearchMatch) {
-          cliEntry.searchQuery = cliSearchMatch[1];
-          try { addFootprint('search', '搜了「' + cliSearchMatch[1] + '」'); } catch(e) {}
+        if (cliSearchTopic) {
+          cliEntry.searchQuery = cliSearchTopic;
+          try { addFootprint('search', '搜了「' + cliSearchTopic + '」'); } catch(e) {}
         }
         chat2.push(cliEntry);
         if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
