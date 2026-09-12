@@ -1094,6 +1094,9 @@ function renderMessage(msg, idx, stagger) {
     think = thinkMatch[1].trim();
     content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   }
+  // normalize: [voice] must start its own line, *action* must be its own line
+  content = content.replace(/([^\n])\s*\[voice\]/gi, '$1\n[voice]');
+  content = content.replace(/^(\*[^*]+\*)\s*(?!\s*$)(.+)$/gm, '$1\n$2');
   var searchQ = msg.searchQuery || null;
   var sI = content.indexOf('[search:');
   if (sI >= 0) {

@@ -1624,7 +1624,12 @@ function writeChat(data) {
 }
 
 function stripVoiceActions(text) {
-  return text.replace(/(\[voice\]\s*)([^\n]*)/i, (_, tag, voiceLine) => {
+  // normalize: [voice] must start its own line
+  text = text.replace(/([^\n])\s*\[voice\]/gi, '$1\n[voice]');
+  // normalize: *action* at start of line must be separate from following text
+  text = text.replace(/^(\*[^*]+\*)\s*(?!\s*$)(.+)$/gm, '$1\n$2');
+  // strip *actions* from within [voice] lines (keep [voice] tag for front-end)
+  return text.replace(/(\[voice\]\s*)([^\n]*)/gi, (_, tag, voiceLine) => {
     return tag + voiceLine.replace(/\*[^*]+\*/g, '').replace(/\s{2,}/g, ' ').trim();
   });
 }
