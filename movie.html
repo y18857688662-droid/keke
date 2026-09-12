@@ -136,21 +136,31 @@ try { keAvatar = localStorage.getItem('avatar_ke'); } catch(e) {}
 
 function parseVideoUrl(url) {
   url = url.trim();
-  // bilibili
+  // bilibili BV video
   var bvMatch = url.match(/bilibili\.com\/video\/(BV[\w]+)/i) || url.match(/(BV[\w]{10,})/i);
-  if (bvMatch) return { type: 'bilibili', id: bvMatch[1] };
+  if (bvMatch) return { type: 'bilibili', embed: 'bvid=' + bvMatch[1] };
+  // bilibili bangumi episode (ep)
+  var epMatch = url.match(/bilibili\.com\/bangumi\/play\/ep(\d+)/i) || url.match(/b23\.tv\/ep(\d+)/i) || url.match(/\/ep(\d+)/i);
+  if (epMatch) return { type: 'bilibili', embed: 'ep_id=' + epMatch[1] };
+  // bilibili bangumi season (ss)
+  var ssMatch = url.match(/bilibili\.com\/bangumi\/play\/ss(\d+)/i) || url.match(/b23\.tv\/ss(\d+)/i);
+  if (ssMatch) return { type: 'bilibili', embed: 'season_id=' + ssMatch[1] };
+  // b23.tv short link (other types, need server resolve)
+  if (/b23\.tv\//i.test(url)) return { type: 'b23short', url: url };
   // youtube
   var ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/);
   if (ytMatch) return { type: 'youtube', id: ytMatch[1] };
   // direct video
-  if (/\.(mp4|webm|m3u8)(\?|$)/i.test(url) || /^https?:\/\/.+/i.test(url)) return { type: 'direct', url: url };
+  if (/\.(mp4|webm|m3u8)(\?|$)/i.test(url)) return { type: 'direct', url: url };
+  // other URLs - try as direct
+  if (/^https?:\/\/.+/i.test(url)) return { type: 'direct', url: url };
   return null;
 }
 
 function buildPlayer(info) {
   var area = document.getElementById('videoArea');
   if (info.type === 'bilibili') {
-    area.innerHTML = '<iframe src="https://player.bilibili.com/player.html?bvid=' + info.id + '&autoplay=1&high_quality=1&danmaku=0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
+    area.innerHTML = '<iframe src="https://player.bilibili.com/player.html?' + info.embed + '&autoplay=1&high_quality=1&danmaku=0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
   } else if (info.type === 'youtube') {
     area.innerHTML = '<iframe src="https://www.youtube.com/embed/' + info.id + '?autoplay=1&rel=0&playsinline=0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
   } else {
@@ -160,6 +170,33 @@ function buildPlayer(info) {
 
 function quickPick(text) {
   document.getElementById('titleInput').value = text;
+}
+
+function resolveAndStart(videoInfo, url, title) {
+  var movieTitle = title || (videoInfo ? '视频' : '');
+  fetch('/movie/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: movieTitle, url: url || '' })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (!data.ok) { alert(data.error || '出错了'); document.getElementById('startBtn').disabled = false; document.getElementById('startBtn').textContent = '开始看'; return; }
+    movieSession = { title: movieTitle, url: url, videoInfo: videoInfo, startTime: Date.now() };
+    document.getElementById('setupView').style.display = 'none';
+    var wv = document.getElementById('watchView');
+    wv.style.display = 'flex';
+    if (videoInfo) {
+      buildPlayer(videoInfo);
+    } else {
+      document.getElementById('videoArea').innerHTML = '<div class="video-placeholder" style="aspect-ratio:16/9;background:var(--surface2)"><div class="icon">🎬</div><span style="font-size:15px">' + escHtml(movieTitle) + '</span></div><div class="danmu-layer" id="danmuLayer"></div>';
+    }
+    addComment('ke', data.comment || '来啦来啦，开始看！');
+    document.getElementById('topStatus').classList.add('show');
+    scheduleComment(data.nextDelay);
+  }).catch(function() {
+    alert('网络错误');
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('startBtn').textContent = '开始看';
+  });
 }
 
 function startWatching() {
@@ -173,35 +210,28 @@ function startWatching() {
   document.getElementById('startBtn').disabled = true;
   document.getElementById('startBtn').textContent = '准备中...';
 
-  var movieTitle = title || (videoInfo ? '视频' : '');
-
-  fetch('/movie/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: movieTitle, url: url || '' })
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (!data.ok) { alert(data.error || '出错了'); document.getElementById('startBtn').disabled = false; document.getElementById('startBtn').textContent = '开始看'; return; }
-    movieSession = { title: movieTitle, url: url, videoInfo: videoInfo, startTime: Date.now() };
-
-    document.getElementById('setupView').style.display = 'none';
-    var wv = document.getElementById('watchView');
-    wv.style.display = 'flex';
-
-    if (videoInfo) {
-      buildPlayer(videoInfo);
-    } else {
-      document.getElementById('videoArea').innerHTML = '<div class="video-placeholder" style="aspect-ratio:16/9;background:var(--surface2)"><div class="icon">🎬</div><span style="font-size:15px">' + escHtml(movieTitle) + '</span></div><div class="danmu-layer" id="danmuLayer"></div>';
-    }
-
-    addComment('ke', data.comment || '来啦来啦，开始看！');
-    document.getElementById('topStatus').classList.add('show');
-
-    scheduleComment(data.nextDelay);
-  }).catch(function() {
-    alert('网络错误');
-    document.getElementById('startBtn').disabled = false;
-    document.getElementById('startBtn').textContent = '开始看';
-  });
+  if (videoInfo && videoInfo.type === 'b23short') {
+    fetch('/movie/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.ok && data.resolved) {
+        var resolved = parseVideoUrl(data.resolved);
+        resolveAndStart(resolved, data.resolved, title);
+      } else {
+        alert('无法解析这个短链接，试试复制完整的B站链接');
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('startBtn').textContent = '开始看';
+      }
+    }).catch(function() {
+      alert('网络错误');
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('startBtn').textContent = '开始看';
+    });
+  } else {
+    resolveAndStart(videoInfo, url, title);
+  }
 }
 
 function scheduleComment(delaySec) {

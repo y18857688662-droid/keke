@@ -5048,6 +5048,22 @@ app.get('/movie', (req, res) => {
   res.sendFile(path.join(__dirname, 'movie.html'));
 });
 
+app.post('/movie/resolve', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.json({ ok: false });
+  try {
+    const r = await fetch(url, { method: 'HEAD', redirect: 'manual' });
+    const location = r.headers.get('location');
+    if (location) return res.json({ ok: true, resolved: location });
+    const r2 = await fetch(url, { redirect: 'manual' });
+    const loc2 = r2.headers.get('location');
+    if (loc2) return res.json({ ok: true, resolved: loc2 });
+    res.json({ ok: false });
+  } catch(e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 app.post('/movie/start', async (req, res) => {
   const { title, url } = req.body;
   movieWatching = { title: title || '视频', url: url || '', startTime: Date.now(), commentCount: 0 };
