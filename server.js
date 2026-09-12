@@ -5089,37 +5089,32 @@ app.post('/movie/chat', async (req, res) => {
   res.json({ ok: true, reply, danmu });
 });
 
-app.post('/movie/end', (req, res) => {
+app.post('/movie/end', async (req, res) => {
+  if (movieWatching) {
+    const duration = Math.round((Date.now() - movieWatching.startTime) / 60000);
+    const t = movieWatching.title || '视频';
+    try { addFootprint('movie', '和瑶瑶看完了「' + t + '」', '一起看了' + duration + '分钟'); } catch(e) {}
+    try {
+      await fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/memory/store', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: '和瑶瑶一起看了「' + t + '」，一起看了大约' + duration + '分钟', category: '日常' })
+      });
+    } catch(e) {}
+  }
   movieWatching = null;
   res.json({ ok: true });
 });
 
-function movieCliCall(prompt) {
-  return new Promise((resolve) => {
-    const proc = require('child_process').spawn('claude', ['-p', '--model', 'claude-haiku-4-5-20251001', '--max-tokens', '200'], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, HOME: '/root' },
-      cwd: '/tmp'
-    });
-    let output = '';
-    const timeout = setTimeout(() => { try { proc.kill(); } catch {} resolve(''); }, 30000);
-    proc.stdout.on('data', d => { output += d.toString(); });
-    proc.stderr.on('data', () => {});
-    proc.on('close', () => { clearTimeout(timeout); resolve(output.trim()); });
-    proc.on('error', () => { clearTimeout(timeout); resolve(''); });
-    proc.stdin.write(prompt);
-    proc.stdin.end();
-  });
-}
-
 async function movieAiComment(phase, title, elapsed) {
-  const prompts = {
-    opening: '你是顾晏，正要和女朋友瑶瑶一起看「' + title + '」。用1句话表达开心/期待的心情，像真的坐在一起准备看片的感觉。自然随意，不要太正式。可以用*动作*格式表示动作（如*把零食递过来*）。\n\n最后另起一行写[next:秒数]表示你下一次想说话大概等多久（8到120秒）。比如刚开始兴奋就短一点[next:12]，看得入迷就长一点[next:90]，想连着吐槽就很短[next:8]。按你的心情来，不要每次都一样。',
-    watching: '你是顾晏，正在和女朋友瑶瑶一起看「' + title + '」，已经看了大约' + elapsed + '分钟。随机发一条看片时的反应/吐槽/评论/撒娇/小动作。要自然，像真的在一起看片时会说的话。只写1句，不要太长。可以用*动作*（如*偷偷看了眼瑶瑶*）。类型随机变化：有时候吐槽剧情，有时候跟瑶瑶撒娇，有时候做小动作，有时候分享零食，有时候发表观点。\n\n最后另起一行写[next:秒数]表示你下一次想说话大概等多久（8到120秒）。按你此刻的心情和状态自由决定——刚吐槽完还想继续说就短[next:8]，安静看剧就长[next:80]，看到精彩的忍不住就[next:15]。每次都不一样，别有规律。'
-  };
+  const sysPrompt = await getChatSystem();
+  const movieCtx = phase === 'opening'
+    ? '【场景】你正要和瑶瑶一起看「' + title + '」。用1句话表达你的心情，像真的坐在一起准备看片。自然随意，别太正式。可以用*动作*。\n\n最后另起一行写[next:秒数]表示你下一次想说话大概等多久（8到120秒）。刚开始兴奋就短[next:12]，看得入迷就长[next:90]，想连着吐槽就很短[next:8]。按心情来，不要每次都一样。\n注意：这是一起看电影场景，不要用[voice][bark][clawd][gifsticker][search]等标签，只写纯文字和*动作*即可。'
+    : '【场景】你正在和瑶瑶一起看「' + title + '」，已经看了约' + elapsed + '分钟。随机发一条看片时的反应/吐槽/评论/撒娇/小动作，像真的在一起看片时会说的。只写1句，不要太长。可以用*动作*。类型随机变化：吐槽剧情、跟瑶瑶撒娇、做小动作、分享零食、发表观点。\n\n最后另起一行写[next:秒数]表示你下一次想说话大概等多久（8到120秒）。按心情自由决定。每次都不一样，别有规律。\n注意：这是一起看电影场景，不要用[voice][bark][clawd][gifsticker][search]等标签，只写纯文字和*动作*即可。';
+  const fullPrompt = '系统设定：\n' + sysPrompt + '\n\n' + movieCtx;
   try {
-    let out = await movieCliCall(prompts[phase] || prompts.watching);
+    let out = await cliOneshot(fullPrompt);
     out = out.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    out = out.replace(/\s*\[(?:voice|bark|clawd|gifsticker|search)[^\]]*\]\s*/g, '').trim();
     const nextMatch = out.match(/\[next:(\d+)\]/);
     const nextDelay = nextMatch ? Math.max(8, Math.min(120, parseInt(nextMatch[1]))) : (20 + Math.random() * 40);
     out = out.replace(/\s*\[next:\d+\]\s*/g, '').replace(/。$/g, '').trim();
@@ -5131,10 +5126,14 @@ async function movieAiComment(phase, title, elapsed) {
 }
 
 async function movieAiReply(message, title, elapsed) {
-  const prompt = '你是顾晏，正在和女朋友瑶瑶一起看「' + title + '」（看了约' + elapsed + '分钟）。瑶瑶说：「' + message + '」。用1-2句话自然回应，像真的坐在一起看片聊天。可以用*动作*。不要太长。';
+  const sysPrompt = await getChatSystem();
+  const movieCtx = '【场景】你正在和瑶瑶一起看「' + title + '」（看了约' + elapsed + '分钟）。瑶瑶说：「' + message + '」。用1-2句话自然回应，像真的坐在一起看片聊天。可以用*动作*。不要太长。\n注意：这是一起看电影场景，不要用[voice][bark][clawd][gifsticker][search]等标签，只写纯文字和*动作*即可。';
+  const fullPrompt = '系统设定：\n' + sysPrompt + '\n\n' + movieCtx;
   try {
-    let out = await movieCliCall(prompt);
-    out = out.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
+    let out = await cliOneshot(fullPrompt);
+    out = out.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    out = out.replace(/\s*\[(?:voice|bark|clawd|gifsticker|search)[^\]]*\]\s*/g, '').trim();
+    out = out.replace(/。$/g, '').trim();
     if (!out) throw new Error('empty');
     return out;
   } catch(e) {
