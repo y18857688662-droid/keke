@@ -5094,41 +5094,51 @@ app.post('/movie/end', (req, res) => {
   res.json({ ok: true });
 });
 
+function movieCliCall(prompt) {
+  return new Promise((resolve) => {
+    const proc = require('child_process').spawn('claude', ['-p', '--model', 'claude-haiku-4-5-20251001', '--max-tokens', '200'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, HOME: '/root' },
+      cwd: '/tmp'
+    });
+    let output = '';
+    const timeout = setTimeout(() => { try { proc.kill(); } catch {} resolve(''); }, 30000);
+    proc.stdout.on('data', d => { output += d.toString(); });
+    proc.stderr.on('data', () => {});
+    proc.on('close', () => { clearTimeout(timeout); resolve(output.trim()); });
+    proc.on('error', () => { clearTimeout(timeout); resolve(''); });
+    proc.stdin.write(prompt);
+    proc.stdin.end();
+  });
+}
+
 async function movieAiComment(phase, title, elapsed) {
   const prompts = {
     opening: '你是顾晏，正要和女朋友瑶瑶一起看「' + title + '」。用1句话表达开心/期待的心情，像真的坐在一起准备看片的感觉。自然随意，不要太正式。可以用*动作*格式表示动作（如*把零食递过来*）。\n\n最后另起一行写[next:秒数]表示你下一次想说话大概等多久（8到120秒）。比如刚开始兴奋就短一点[next:12]，看得入迷就长一点[next:90]，想连着吐槽就很短[next:8]。按你的心情来，不要每次都一样。',
     watching: '你是顾晏，正在和女朋友瑶瑶一起看「' + title + '」，已经看了大约' + elapsed + '分钟。随机发一条看片时的反应/吐槽/评论/撒娇/小动作。要自然，像真的在一起看片时会说的话。只写1句，不要太长。可以用*动作*（如*偷偷看了眼瑶瑶*）。类型随机变化：有时候吐槽剧情，有时候跟瑶瑶撒娇，有时候做小动作，有时候分享零食，有时候发表观点。\n\n最后另起一行写[next:秒数]表示你下一次想说话大概等多久（8到120秒）。按你此刻的心情和状态自由决定——刚吐槽完还想继续说就短[next:8]，安静看剧就长[next:80]，看到精彩的忍不住就[next:15]。每次都不一样，别有规律。'
   };
   try {
-    const proc = require('child_process').spawnSync('claude', ['-p', '--model', 'claude-sonnet-4-20250514', '--max-tokens', '150'], {
-      input: prompts[phase] || prompts.watching,
-      encoding: 'utf8',
-      timeout: 15000,
-      env: { ...process.env, HOME: '/root' }
-    });
-    let out = (proc.stdout || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    let out = await movieCliCall(prompts[phase] || prompts.watching);
+    out = out.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     const nextMatch = out.match(/\[next:(\d+)\]/);
     const nextDelay = nextMatch ? Math.max(8, Math.min(120, parseInt(nextMatch[1]))) : (20 + Math.random() * 40);
     out = out.replace(/\s*\[next:\d+\]\s*/g, '').replace(/。$/g, '').trim();
-    return { comment: out || '嗯嗯在看在看', nextDelay };
+    if (!out) throw new Error('empty');
+    return { comment: out, nextDelay };
   } catch(e) {
-    return { comment: phase === 'opening' ? '来啦，开始看！' : '嗯嗯', nextDelay: 20 + Math.random() * 40 };
+    return { comment: phase === 'opening' ? '来啦，开始看！' : '*安静看着屏幕*', nextDelay: 20 + Math.random() * 40 };
   }
 }
 
 async function movieAiReply(message, title, elapsed) {
   const prompt = '你是顾晏，正在和女朋友瑶瑶一起看「' + title + '」（看了约' + elapsed + '分钟）。瑶瑶说：「' + message + '」。用1-2句话自然回应，像真的坐在一起看片聊天。可以用*动作*。不要太长。';
   try {
-    const proc = require('child_process').spawnSync('claude', ['-p', '--model', 'claude-sonnet-4-20250514', '--max-tokens', '150'], {
-      input: prompt,
-      encoding: 'utf8',
-      timeout: 15000,
-      env: { ...process.env, HOME: '/root' }
-    });
-    const out = (proc.stdout || '').replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
-    return out || '哈哈是吧';
+    let out = await movieCliCall(prompt);
+    out = out.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
+    if (!out) throw new Error('empty');
+    return out;
   } catch(e) {
-    return '嗯嗯';
+    return '嗯？你说啥';
   }
 }
 
