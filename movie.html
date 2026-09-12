@@ -196,7 +196,7 @@ function startWatching() {
     addComment('ke', data.comment || '来啦来啦，开始看！');
     document.getElementById('topStatus').classList.add('show');
 
-    scheduleComment();
+    scheduleComment(data.nextDelay);
   }).catch(function() {
     alert('网络错误');
     document.getElementById('startBtn').disabled = false;
@@ -204,11 +204,11 @@ function startWatching() {
   });
 }
 
-function scheduleComment() {
+function scheduleComment(delaySec) {
   if (commentTimer) clearTimeout(commentTimer);
-  var delay = 25000 + Math.random() * 35000;
-  if (commentCount < 2) delay = 10000 + Math.random() * 10000;
-  commentTimer = setTimeout(function() { fetchComment(); }, delay);
+  var ms = delaySec ? delaySec * 1000 : (20000 + Math.random() * 40000);
+  var jitter = ms * (0.8 + Math.random() * 0.4);
+  commentTimer = setTimeout(function() { fetchComment(); }, jitter);
 }
 
 function fetchComment() {
@@ -224,7 +224,7 @@ function fetchComment() {
       addComment('ke', data.comment);
       if (data.danmu) fireDanmu(data.danmu);
     }
-    if (movieSession) scheduleComment();
+    if (movieSession) scheduleComment(data.nextDelay);
   }).catch(function() {
     if (movieSession) scheduleComment();
   });
