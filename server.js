@@ -1989,7 +1989,7 @@ app.post('/chat/send', async (req, res) => {
             }
           })().catch(() => {});
         }
-        res.json({ ok: true, reply: savedContent, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined, gifStickers: cliGifStickers.length ? cliGifStickers : undefined, videoUrls: cliVideoUrls.length ? cliVideoUrls : undefined });
+        res.json({ ok: true, reply: savedContent, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl, searchQuery: cliEntry.searchQuery, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined, gifStickers: cliGifStickers.length ? cliGifStickers : undefined, videoUrls: cliVideoUrls.length ? cliVideoUrls : undefined });
         (async () => {
           try {
             const last5 = chat2.slice(-6);
@@ -2110,7 +2110,7 @@ app.post('/chat/send', async (req, res) => {
         }
       })().catch(() => {});
     }
-    res.json({ ok: true, reply: savedContentApi, time: replyTime, memoryLoaded });
+    res.json({ ok: true, reply: savedContentApi, time: replyTime, memoryLoaded, searchQuery: replyMsg.searchQuery });
     (async () => {
       try {
         const last5 = chat2.slice(-6);
