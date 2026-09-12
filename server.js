@@ -5066,9 +5066,10 @@ app.post('/movie/resolve', async (req, res) => {
 
 app.post('/movie/start', async (req, res) => {
   const { title, url } = req.body;
-  movieWatching = { title: title || '视频', url: url || '', startTime: Date.now(), commentCount: 0 };
+  movieWatching = { title: title || '视频', url: url || '', startTime: Date.now(), commentCount: 0, log: [] };
   try { addFootprint('movie', '和瑶瑶一起看「' + (title || '视频') + '」'); } catch(e) {}
   const result = await movieAiComment('opening', title || '视频', 0);
+  if (movieWatching) movieWatching.log.push({ who: '顾晏', text: result.comment });
   res.json({ ok: true, comment: result.comment, nextDelay: result.nextDelay });
 });
 
@@ -5077,6 +5078,7 @@ app.post('/movie/comment', async (req, res) => {
   if (!movieWatching) return res.json({ ok: false });
   movieWatching.commentCount = (count || 0) + 1;
   const result = await movieAiComment('watching', title || movieWatching.title, elapsed || 0);
+  if (movieWatching) movieWatching.log.push({ who: '顾晏', text: result.comment });
   const danmu = result.comment.length < 20 ? result.comment.replace(/^\*|\*$/g, '') : null;
   res.json({ ok: true, comment: result.comment, danmu, nextDelay: result.nextDelay });
 });
@@ -5084,7 +5086,9 @@ app.post('/movie/comment', async (req, res) => {
 app.post('/movie/chat', async (req, res) => {
   const { message, title, elapsed } = req.body;
   if (!message) return res.json({ ok: false });
+  if (movieWatching) movieWatching.log.push({ who: '瑶瑶', text: message });
   const reply = await movieAiReply(message, title || (movieWatching ? movieWatching.title : '视频'), elapsed || 0);
+  if (movieWatching) movieWatching.log.push({ who: '顾晏', text: reply });
   const danmu = reply.length < 20 ? reply.replace(/^\*|\*$/g, '') : null;
   res.json({ ok: true, reply, danmu });
 });
@@ -5093,13 +5097,19 @@ app.post('/movie/end', async (req, res) => {
   if (movieWatching) {
     const duration = Math.round((Date.now() - movieWatching.startTime) / 60000);
     const t = movieWatching.title || '视频';
-    try { addFootprint('movie', '和瑶瑶看完了「' + t + '」', '一起看了' + duration + '分钟'); } catch(e) {}
-    try {
-      await fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/memory/store', {
+    const log = movieWatching.log || [];
+    const logText = log.slice(-30).map(l => l.who + '：' + l.text).join('\n');
+    try { addFootprint('movie', '和瑶瑶看完了「' + t + '」', '一起看了' + duration + '分钟，聊了' + log.length + '条'); } catch(e) {}
+    // 让AI自己写这段观影回忆
+    const memPrompt = '你是顾晏。你刚和女朋友瑶瑶一起看了「' + t + '」，看了大约' + duration + '分钟。以下是你们看片时的对话记录：\n' + logText + '\n\n请用顾晏的第一人称视角，写一段简短的观影回忆（2-3句话），记录你们看了什么、过程中聊了什么、有什么印象深刻的瞬间。写得自然温暖，像日记一样。不要用标签，不要用星号动作，纯文字。';
+    cliOneshot(memPrompt).then(memOut => {
+      let summary = (memOut || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      if (!summary || summary.length < 5) summary = '和瑶瑶一起看了「' + t + '」，看了' + duration + '分钟';
+      fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/memory/store', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: '和瑶瑶一起看了「' + t + '」，一起看了大约' + duration + '分钟', category: '日常' })
-      });
-    } catch(e) {}
+        body: JSON.stringify({ text: summary, category: '日常' })
+      }).catch(() => {});
+    }).catch(() => {});
   }
   movieWatching = null;
   res.json({ ok: true });
