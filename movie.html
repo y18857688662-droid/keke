@@ -2,64 +2,34 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>一起看</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg: #0d0f0c; --surface: #1a1d18; --surface2: #242822;
   --text: #e2e8de; --text-mid: #a0a89c; --text-soft: #6a726a;
   --accent: #7B8F6B; --accent-soft: rgba(123,143,107,.15);
-  --border: #2e332b; --danmu-bg: rgba(20,23,18,.85);
+  --border: #2e332b;
   --font: -apple-system, "SF Pro Display", "PingFang SC", system-ui, sans-serif;
   --radius: 14px;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+html, body { height: 100%; height: 100dvh; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); display: flex; flex-direction: column; }
 
-.top-bar { display: flex; align-items: center; padding: 12px 16px; gap: 12px; flex-shrink: 0; z-index: 10; }
+/* ===== top bar ===== */
+.top-bar { display: flex; align-items: center; padding: 10px 16px; gap: 12px; flex-shrink: 0; z-index: 10; padding-top: calc(10px + env(safe-area-inset-top)); }
 .back-btn { background: none; border: none; color: var(--text-mid); font-size: 20px; cursor: pointer; padding: 4px; }
 .top-title { font-size: 15px; font-weight: 500; flex: 1; }
-.top-status { font-size: 12px; color: var(--accent); opacity: 0; transition: opacity .3s; }
+.top-status { font-size: 12px; color: var(--accent); opacity: 0; transition: opacity .3s; white-space: nowrap; }
 .top-status.show { opacity: 1; }
 
-.video-area { position: relative; width: 100%; background: #000; flex-shrink: 0; }
-.video-area iframe, .video-area video { width: 100%; aspect-ratio: 16/9; display: block; border: none; }
-.video-placeholder { width: 100%; aspect-ratio: 16/9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: var(--surface); color: var(--text-soft); }
+/* ===== setup view ===== */
+.setup-view { flex: 1; display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.video-placeholder { width: 100%; aspect-ratio: 16/9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: var(--surface); color: var(--text-soft); flex-shrink: 0; }
 .video-placeholder .icon { font-size: 48px; opacity: .4; }
-
-.danmu-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; z-index: 5; }
-.danmu { position: absolute; white-space: nowrap; font-size: 14px; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,.7); animation: danmuScroll linear forwards; pointer-events: none; }
-@keyframes danmuScroll {
-  from { transform: translateX(100vw); }
-  to { transform: translateX(-100%); }
-}
-
-.comment-area { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-
-.comments-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
-.comment-item { display: flex; gap: 10px; align-items: flex-start; animation: fadeInUp .3s ease; }
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.comment-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--surface2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.comment-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.comment-avatar svg { width: 100%; height: 100%; }
-.comment-body { flex: 1; min-width: 0; }
-.comment-name { font-size: 11px; color: var(--text-soft); margin-bottom: 2px; }
-.comment-text { font-size: 14px; line-height: 1.5; color: var(--text); }
-.comment-text.action { font-style: italic; color: var(--text-mid); }
-.comment-time { font-size: 10px; color: var(--text-soft); margin-top: 2px; }
-
-.input-area { flex-shrink: 0; padding: 10px 16px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); display: flex; gap: 8px; background: var(--surface); }
-.input-area input { flex: 1; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; color: var(--text); font-size: 14px; outline: none; }
-.input-area input::placeholder { color: var(--text-soft); }
-.input-area input:focus { border-color: var(--accent); }
-.input-area button { padding: 10px 18px; background: var(--accent); color: #fff; border: none; border-radius: 20px; font-size: 14px; font-weight: 500; cursor: pointer; flex-shrink: 0; }
-.input-area button:active { opacity: .8; }
-
-.setup-panel { padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
+.setup-panel { padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
 .setup-label { font-size: 13px; color: var(--text-mid); margin-bottom: 6px; }
 .setup-input { width: 100%; padding: 12px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; outline: none; }
 .setup-input:focus { border-color: var(--accent); }
@@ -68,17 +38,80 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 .setup-btn { padding: 14px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
 .setup-btn:active { opacity: .8; }
 .setup-btn:disabled { opacity: .4; cursor: default; }
-
 .quick-picks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .quick-pick { padding: 8px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; font-size: 13px; color: var(--text-mid); cursor: pointer; }
-.quick-pick:hover { border-color: var(--accent); color: var(--accent); }
+.quick-pick:active { border-color: var(--accent); color: var(--accent); }
 
-.end-bar { text-align: center; padding: 12px; }
-.end-btn { padding: 10px 24px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; color: var(--text-mid); font-size: 13px; cursor: pointer; }
-.end-btn:hover { border-color: #D4756B; color: #D4756B; }
+/* ===== watch view — fixed full height ===== */
+.watch-view { flex: 1; display: none; flex-direction: column; min-height: 0; }
+.watch-view.active { display: flex; }
 
-.empty-tip { text-align: center; color: var(--text-soft); font-size: 13px; padding: 40px 20px; opacity: .6; }
+/* video */
+.video-area { position: relative; width: 100%; background: #000; flex-shrink: 0; z-index: 1; }
+.video-area iframe, .video-area video { width: 100%; aspect-ratio: 16/9; display: block; border: none; }
+.danmu-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+.danmu { position: absolute; white-space: nowrap; font-size: 14px; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,.7); animation: danmuScroll linear forwards; pointer-events: none; }
+@keyframes danmuScroll { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
 
+/* fullscreen button on video */
+.fs-btn { position: absolute; top: 8px; right: 8px; z-index: 6; width: 32px; height: 32px; background: rgba(0,0,0,.5); border: none; border-radius: 8px; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+.fs-btn:active { opacity: .7; }
+
+/* ===== chat container — fills remaining space ===== */
+.chat-container { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--bg); }
+.comments-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.comment-item { display: flex; gap: 10px; align-items: flex-start; animation: fadeInUp .3s ease; flex-shrink: 0; }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.comment-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--surface2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.comment-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.comment-avatar svg { width: 100%; height: 100%; }
+.comment-body { flex: 1; min-width: 0; }
+.comment-name { font-size: 11px; color: var(--text-soft); margin-bottom: 2px; }
+.comment-text { font-size: 14px; line-height: 1.5; color: var(--text); word-break: break-word; }
+.comment-text .action { color: var(--text-mid); font-size: 13px; }
+
+.input-bar { flex-shrink: 0; padding: 8px 16px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; background: var(--surface); }
+.input-bar input { flex: 1; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; color: var(--text); font-size: 14px; outline: none; min-width: 0; }
+.input-bar input::placeholder { color: var(--text-soft); }
+.input-bar input:focus { border-color: var(--accent); }
+.input-bar button { padding: 10px 16px; background: var(--accent); color: #fff; border: none; border-radius: 20px; font-size: 14px; font-weight: 500; cursor: pointer; flex-shrink: 0; }
+.input-bar button:active { opacity: .8; }
+.end-btn { padding: 6px 12px; background: none; border: 1px solid var(--border); border-radius: 16px; color: var(--text-soft); font-size: 12px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+.end-btn:active { border-color: #D4756B; color: #D4756B; }
+
+/* ===== custom fullscreen mode ===== */
+body.fs-mode .top-bar { display: none; }
+body.fs-mode .video-area { position: fixed; inset: 0; z-index: 200; }
+body.fs-mode .video-area iframe,
+body.fs-mode .video-area video { width: 100%; height: 100%; aspect-ratio: auto; object-fit: contain; }
+body.fs-mode .chat-container { display: none; }
+body.fs-mode .fs-btn { display: none; }
+
+/* floating chat bubble in fullscreen */
+.chat-bubble { display: none; position: fixed; bottom: 28px; right: 16px; z-index: 300; width: 48px; height: 48px; border-radius: 50%; background: var(--accent); border: none; color: #fff; font-size: 20px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.4); align-items: center; justify-content: center; transition: transform .2s; }
+.chat-bubble:active { transform: scale(.9); }
+.chat-bubble .badge { position: absolute; top: -2px; right: -2px; width: 16px; height: 16px; background: #D4756B; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+body.fs-mode .chat-bubble { display: flex; }
+body.fs-mode .chat-bubble.panel-open { width: 36px; height: 36px; bottom: auto; top: 12px; right: 12px; background: rgba(255,255,255,.15); font-size: 16px; box-shadow: none; backdrop-filter: blur(4px); }
+
+/* floating chat panel in fullscreen */
+.chat-float { display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 250; max-height: 55vh; background: var(--bg); border-top-left-radius: 16px; border-top-right-radius: 16px; flex-direction: column; box-shadow: 0 -4px 24px rgba(0,0,0,.5); animation: slideUp .25s ease; }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.chat-float.active { display: flex; }
+.chat-float .float-header { padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.chat-float .float-header span { font-size: 13px; color: var(--text-mid); }
+.chat-float .float-close { background: none; border: none; color: var(--text-soft); font-size: 18px; cursor: pointer; padding: 4px; }
+.chat-float .float-messages { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.chat-float .float-input { flex-shrink: 0; padding: 8px 12px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); display: flex; gap: 8px; border-top: 1px solid var(--border); }
+.chat-float .float-input input { flex: 1; padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 18px; color: var(--text); font-size: 13px; outline: none; min-width: 0; }
+.chat-float .float-input input::placeholder { color: var(--text-soft); }
+.chat-float .float-input button { padding: 8px 14px; background: var(--accent); color: #fff; border: none; border-radius: 18px; font-size: 13px; cursor: pointer; flex-shrink: 0; }
+.float-msg { font-size: 13px; line-height: 1.4; }
+.float-msg .fname { color: var(--text-soft); font-size: 11px; }
+.float-msg .ftext { color: var(--text); margin-top: 1px; }
+.float-msg .ftext .action { color: var(--text-mid); font-size: 12px; }
+
+/* bangumi placeholder */
 .bangumi-placeholder { width: 100%; aspect-ratio: 16/9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: linear-gradient(135deg, var(--surface) 0%, #1e2318 100%); position: relative; overflow: hidden; }
 .bangumi-placeholder::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 40%, rgba(123,143,107,.12) 0%, transparent 60%); }
 .bangumi-icon { font-size: 40px; opacity: .5; position: relative; }
@@ -86,16 +119,22 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 .bangumi-open-btn { padding: 10px 24px; background: var(--accent); color: #fff; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; position: relative; display: flex; align-items: center; gap: 6px; }
 .bangumi-open-btn:active { opacity: .8; }
 .bangumi-hint { font-size: 11px; color: var(--text-soft); position: relative; opacity: .6; }
+
+/* exit fullscreen button */
+.exit-fs-btn { display: none; position: fixed; top: 12px; left: 12px; z-index: 300; padding: 6px 14px; background: rgba(0,0,0,.5); border: none; border-radius: 16px; color: #fff; font-size: 13px; cursor: pointer; backdrop-filter: blur(4px); }
+.exit-fs-btn:active { opacity: .7; }
+body.fs-mode .exit-fs-btn { display: block; }
 </style>
 </head>
 <body>
 <div class="top-bar">
-  <button class="back-btn" onclick="location.href='/'">‹</button>
+  <button class="back-btn" onclick="location.href='/'">&#8249;</button>
   <div class="top-title">一起看</div>
   <div class="top-status" id="topStatus">顾晏正在看...</div>
 </div>
 
-<div id="setupView">
+<!-- Setup -->
+<div class="setup-view" id="setupView">
   <div class="video-placeholder">
     <div class="icon">🎬</div>
     <span>和顾晏一起看电影</span>
@@ -123,15 +162,31 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   </div>
 </div>
 
-<div id="watchView" style="display:none; flex-direction:column;">
+<!-- Watch -->
+<div class="watch-view" id="watchView">
   <div class="video-area" id="videoArea"></div>
-  <div class="comment-area">
+  <div class="chat-container">
     <div class="comments-list" id="commentsList"></div>
-    <div class="end-bar"><button class="end-btn" onclick="endWatching()">结束观影</button></div>
-    <div class="input-area">
+    <div class="input-bar">
+      <button class="end-btn" onclick="endWatching()">结束</button>
       <input id="chatInput" placeholder="跟顾晏说点什么..." autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.isComposing)sendChat()">
       <button onclick="sendChat()">发送</button>
     </div>
+  </div>
+</div>
+
+<!-- Fullscreen floating UI -->
+<button class="chat-bubble" id="chatBubble" onclick="toggleFloatChat()">💬<span class="badge" id="chatBadge" hidden>0</span></button>
+<button class="exit-fs-btn" id="exitFsBtn" onclick="exitFullscreen()">&#8249; 退出全屏</button>
+<div class="chat-float" id="chatFloat">
+  <div class="float-header">
+    <span>顾晏</span>
+    <button class="float-close" onclick="toggleFloatChat()">&#10005;</button>
+  </div>
+  <div class="float-messages" id="floatMessages"></div>
+  <div class="float-input">
+    <input id="floatInput" placeholder="说点什么..." autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.isComposing)sendFloatChat()">
+    <button onclick="sendFloatChat()">发送</button>
   </div>
 </div>
 
@@ -139,48 +194,43 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 var movieSession = null;
 var commentTimer = null;
 var commentCount = 0;
+var unreadInFs = 0;
 var keAvatar = null;
 try { keAvatar = localStorage.getItem('avatar_ke'); } catch(e) {}
 
 function parseVideoUrl(url) {
   url = url.trim();
-  // bilibili BV video
   var bvMatch = url.match(/bilibili\.com\/video\/(BV[\w]+)/i) || url.match(/(BV[\w]{10,})/i);
   if (bvMatch) return { type: 'bilibili', embed: 'bvid=' + bvMatch[1] };
-  // bilibili bangumi episode (ep) — can't embed, need external link
   var epMatch = url.match(/bilibili\.com\/bangumi\/play\/ep(\d+)/i) || url.match(/b23\.tv\/ep(\d+)/i) || url.match(/\/ep(\d+)/i);
   if (epMatch) return { type: 'bangumi', epId: epMatch[1], link: 'https://www.bilibili.com/bangumi/play/ep' + epMatch[1] };
-  // bilibili bangumi season (ss)
   var ssMatch = url.match(/bilibili\.com\/bangumi\/play\/ss(\d+)/i) || url.match(/b23\.tv\/ss(\d+)/i);
   if (ssMatch) return { type: 'bangumi', ssId: ssMatch[1], link: 'https://www.bilibili.com/bangumi/play/ss' + ssMatch[1] };
-  // b23.tv short link (other types, need server resolve)
   if (/b23\.tv\//i.test(url)) return { type: 'b23short', url: url };
-  // youtube
   var ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/);
   if (ytMatch) return { type: 'youtube', id: ytMatch[1] };
-  // direct video
   if (/\.(mp4|webm|m3u8)(\?|$)/i.test(url)) return { type: 'direct', url: url };
-  // other URLs - try as direct
   if (/^https?:\/\/.+/i.test(url)) return { type: 'direct', url: url };
   return null;
 }
 
 function buildPlayer(info) {
   var area = document.getElementById('videoArea');
+  var fsBtn = '<button class="fs-btn" onclick="enterFullscreen()" title="全屏">&#x26F6;</button>';
   if (info.type === 'bangumi') {
     var titleText = document.getElementById('titleInput').value.trim() || '番剧';
     area.innerHTML = '<div class="bangumi-placeholder">' +
       '<div class="bangumi-icon">📺</div>' +
       '<div class="bangumi-title">「' + escHtml(titleText) + '」是B站版权内容<br>需要在B站观看</div>' +
-      '<button class="bangumi-open-btn" onclick="window.open(\'' + info.link + '\',\'_blank\')">▶ 在B站打开</button>' +
+      '<button class="bangumi-open-btn" onclick="window.open(\'' + info.link + '\',\'_blank\')">&#9654; 在B站打开</button>' +
       '<div class="bangumi-hint">顾晏会在下面陪你聊天哦~</div>' +
       '</div><div class="danmu-layer" id="danmuLayer"></div>';
   } else if (info.type === 'bilibili') {
-    area.innerHTML = '<iframe src="https://player.bilibili.com/player.html?' + info.embed + '&autoplay=1&high_quality=1&danmaku=0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
+    area.innerHTML = '<iframe src="https://player.bilibili.com/player.html?' + info.embed + '&autoplay=1&high_quality=1&danmaku=0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe>' + fsBtn + '<div class="danmu-layer" id="danmuLayer"></div>';
   } else if (info.type === 'youtube') {
-    area.innerHTML = '<iframe src="https://www.youtube.com/embed/' + info.id + '?autoplay=1&rel=0&playsinline=0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
+    area.innerHTML = '<iframe src="https://www.youtube.com/embed/' + info.id + '?autoplay=1&rel=0&playsinline=1" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe>' + fsBtn + '<div class="danmu-layer" id="danmuLayer"></div>';
   } else {
-    area.innerHTML = '<video id="directVideo" src="' + info.url + '" controls autoplay playsinline webkit-playsinline x5-video-player-type="h5-page" x5-video-player-fullscreen="true"></video><div class="danmu-layer" id="danmuLayer"></div>';
+    area.innerHTML = '<video id="directVideo" src="' + info.url + '" controls autoplay playsinline webkit-playsinline></video>' + fsBtn + '<div class="danmu-layer" id="danmuLayer"></div>';
   }
 }
 
@@ -188,18 +238,79 @@ function quickPick(text) {
   document.getElementById('titleInput').value = text;
 }
 
+/* ===== fullscreen ===== */
+function enterFullscreen() {
+  document.body.classList.add('fs-mode');
+  unreadInFs = 0;
+  updateBadge();
+  try { screen.orientation.lock('landscape').catch(function(){}); } catch(e) {}
+}
+function exitFullscreen() {
+  document.body.classList.remove('fs-mode');
+  document.getElementById('chatFloat').classList.remove('active');
+  document.getElementById('chatBubble').classList.remove('panel-open');
+  try { screen.orientation.unlock(); } catch(e) {}
+  // scroll main chat to bottom
+  var list = document.getElementById('commentsList');
+  if (list) list.scrollTop = list.scrollHeight;
+}
+function toggleFloatChat() {
+  var panel = document.getElementById('chatFloat');
+  var bubble = document.getElementById('chatBubble');
+  if (panel.classList.contains('active')) {
+    panel.classList.remove('active');
+    bubble.classList.remove('panel-open');
+  } else {
+    panel.classList.add('active');
+    bubble.classList.add('panel-open');
+    unreadInFs = 0;
+    updateBadge();
+    var fm = document.getElementById('floatMessages');
+    fm.scrollTop = fm.scrollHeight;
+    document.getElementById('floatInput').focus();
+  }
+}
+function updateBadge() {
+  var badge = document.getElementById('chatBadge');
+  if (unreadInFs > 0 && !document.getElementById('chatFloat').classList.contains('active')) {
+    badge.textContent = unreadInFs > 9 ? '9+' : unreadInFs;
+    badge.hidden = false;
+  } else {
+    badge.hidden = true;
+  }
+}
+function sendFloatChat() {
+  var input = document.getElementById('floatInput');
+  var text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  addComment('yao', text);
+  var elapsed = movieSession ? Math.round((Date.now() - movieSession.startTime) / 60000) : 0;
+  fetch('/movie/chat', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: text, title: movieSession ? movieSession.title : '', elapsed: elapsed })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.ok && data.reply) {
+      addComment('ke', data.reply);
+      if (data.danmu) fireDanmu(data.danmu);
+      if (commentTimer) clearTimeout(commentTimer);
+      scheduleComment();
+    }
+  }).catch(function() {});
+}
+
+/* ===== start/stop ===== */
 function resolveAndStart(videoInfo, url, title) {
   var movieTitle = title || (videoInfo ? '视频' : '');
   fetch('/movie/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title: movieTitle, url: url || '' })
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (!data.ok) { alert(data.error || '出错了'); document.getElementById('startBtn').disabled = false; document.getElementById('startBtn').textContent = '开始看'; return; }
     movieSession = { title: movieTitle, url: url, videoInfo: videoInfo, startTime: Date.now() };
     document.getElementById('setupView').style.display = 'none';
     var wv = document.getElementById('watchView');
-    wv.style.display = 'flex';
+    wv.classList.add('active');
     if (videoInfo) {
       buildPlayer(videoInfo);
     } else {
@@ -219,37 +330,47 @@ function startWatching() {
   var url = document.getElementById('urlInput').value.trim();
   var title = document.getElementById('titleInput').value.trim();
   if (!url && !title) { alert('请输入视频链接或告诉顾晏想看什么'); return; }
-
   var videoInfo = url ? parseVideoUrl(url) : null;
   if (url && !videoInfo) { alert('暂不支持这个链接格式，试试B站或YouTube链接'); return; }
-
   document.getElementById('startBtn').disabled = true;
   document.getElementById('startBtn').textContent = '准备中...';
-
   if (videoInfo && videoInfo.type === 'b23short') {
     fetch('/movie/resolve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: url })
     }).then(function(r) { return r.json(); }).then(function(data) {
       if (data.ok && data.resolved) {
-        var resolved = parseVideoUrl(data.resolved);
-        resolveAndStart(resolved, data.resolved, title);
+        resolveAndStart(parseVideoUrl(data.resolved), data.resolved, title);
       } else {
         alert('无法解析这个短链接，试试复制完整的B站链接');
         document.getElementById('startBtn').disabled = false;
         document.getElementById('startBtn').textContent = '开始看';
       }
-    }).catch(function() {
-      alert('网络错误');
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('startBtn').textContent = '开始看';
-    });
+    }).catch(function() { alert('网络错误'); document.getElementById('startBtn').disabled = false; document.getElementById('startBtn').textContent = '开始看'; });
   } else {
     resolveAndStart(videoInfo, url, title);
   }
 }
 
+function endWatching() {
+  if (commentTimer) { clearTimeout(commentTimer); commentTimer = null; }
+  fetch('/movie/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: movieSession ? movieSession.title : '' }) }).catch(function(){});
+  movieSession = null;
+  commentCount = 0;
+  exitFullscreen();
+  document.getElementById('topStatus').classList.remove('show');
+  document.getElementById('watchView').classList.remove('active');
+  document.getElementById('setupView').style.display = '';
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('startBtn').textContent = '开始看';
+  document.getElementById('commentsList').innerHTML = '';
+  document.getElementById('floatMessages').innerHTML = '';
+  document.getElementById('urlInput').value = '';
+  document.getElementById('titleInput').value = '';
+  document.getElementById('videoArea').innerHTML = '';
+}
+
+/* ===== comments ===== */
 function scheduleComment(delaySec) {
   if (commentTimer) clearTimeout(commentTimer);
   var ms = delaySec ? delaySec * 1000 : (20000 + Math.random() * 40000);
@@ -261,8 +382,7 @@ function fetchComment() {
   if (!movieSession) return;
   var elapsed = Math.round((Date.now() - movieSession.startTime) / 60000);
   fetch('/movie/comment', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title: movieSession.title, elapsed: elapsed, count: commentCount })
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.ok && data.comment) {
@@ -271,9 +391,7 @@ function fetchComment() {
       if (data.danmu) fireDanmu(data.danmu);
     }
     if (movieSession) scheduleComment(data.nextDelay);
-  }).catch(function() {
-    if (movieSession) scheduleComment();
-  });
+  }).catch(function() { if (movieSession) scheduleComment(); });
 }
 
 function sendChat() {
@@ -282,11 +400,9 @@ function sendChat() {
   if (!text) return;
   input.value = '';
   addComment('yao', text);
-
   var elapsed = movieSession ? Math.round((Date.now() - movieSession.startTime) / 60000) : 0;
   fetch('/movie/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: text, title: movieSession ? movieSession.title : '', elapsed: elapsed })
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.ok && data.reply) {
@@ -298,32 +414,50 @@ function sendChat() {
   }).catch(function() {});
 }
 
+function formatText(text) {
+  var escaped = escHtml(text);
+  // *动作* → styled action spans
+  escaped = escaped.replace(/\*([^*]+)\*/g, '<span class="action">$1</span>');
+  return escaped;
+}
+
 function addComment(who, text) {
+  // main comments list
   var list = document.getElementById('commentsList');
   var item = document.createElement('div');
   item.className = 'comment-item';
-
-  var isAction = /^\*.*\*$/.test(text.trim());
-  var displayText = isAction ? text.replace(/^\*|\*$/g, '') : text;
-
-  var avaHtml = '';
-  if (who === 'ke') {
-    if (keAvatar) avaHtml = '<img src="' + keAvatar + '">';
-    else avaHtml = '<svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#E8EDE4"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#7B8F6B" opacity=".6"/></svg>';
-  } else {
-    var yaoAvatar = null;
-    try { yaoAvatar = localStorage.getItem('avatar_yao'); } catch(e) {}
-    if (yaoAvatar) avaHtml = '<img src="' + yaoAvatar + '">';
-    else avaHtml = '<svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#E8D5F0"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#B08CC2" opacity=".5"/></svg>';
-  }
-
+  var avaHtml = getAvatar(who);
   item.innerHTML = '<div class="comment-avatar">' + avaHtml + '</div>' +
     '<div class="comment-body">' +
     '<div class="comment-name">' + (who === 'ke' ? '顾晏' : '瑶瑶') + '</div>' +
-    '<div class="comment-text' + (isAction ? ' action' : '') + '">' + escHtml(displayText) + '</div>' +
-    '</div>';
+    '<div class="comment-text">' + formatText(text) + '</div></div>';
   list.appendChild(item);
   list.scrollTop = list.scrollHeight;
+
+  // also add to float panel
+  var fm = document.getElementById('floatMessages');
+  var fmsg = document.createElement('div');
+  fmsg.className = 'float-msg';
+  fmsg.innerHTML = '<div class="fname">' + (who === 'ke' ? '顾晏' : '瑶瑶') + '</div><div class="ftext">' + formatText(text) + '</div>';
+  fm.appendChild(fmsg);
+  fm.scrollTop = fm.scrollHeight;
+
+  // badge if in fullscreen and panel closed
+  if (document.body.classList.contains('fs-mode') && who === 'ke' && !document.getElementById('chatFloat').classList.contains('active')) {
+    unreadInFs++;
+    updateBadge();
+  }
+}
+
+function getAvatar(who) {
+  if (who === 'ke') {
+    if (keAvatar) return '<img src="' + keAvatar + '">';
+    return '<svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#E8EDE4"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#7B8F6B" opacity=".6"/></svg>';
+  }
+  var yaoAvatar = null;
+  try { yaoAvatar = localStorage.getItem('avatar_yao'); } catch(e) {}
+  if (yaoAvatar) return '<img src="' + yaoAvatar + '">';
+  return '<svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#E8D5F0"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#B08CC2" opacity=".5"/></svg>';
 }
 
 function fireDanmu(text) {
@@ -336,22 +470,6 @@ function fireDanmu(text) {
   el.style.animationDuration = (6 + Math.random() * 4) + 's';
   layer.appendChild(el);
   el.addEventListener('animationend', function() { el.remove(); });
-}
-
-function endWatching() {
-  if (commentTimer) { clearTimeout(commentTimer); commentTimer = null; }
-  fetch('/movie/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: movieSession ? movieSession.title : '' }) }).catch(function(){});
-  movieSession = null;
-  commentCount = 0;
-  document.getElementById('topStatus').classList.remove('show');
-  document.getElementById('watchView').style.display = 'none';
-  document.getElementById('setupView').style.display = '';
-  document.getElementById('startBtn').disabled = false;
-  document.getElementById('startBtn').textContent = '开始看';
-  document.getElementById('commentsList').innerHTML = '';
-  document.getElementById('urlInput').value = '';
-  document.getElementById('titleInput').value = '';
-  document.getElementById('videoArea').innerHTML = '';
 }
 
 function escHtml(s) {
