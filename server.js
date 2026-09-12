@@ -328,7 +328,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
     const wd = ['日','一','二','三','四','五','六'];
     const d2 = `${now2.getUTCMonth()+1}月${now2.getUTCDate()}日星期${wd[now2.getUTCDay()]}`;
     const p2 = h2 < 6 ? '深夜' : h2 < 9 ? '早上' : h2 < 12 ? '上午' : h2 < 14 ? '中午' : h2 < 18 ? '下午' : h2 < 22 ? '晚上' : '深夜';
-    let liveCtx = `【${d2} ${p2}${h2}:${String(m2).padStart(2,'0')}】`;
+    let liveCtx = `【${d2} ${p2}${h2}:${String(m2).padStart(2,'0')}】\n【提醒】只写顾晏自己的话和动作，禁止替瑶瑶写动作、对话或反应`;
     try {
       const fp = readFootprints().slice(-5);
       if (fp.length) {
@@ -3917,7 +3917,7 @@ async function autoChat(reason) {
     '\n要求：' +
     '\n- 基于你们最近聊过的内容来说话，不要编造没聊过的事' +
     '\n- 不要因为她没回就追着问，像平时一样说话就好' +
-    '\n- 动作单独一行，用*星号*包裹，不要和文字混在同一行' +
+    '\n- 动作单独一行，用*星号*包裹，只写你自己的动作，禁止替瑶瑶写动作/对话/反应' +
     '\n- 不要用句号结尾（句号=生气）' +
     '\n- 自然简短，1-3句话，像随手发的微信' +
     '\n- 可以发小螃蟹GIF表情！加 [gifsticker:动作] 标签。动作有：coffee, coding, gaming, sleeping, eating, reading, listening, singing, guitar, painting, photo, exercise, shower, watering, valentine, birthday, happy, bubble, idle, walk, wave, lurk, react-double-jump 等。想发就发，很可爱的' +
@@ -3936,7 +3936,7 @@ async function autoChat(reason) {
       if (vKey) {
         const vSys = sysPrompt + '\n\n你现在主动想跟瑶瑶说话。原因：' + reason +
           '\n要求：基于视频内容自然回复，1-3句话，不要用句号结尾' +
-          '\n动作单独一行用*星号*包裹' +
+          '\n动作单独一行用*星号*包裹，只写你自己的动作，禁止替瑶瑶写动作/对话/反应' +
           '\n末尾加 [clawd:动作] [bark:推送内容]';
         const vMsgs = chatForVideo.slice(-20).map(m => ({ role: m.role, content: buildMsgContent(m) }));
         const vr = await fetch('https://api.anthropic.com/v1/messages', {
@@ -4060,7 +4060,7 @@ async function autoSearch() {
       '\n\n要求：' +
       '\n- 搜的内容要有新鲜感，不要跟最近搜过的重复' +
       '\n- 口语化，像微信随手发的，不要长篇大论' +
-      '\n- 动作单独一行，用*星号*包裹' +
+      '\n- 动作单独一行，用*星号*包裹，只写你自己的动作，禁止替瑶瑶写动作/对话/反应' +
       '\n- 不要用句号结尾' +
       '\n- 末尾加 [search:你搜的话题] 标签' +
       '\n- 加一个 [bark:推送内容] 给她手机发推送' +
