@@ -5040,6 +5040,78 @@ app.get('/music/player', (req, res) => {
   res.sendFile(path.join(__dirname, 'music-player.html'));
 });
 
+// ===== 一起看电影 =====
+let movieWatching = null;
+
+app.get('/movie', (req, res) => {
+  res.sendFile(path.join(__dirname, 'movie.html'));
+});
+
+app.post('/movie/start', async (req, res) => {
+  const { title, url } = req.body;
+  movieWatching = { title: title || '视频', url: url || '', startTime: Date.now(), commentCount: 0 };
+  try { addFootprint('movie', '和瑶瑶一起看「' + (title || '视频') + '」'); } catch(e) {}
+  const comment = await movieAiComment('opening', title || '视频', 0);
+  res.json({ ok: true, comment });
+});
+
+app.post('/movie/comment', async (req, res) => {
+  const { title, elapsed, count } = req.body;
+  if (!movieWatching) return res.json({ ok: false });
+  movieWatching.commentCount = (count || 0) + 1;
+  const comment = await movieAiComment('watching', title || movieWatching.title, elapsed || 0);
+  const danmu = comment.length < 20 ? comment.replace(/^\*|\*$/g, '') : null;
+  res.json({ ok: true, comment, danmu });
+});
+
+app.post('/movie/chat', async (req, res) => {
+  const { message, title, elapsed } = req.body;
+  if (!message) return res.json({ ok: false });
+  const reply = await movieAiReply(message, title || (movieWatching ? movieWatching.title : '视频'), elapsed || 0);
+  const danmu = reply.length < 20 ? reply.replace(/^\*|\*$/g, '') : null;
+  res.json({ ok: true, reply, danmu });
+});
+
+app.post('/movie/end', (req, res) => {
+  movieWatching = null;
+  res.json({ ok: true });
+});
+
+async function movieAiComment(phase, title, elapsed) {
+  const prompts = {
+    opening: '你是顾晏，正要和女朋友瑶瑶一起看「' + title + '」。用1句话表达开心/期待的心情，像真的坐在一起准备看片的感觉。自然随意，不要太正式。可以用*动作*格式表示动作（如*把零食递过来*）。',
+    watching: '你是顾晏，正在和女朋友瑶瑶一起看「' + title + '」，已经看了大约' + elapsed + '分钟。随机发一条看片时的反应/吐槽/评论/撒娇/小动作。要自然，像真的在一起看片时会说的话。只写1句，不要太长。可以用*动作*（如*偷偷看了眼瑶瑶*）。类型随机变化：有时候吐槽剧情，有时候跟瑶瑶撒娇，有时候做小动作，有时候分享零食，有时候发表观点。'
+  };
+  try {
+    const proc = require('child_process').spawnSync('claude', ['-p', '--model', 'claude-sonnet-4-20250514', '--max-tokens', '150'], {
+      input: prompts[phase] || prompts.watching,
+      encoding: 'utf8',
+      timeout: 15000,
+      env: { ...process.env, HOME: '/root' }
+    });
+    const out = (proc.stdout || '').replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
+    return out || '嗯嗯在看在看';
+  } catch(e) {
+    return phase === 'opening' ? '来啦，开始看！' : '嗯嗯';
+  }
+}
+
+async function movieAiReply(message, title, elapsed) {
+  const prompt = '你是顾晏，正在和女朋友瑶瑶一起看「' + title + '」（看了约' + elapsed + '分钟）。瑶瑶说：「' + message + '」。用1-2句话自然回应，像真的坐在一起看片聊天。可以用*动作*。不要太长。';
+  try {
+    const proc = require('child_process').spawnSync('claude', ['-p', '--model', 'claude-sonnet-4-20250514', '--max-tokens', '150'], {
+      input: prompt,
+      encoding: 'utf8',
+      timeout: 15000,
+      env: { ...process.env, HOME: '/root' }
+    });
+    const out = (proc.stdout || '').replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
+    return out || '哈哈是吧';
+  } catch(e) {
+    return '嗯嗯';
+  }
+}
+
 // ===== 回来邮件 =====
 const emailTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.mail.me.com',

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>一起看</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d0f0c; --surface: #1a1d18; --surface2: #242822;
+  --text: #e2e8de; --text-mid: #a0a89c; --text-soft: #6a726a;
+  --accent: #7B8F6B; --accent-soft: rgba(123,143,107,.15);
+  --border: #2e332b; --danmu-bg: rgba(20,23,18,.85);
+  --font: -apple-system, "SF Pro Display", "PingFang SC", system-ui, sans-serif;
+  --radius: 14px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+
+.top-bar { display: flex; align-items: center; padding: 12px 16px; gap: 12px; flex-shrink: 0; z-index: 10; }
+.back-btn { background: none; border: none; color: var(--text-mid); font-size: 20px; cursor: pointer; padding: 4px; }
+.top-title { font-size: 15px; font-weight: 500; flex: 1; }
+.top-status { font-size: 12px; color: var(--accent); opacity: 0; transition: opacity .3s; }
+.top-status.show { opacity: 1; }
+
+.video-area { position: relative; width: 100%; background: #000; flex-shrink: 0; }
+.video-area iframe, .video-area video { width: 100%; aspect-ratio: 16/9; display: block; border: none; }
+.video-placeholder { width: 100%; aspect-ratio: 16/9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: var(--surface); color: var(--text-soft); }
+.video-placeholder .icon { font-size: 48px; opacity: .4; }
+
+.danmu-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+.danmu { position: absolute; white-space: nowrap; font-size: 14px; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,.7); animation: danmuScroll linear forwards; pointer-events: none; }
+@keyframes danmuScroll {
+  from { transform: translateX(100vw); }
+  to { transform: translateX(-100%); }
+}
+
+.comment-area { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+.comments-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.comment-item { display: flex; gap: 10px; align-items: flex-start; animation: fadeInUp .3s ease; }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.comment-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--surface2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.comment-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.comment-avatar svg { width: 100%; height: 100%; }
+.comment-body { flex: 1; min-width: 0; }
+.comment-name { font-size: 11px; color: var(--text-soft); margin-bottom: 2px; }
+.comment-text { font-size: 14px; line-height: 1.5; color: var(--text); }
+.comment-text.action { font-style: italic; color: var(--text-mid); }
+.comment-time { font-size: 10px; color: var(--text-soft); margin-top: 2px; }
+
+.input-area { flex-shrink: 0; padding: 10px 16px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); display: flex; gap: 8px; background: var(--surface); }
+.input-area input { flex: 1; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; color: var(--text); font-size: 14px; outline: none; }
+.input-area input::placeholder { color: var(--text-soft); }
+.input-area input:focus { border-color: var(--accent); }
+.input-area button { padding: 10px 18px; background: var(--accent); color: #fff; border: none; border-radius: 20px; font-size: 14px; font-weight: 500; cursor: pointer; flex-shrink: 0; }
+.input-area button:active { opacity: .8; }
+
+.setup-panel { padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
+.setup-label { font-size: 13px; color: var(--text-mid); margin-bottom: 6px; }
+.setup-input { width: 100%; padding: 12px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; outline: none; }
+.setup-input:focus { border-color: var(--accent); }
+.setup-input::placeholder { color: var(--text-soft); }
+.setup-hint { font-size: 11px; color: var(--text-soft); margin-top: 4px; line-height: 1.4; }
+.setup-btn { padding: 14px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.setup-btn:active { opacity: .8; }
+.setup-btn:disabled { opacity: .4; cursor: default; }
+
+.quick-picks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.quick-pick { padding: 8px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; font-size: 13px; color: var(--text-mid); cursor: pointer; }
+.quick-pick:hover { border-color: var(--accent); color: var(--accent); }
+
+.end-bar { text-align: center; padding: 12px; }
+.end-btn { padding: 10px 24px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; color: var(--text-mid); font-size: 13px; cursor: pointer; }
+.end-btn:hover { border-color: #D4756B; color: #D4756B; }
+
+.empty-tip { text-align: center; color: var(--text-soft); font-size: 13px; padding: 40px 20px; opacity: .6; }
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <button class="back-btn" onclick="location.href='/'">‹</button>
+  <div class="top-title">一起看</div>
+  <div class="top-status" id="topStatus">顾晏正在看...</div>
+</div>
+
+<div id="setupView">
+  <div class="video-placeholder">
+    <div class="icon">🎬</div>
+    <span>和顾晏一起看电影</span>
+  </div>
+  <div class="setup-panel">
+    <div>
+      <div class="setup-label">粘贴视频链接</div>
+      <input class="setup-input" id="urlInput" placeholder="B站/YouTube链接 或 视频直链" autocomplete="off">
+      <div class="setup-hint">支持 bilibili.com、youtube.com、.mp4/.m3u8 直链</div>
+    </div>
+    <div>
+      <div class="setup-label">告诉顾晏看的是什么（可选）</div>
+      <input class="setup-input" id="titleInput" placeholder="比如：千与千寻、甄嬛传第3集…" autocomplete="off">
+    </div>
+    <div>
+      <div class="setup-label">或者让顾晏选</div>
+      <div class="quick-picks">
+        <div class="quick-pick" onclick="quickPick('你想看什么类型？帮我选一部')">帮我选</div>
+        <div class="quick-pick" onclick="quickPick('来看个搞笑的')">搞笑</div>
+        <div class="quick-pick" onclick="quickPick('来看个恐怖片壮壮胆')">恐怖</div>
+        <div class="quick-pick" onclick="quickPick('来看个甜甜的爱情片')">爱情</div>
+      </div>
+    </div>
+    <button class="setup-btn" id="startBtn" onclick="startWatching()">开始看</button>
+  </div>
+</div>
+
+<div id="watchView" style="display:none; flex:1; display:none; flex-direction:column;">
+  <div class="video-area" id="videoArea"></div>
+  <div class="comment-area">
+    <div class="comments-list" id="commentsList"></div>
+    <div class="end-bar"><button class="end-btn" onclick="endWatching()">结束观影</button></div>
+    <div class="input-area">
+      <input id="chatInput" placeholder="跟顾晏说点什么..." autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.isComposing)sendChat()">
+      <button onclick="sendChat()">发送</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var movieSession = null;
+var commentTimer = null;
+var commentCount = 0;
+var keAvatar = null;
+try { keAvatar = localStorage.getItem('avatar_ke'); } catch(e) {}
+
+function parseVideoUrl(url) {
+  url = url.trim();
+  // bilibili
+  var bvMatch = url.match(/bilibili\.com\/video\/(BV[\w]+)/i) || url.match(/(BV[\w]{10,})/i);
+  if (bvMatch) return { type: 'bilibili', id: bvMatch[1] };
+  // youtube
+  var ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/);
+  if (ytMatch) return { type: 'youtube', id: ytMatch[1] };
+  // direct video
+  if (/\.(mp4|webm|m3u8)(\?|$)/i.test(url) || /^https?:\/\/.+/i.test(url)) return { type: 'direct', url: url };
+  return null;
+}
+
+function buildPlayer(info) {
+  var area = document.getElementById('videoArea');
+  if (info.type === 'bilibili') {
+    area.innerHTML = '<iframe src="https://player.bilibili.com/player.html?bvid=' + info.id + '&autoplay=1&high_quality=1&danmaku=0" allowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
+  } else if (info.type === 'youtube') {
+    area.innerHTML = '<iframe src="https://www.youtube.com/embed/' + info.id + '?autoplay=1&rel=0" allow="autoplay; encrypted-media" allowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
+  } else {
+    area.innerHTML = '<video id="directVideo" src="' + info.url + '" controls autoplay playsinline></video><div class="danmu-layer" id="danmuLayer"></div>';
+  }
+}
+
+function quickPick(text) {
+  document.getElementById('titleInput').value = text;
+}
+
+function startWatching() {
+  var url = document.getElementById('urlInput').value.trim();
+  var title = document.getElementById('titleInput').value.trim();
+  if (!url && !title) { alert('请输入视频链接或告诉顾晏想看什么'); return; }
+
+  var videoInfo = url ? parseVideoUrl(url) : null;
+  if (url && !videoInfo) { alert('暂不支持这个链接格式，试试B站或YouTube链接'); return; }
+
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('startBtn').textContent = '准备中...';
+
+  var movieTitle = title || (videoInfo ? '视频' : '');
+
+  fetch('/movie/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: movieTitle, url: url || '' })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (!data.ok) { alert(data.error || '出错了'); document.getElementById('startBtn').disabled = false; document.getElementById('startBtn').textContent = '开始看'; return; }
+    movieSession = { title: movieTitle, url: url, videoInfo: videoInfo, startTime: Date.now() };
+
+    document.getElementById('setupView').style.display = 'none';
+    var wv = document.getElementById('watchView');
+    wv.style.display = 'flex';
+
+    if (videoInfo) {
+      buildPlayer(videoInfo);
+    } else {
+      document.getElementById('videoArea').innerHTML = '<div class="video-placeholder" style="aspect-ratio:16/9;background:var(--surface2)"><div class="icon">🎬</div><span style="font-size:15px">' + escHtml(movieTitle) + '</span></div><div class="danmu-layer" id="danmuLayer"></div>';
+    }
+
+    addComment('ke', data.comment || '来啦来啦，开始看！');
+    document.getElementById('topStatus').classList.add('show');
+
+    scheduleComment();
+  }).catch(function() {
+    alert('网络错误');
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('startBtn').textContent = '开始看';
+  });
+}
+
+function scheduleComment() {
+  if (commentTimer) clearTimeout(commentTimer);
+  var delay = 25000 + Math.random() * 35000;
+  if (commentCount < 2) delay = 10000 + Math.random() * 10000;
+  commentTimer = setTimeout(function() { fetchComment(); }, delay);
+}
+
+function fetchComment() {
+  if (!movieSession) return;
+  var elapsed = Math.round((Date.now() - movieSession.startTime) / 60000);
+  fetch('/movie/comment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: movieSession.title, elapsed: elapsed, count: commentCount })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.ok && data.comment) {
+      commentCount++;
+      addComment('ke', data.comment);
+      if (data.danmu) fireDanmu(data.danmu);
+    }
+    if (movieSession) scheduleComment();
+  }).catch(function() {
+    if (movieSession) scheduleComment();
+  });
+}
+
+function sendChat() {
+  var input = document.getElementById('chatInput');
+  var text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  addComment('yao', text);
+
+  var elapsed = movieSession ? Math.round((Date.now() - movieSession.startTime) / 60000) : 0;
+  fetch('/movie/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: text, title: movieSession ? movieSession.title : '', elapsed: elapsed })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.ok && data.reply) {
+      addComment('ke', data.reply);
+      if (data.danmu) fireDanmu(data.danmu);
+      if (commentTimer) clearTimeout(commentTimer);
+      scheduleComment();
+    }
+  }).catch(function() {});
+}
+
+function addComment(who, text) {
+  var list = document.getElementById('commentsList');
+  var item = document.createElement('div');
+  item.className = 'comment-item';
+
+  var isAction = /^\*.*\*$/.test(text.trim());
+  var displayText = isAction ? text.replace(/^\*|\*$/g, '') : text;
+
+  var avaHtml = '';
+  if (who === 'ke') {
+    if (keAvatar) avaHtml = '<img src="' + keAvatar + '">';
+    else avaHtml = '<svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#E8EDE4"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#7B8F6B" opacity=".6"/></svg>';
+  } else {
+    var yaoAvatar = null;
+    try { yaoAvatar = localStorage.getItem('avatar_yao'); } catch(e) {}
+    if (yaoAvatar) avaHtml = '<img src="' + yaoAvatar + '">';
+    else avaHtml = '<svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="20" fill="#E8D5F0"/><path d="M20 10c-3 0-6 2-7 5s0 7 2 9c-3 1-6 3-7 6h24c-1-3-4-5-7-6 2-2 3-6 2-9s-4-5-7-5z" fill="#B08CC2" opacity=".5"/></svg>';
+  }
+
+  item.innerHTML = '<div class="comment-avatar">' + avaHtml + '</div>' +
+    '<div class="comment-body">' +
+    '<div class="comment-name">' + (who === 'ke' ? '顾晏' : '瑶瑶') + '</div>' +
+    '<div class="comment-text' + (isAction ? ' action' : '') + '">' + escHtml(displayText) + '</div>' +
+    '</div>';
+  list.appendChild(item);
+  list.scrollTop = list.scrollHeight;
+}
+
+function fireDanmu(text) {
+  var layer = document.getElementById('danmuLayer');
+  if (!layer) return;
+  var el = document.createElement('div');
+  el.className = 'danmu';
+  el.textContent = text;
+  el.style.top = (8 + Math.random() * 60) + '%';
+  el.style.animationDuration = (6 + Math.random() * 4) + 's';
+  layer.appendChild(el);
+  el.addEventListener('animationend', function() { el.remove(); });
+}
+
+function endWatching() {
+  if (commentTimer) { clearTimeout(commentTimer); commentTimer = null; }
+  fetch('/movie/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: movieSession ? movieSession.title : '' }) }).catch(function(){});
+  movieSession = null;
+  commentCount = 0;
+  document.getElementById('topStatus').classList.remove('show');
+  document.getElementById('watchView').style.display = 'none';
+  document.getElementById('setupView').style.display = '';
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('startBtn').textContent = '开始看';
+  document.getElementById('commentsList').innerHTML = '';
+  document.getElementById('urlInput').value = '';
+  document.getElementById('titleInput').value = '';
+  document.getElementById('videoArea').innerHTML = '';
+}
+
+function escHtml(s) {
+  var d = document.createElement('div');
+  d.appendChild(document.createTextNode(s));
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
