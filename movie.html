@@ -78,6 +78,14 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
 .end-btn:hover { border-color: #D4756B; color: #D4756B; }
 
 .empty-tip { text-align: center; color: var(--text-soft); font-size: 13px; padding: 40px 20px; opacity: .6; }
+
+.bangumi-placeholder { width: 100%; aspect-ratio: 16/9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: linear-gradient(135deg, var(--surface) 0%, #1e2318 100%); position: relative; overflow: hidden; }
+.bangumi-placeholder::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 40%, rgba(123,143,107,.12) 0%, transparent 60%); }
+.bangumi-icon { font-size: 40px; opacity: .5; position: relative; }
+.bangumi-title { font-size: 14px; color: var(--text-mid); text-align: center; padding: 0 20px; position: relative; max-width: 280px; line-height: 1.5; }
+.bangumi-open-btn { padding: 10px 24px; background: var(--accent); color: #fff; border: none; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; position: relative; display: flex; align-items: center; gap: 6px; }
+.bangumi-open-btn:active { opacity: .8; }
+.bangumi-hint { font-size: 11px; color: var(--text-soft); position: relative; opacity: .6; }
 </style>
 </head>
 <body>
@@ -115,7 +123,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); min-
   </div>
 </div>
 
-<div id="watchView" style="display:none; flex:1; display:none; flex-direction:column;">
+<div id="watchView" style="display:none; flex-direction:column;">
   <div class="video-area" id="videoArea"></div>
   <div class="comment-area">
     <div class="comments-list" id="commentsList"></div>
@@ -139,12 +147,12 @@ function parseVideoUrl(url) {
   // bilibili BV video
   var bvMatch = url.match(/bilibili\.com\/video\/(BV[\w]+)/i) || url.match(/(BV[\w]{10,})/i);
   if (bvMatch) return { type: 'bilibili', embed: 'bvid=' + bvMatch[1] };
-  // bilibili bangumi episode (ep)
+  // bilibili bangumi episode (ep) — can't embed, need external link
   var epMatch = url.match(/bilibili\.com\/bangumi\/play\/ep(\d+)/i) || url.match(/b23\.tv\/ep(\d+)/i) || url.match(/\/ep(\d+)/i);
-  if (epMatch) return { type: 'bilibili', embed: 'ep_id=' + epMatch[1] };
+  if (epMatch) return { type: 'bangumi', epId: epMatch[1], link: 'https://www.bilibili.com/bangumi/play/ep' + epMatch[1] };
   // bilibili bangumi season (ss)
   var ssMatch = url.match(/bilibili\.com\/bangumi\/play\/ss(\d+)/i) || url.match(/b23\.tv\/ss(\d+)/i);
-  if (ssMatch) return { type: 'bilibili', embed: 'season_id=' + ssMatch[1] };
+  if (ssMatch) return { type: 'bangumi', ssId: ssMatch[1], link: 'https://www.bilibili.com/bangumi/play/ss' + ssMatch[1] };
   // b23.tv short link (other types, need server resolve)
   if (/b23\.tv\//i.test(url)) return { type: 'b23short', url: url };
   // youtube
@@ -159,7 +167,15 @@ function parseVideoUrl(url) {
 
 function buildPlayer(info) {
   var area = document.getElementById('videoArea');
-  if (info.type === 'bilibili') {
+  if (info.type === 'bangumi') {
+    var titleText = document.getElementById('titleInput').value.trim() || '番剧';
+    area.innerHTML = '<div class="bangumi-placeholder">' +
+      '<div class="bangumi-icon">📺</div>' +
+      '<div class="bangumi-title">「' + escHtml(titleText) + '」是B站版权内容<br>需要在B站观看</div>' +
+      '<button class="bangumi-open-btn" onclick="window.open(\'' + info.link + '\',\'_blank\')">▶ 在B站打开</button>' +
+      '<div class="bangumi-hint">顾晏会在下面陪你聊天哦~</div>' +
+      '</div><div class="danmu-layer" id="danmuLayer"></div>';
+  } else if (info.type === 'bilibili') {
     area.innerHTML = '<iframe src="https://player.bilibili.com/player.html?' + info.embed + '&autoplay=1&high_quality=1&danmaku=0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
   } else if (info.type === 'youtube') {
     area.innerHTML = '<iframe src="https://www.youtube.com/embed/' + info.id + '?autoplay=1&rel=0&playsinline=0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen webkitallowfullscreen></iframe><div class="danmu-layer" id="danmuLayer"></div>';
