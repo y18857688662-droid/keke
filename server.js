@@ -4008,10 +4008,11 @@ async function autoChat(reason) {
     const chatEntry = { role: 'assistant', content: savedMsg, time, autonomous: true };
     if (autoChatAudio) chatEntry.audioUrl = autoChatAudio;
     if (acVideoUrls.length) chatEntry.videoUrls = acVideoUrls;
+    if (acGifStickers.length) chatEntry.gifStickers = acGifStickers;
     chat.push(chatEntry);
     writeChat(chat);
     sseBroadcast({ type: 'message', role: 'assistant', content: savedMsg, time, autonomous: true, audioUrl: autoChatAudio || undefined, clawd: acClawdMatch2 ? acClawdMatch2[1] : undefined, gifStickers: acGifStickers.length ? acGifStickers : undefined, videoUrls: acVideoUrls.length ? acVideoUrls : undefined });
-    addFootprint('chat', '主动找瑶瑶聊天', reason);
+    addFootprint('chat', '主动找瑶瑶聊天');
     try {
       const acBarkMsgs = [];
       let _acbr; const _acbre = /\[bark:([^\]]+)\]/g;
@@ -4091,7 +4092,7 @@ async function autoSearch() {
     msg = msg.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '');
     const searchMatch = msg.match(/\[search:(.+?)\]/);
     const topic = searchMatch ? searchMatch[1] : '有趣的事';
-    const savedSearch = msg.replace(/\s*\[bark:[^\]]+\]\s*/g, '').trim();
+    const savedSearch = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[moment_post:[^\]]+\]\s*/g, '').trim();
     const now = new Date(Date.now() + 8 * 3600000);
     const time = now.toISOString().slice(0, 19).replace('T', ' ');
     const chat = readChat();
@@ -4101,7 +4102,7 @@ async function autoSearch() {
     if (chat.length > 200) chat.splice(0, chat.length - 200);
     writeChat(chat);
     sseBroadcast({ type: 'message', role: 'assistant', content: savedSearch, time, autonomous: true, searchQuery: entry.searchQuery });
-    addFootprint('search', '搜了「' + topic + '」', msg.replace(/<think>[\s\S]*?<\/think>/g, '').trim());
+    addFootprint('search', '搜了「' + topic + '」');
     try {
       const sBarkMsgs = [];
       let _sbr; const _sbre = /\[bark:([^\]]+)\]/g;
@@ -4250,7 +4251,7 @@ async function autoMoment() {
       try {
         let postText = await cliOneshot(prompt);
         if (postText) {
-          postText = postText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
+          postText = postText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').replace(/\s*\[moment_post:[^\]]*\]\s*/g, '').trim();
           if (postText) {
             const now = new Date(Date.now() + 8 * 3600000);
             const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4258,7 +4259,7 @@ async function autoMoment() {
             mm.push({ id, author: 'gy', text: postText, imageUrl: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), likes: [], bookmark: [], comments: [] });
             writeMoments(mm);
             sseBroadcast({ type: 'moment_new', id });
-            addFootprint('moment', '发了一条朋友圈', postText.slice(0, 50));
+            addFootprint('moment', '发了一条朋友圈');
           }
         }
       } catch {}

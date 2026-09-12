@@ -1289,6 +1289,11 @@ function renderAll(messages) {
       msgContainer.appendChild(renderTime(msg.time, msgEl._thinkIdx));
     }
     msgContainer.appendChild(msgEl);
+    if (msg.gifStickers && msg.gifStickers.length) {
+      for (var gi = 0; gi < msg.gifStickers.length; gi++) {
+        msgContainer.appendChild(renderMessage({role:'assistant', content:'[gifsticker:'+msg.gifStickers[gi]+']'}, -1));
+      }
+    }
   });
   scrollBottom();
   checkArchive();
@@ -1329,6 +1334,11 @@ function loadArchive() {
         msgContainer.insertBefore(renderTime(msg.time, archMsgEl._thinkIdx), ref);
       }
       msgContainer.insertBefore(archMsgEl, ref);
+      if (msg.gifStickers && msg.gifStickers.length) {
+        for (var gi = 0; gi < msg.gifStickers.length; gi++) {
+          msgContainer.insertBefore(renderMessage({role:'assistant', content:'[gifsticker:'+msg.gifStickers[gi]+']'}, -1), ref);
+        }
+      }
     });
     msgContainer.scrollTop = scrollT + (msgContainer.scrollHeight - scrollH);
     if (archiveRemaining <= 0) {
@@ -1814,6 +1824,11 @@ function syncNewMessages() {
         if (el._searchQuery) msgContainer.appendChild(renderSearchNarrator(el._searchQuery));
         if (m.time && m.role === 'assistant') msgContainer.appendChild(renderTime(m.time, el._thinkIdx));
         msgContainer.appendChild(el);
+        if (m.gifStickers && m.gifStickers.length) {
+          for (var gi = 0; gi < m.gifStickers.length; gi++) {
+            msgContainer.appendChild(renderMessage({role:'assistant', content:'[gifsticker:'+m.gifStickers[gi]+']'}, -1));
+          }
+        }
         if (m.time) lastRenderedTime = m.time;
         added++;
       }
