@@ -2046,7 +2046,7 @@ app.post('/chat/send', async (req, res) => {
                   const ttsResp = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + elVoice, {
                     method: 'POST',
                     headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: ttsText, model_id: 'eleven_v3', language_code: 'zh', voice_settings: { stability: 0.82, similarity_boost: 0.85, style: 0.20, speed: 0.85 } })
+                    body: JSON.stringify({ text: ttsText, model_id: 'eleven_v3', language_code: detectLang(ttsText), voice_settings: { stability: 0.82, similarity_boost: 0.85, style: 0.20, speed: 0.85 } })
                   });
                   if (ttsResp.ok) {
                     const audioBuf = Buffer.from(await ttsResp.arrayBuffer());
@@ -2274,7 +2274,7 @@ app.post('/chat/reply', async (req, res) => {
         const ttsResp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
           method: 'POST',
           headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: ttsText, model_id: 'eleven_v3', language_code: 'zh', voice_settings: { stability: 0.82, similarity_boost: 0.85, style: 0.20, speed: 0.85 } })
+          body: JSON.stringify({ text: ttsText, model_id: 'eleven_v3', language_code: detectLang(ttsText), voice_settings: { stability: 0.82, similarity_boost: 0.85, style: 0.20, speed: 0.85 } })
         });
         if (ttsResp.ok) {
           const audioBuf = Buffer.from(await ttsResp.arrayBuffer());
@@ -2687,6 +2687,14 @@ function addAudioTags(text) {
   return '，' + text + ' ...';
 }
 
+function detectLang(text) {
+  const clean = text.replace(/[^\p{L}\p{N}]/gu, '');
+  if (!clean) return 'zh';
+  const zh = (clean.match(/[一-鿿㐀-䶿]/g) || []).length;
+  const en = (clean.match(/[a-zA-Z]/g) || []).length;
+  return en > zh * 2 ? 'en' : 'zh';
+}
+
 app.post('/chat/tts', async (req, res) => {
   const rawText = (req.body.text || '').trim().slice(0, 500);
   if (!rawText) return res.status(400).json({ error: 'empty' });
@@ -2703,7 +2711,7 @@ app.post('/chat/tts', async (req, res) => {
         body: JSON.stringify({
           text,
           model_id: 'eleven_v3',
-          language_code: 'zh',
+          language_code: detectLang(rawText),
           voice_settings: { stability: 0.82, similarity_boost: 0.85, style: 0.20, speed: 0.85 }
         })
       });
@@ -2942,7 +2950,7 @@ async function tgSendVoice(chatId, text) {
       body: JSON.stringify({
         text: tagged,
         model_id: 'eleven_v3',
-        language_code: 'zh',
+        language_code: detectLang(text),
         voice_settings: { stability: 0.82, similarity_boost: 0.85, style: 0.20, speed: 0.85 }
       })
     });
@@ -3206,7 +3214,7 @@ app.post('/voice/tts', async (req, res) => {
       body: JSON.stringify({
         text,
         model_id: (b.model === 'v2' ? 'eleven_multilingual_v2' : 'eleven_v3'),
-        language_code: 'zh',
+        language_code: detectLang(text),
         voice_settings: vs
       })
     });
@@ -4082,7 +4090,7 @@ async function autoChat(reason) {
             const ttsR = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + elVoice3, {
               method: 'POST',
               headers: { 'xi-api-key': elKey3, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: ttsT, model_id: 'eleven_v3', language_code: 'zh', voice_settings: { stability: 0.82, similarity_boost: 0.85, style: 0.20, speed: 0.85 } })
+              body: JSON.stringify({ text: ttsT, model_id: 'eleven_v3', language_code: detectLang(vt), voice_settings: { stability: 0.82, similarity_boost: 0.85, style: 0.20, speed: 0.85 } })
             });
             if (ttsR.ok) {
               const buf = Buffer.from(await ttsR.arrayBuffer());
