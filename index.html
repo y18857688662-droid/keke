@@ -176,7 +176,7 @@ body {
 .thinking-cloud { display: inline-flex; cursor: pointer; padding: 1px 0; color: var(--text-faint); transition: color .15s; }
 .thinking-cloud:hover { color: var(--text-soft); }
 .thinking-cloud svg { width: 16px; height: 16px; }
-.think-block { margin: 4px 0 2px; }
+.think-block { margin: 2px 0 4px; padding: 5px 10px; border-radius: 12px; background: rgba(120,120,120,.05); }
 .think-toggle { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; font-size: 12px; color: var(--text-faint); transition: color .15s; padding: 3px 8px; border-radius: 10px; background: rgba(120,120,120,.06); }
 .think-toggle:hover { color: var(--text-soft); background: rgba(120,120,120,.1); }
 .think-toggle svg { width: 13px; height: 13px; flex-shrink: 0; }
@@ -1153,6 +1153,16 @@ function renderMessage(msg, idx, stagger) {
     if (qt.length > 40) qt = qt.slice(0,40) + '…';
     colHtml += '<div class="msg-quote">' + escHtml(qt) + '</div>';
   }
+  if (think && isKe) {
+    var tSteps = parseThinkSteps(think);
+    if (tSteps.length) {
+      colHtml += '<div class="think-block"><div class="think-toggle" onclick="toggleThinkBlock(this)"><span class="think-toggle-arrow">▶</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg><span>思考过程 · '+tSteps.length+'步</span></div><div class="think-steps">';
+      for (var si = 0; si < tSteps.length; si++) {
+        colHtml += '<div class="think-step-item" onclick="toggleThinkStep(this,event)"><div class="think-step-head"><span class="think-step-arrow">▶</span><span class="think-step-title">'+escHtml(tSteps[si].title)+'</span></div><div class="think-step-body">'+escHtml(tSteps[si].body)+'</div></div>';
+      }
+      colHtml += '</div></div>';
+    }
+  }
   var allImgs = [];
   if (msg.images && msg.images.length) { msg.images.forEach(function(im){ allImgs.push(im); }); }
   else if (msg.image) { allImgs.push(msg.image); }
@@ -1296,33 +1306,14 @@ function parseThinkSteps(text) {
   return steps;
 }
 function renderTime(t, thinkIdx) {
-  var wrap = document.createElement('div');
-  var timeEl = document.createElement('div');
-  timeEl.className = 'msg-time';
-  timeEl.innerHTML = formatTimeDisplay(t);
-  wrap.appendChild(timeEl);
+  var el = document.createElement('div');
+  el.className = 'msg-time';
+  var html = formatTimeDisplay(t);
   if (thinkIdx !== undefined && thinkIdx !== null) {
-    var thinkText = thinkingStore[thinkIdx] || '';
-    if (thinkText) {
-      var steps = parseThinkSteps(thinkText);
-      var block = document.createElement('div');
-      block.className = 'think-block';
-      var toggleHtml = '<div class="think-toggle" onclick="toggleThinkBlock(this)">'
-        + '<span class="think-toggle-arrow">▶</span>'
-        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9 9c0-1.7 1.3-3 3-3s3 1.3 3 3c0 1.2-.7 2.2-1.8 2.7-.3.2-.7.5-.7.8V14M12 17h.01"/></svg>'
-        + '思考了 ' + steps.length + ' 步</div>';
-      var stepsHtml = '<div class="think-steps">';
-      for (var si = 0; si < steps.length; si++) {
-        stepsHtml += '<div class="think-step-item" onclick="toggleThinkStep(this,event)">'
-          + '<div class="think-step-head"><span class="think-step-arrow">▶</span><span class="think-step-title">' + escHtml(steps[si].title) + '</span></div>'
-          + '<div class="think-step-body">' + escHtml(steps[si].body).replace(/\n/g, '<br>') + '</div></div>';
-      }
-      stepsHtml += '</div>';
-      block.innerHTML = toggleHtml + stepsHtml;
-      wrap.appendChild(block);
-    }
+    html += ' <span class="thinking-cloud" onclick="openThinking('+thinkIdx+',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg></span>';
   }
-  return wrap;
+  el.innerHTML = html;
+  return el;
 }
 
 function shouldShowTime(cur, prev) {
