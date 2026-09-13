@@ -1649,10 +1649,11 @@ async function processMomentActions(text) {
       const now = new Date(Date.now() + 8 * 3600000);
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const mm = readMoments();
-      mm.push({ id, author: 'gy', text: postMatch[1].trim(), imageUrl: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), likes: [], bookmark: [], comments: [] });
+      const momentText = postMatch[1].trim().replace(/\s*\[(?:clawd|gifsticker|bark|search|voice|video|sms|email|think|next):?[^\]]*\]\s*/g, '').trim();
+      mm.push({ id, author: 'gy', text: momentText, imageUrl: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), likes: [], bookmark: [], comments: [] });
       writeMoments(mm);
       sseBroadcast({ type: 'moment_new', id });
-      addFootprint('moment', '发了朋友圈', postMatch[1].trim().slice(0, 50));
+      addFootprint('moment', '发了朋友圈', momentText.slice(0, 50));
     } catch(e) { console.log('[moment_post] error:', e.message); }
     cleaned = cleaned.replace(/\[moment_post:[^\]]+\]/g, '');
   }
@@ -4260,7 +4261,7 @@ async function autoMoment() {
       try {
         let postText = await cliOneshot(prompt);
         if (postText) {
-          postText = postText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').replace(/\s*\[moment_post:[^\]]*\]\s*/g, '').trim();
+          postText = postText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').replace(/\s*\[(?:moment_post|clawd|gifsticker|bark|search|voice|video|sms|email|think|next):?[^\]]*\]\s*/g, '').trim();
           if (postText) {
             const now = new Date(Date.now() + 8 * 3600000);
             const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
