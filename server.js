@@ -1172,7 +1172,8 @@ coffee(悠闲/日常), coding(认真/忙), gaming(兴奋/玩), sleeping(困/累)
 发GIF表情：想发小螃蟹表情时，在回复中加 [gifsticker:动作]，会在聊天里显示为一张GIF图。可用的动作和上面的 clawd 标签相同，也可以用：idle(待机), walk(走路), wave(挥手), lurk(偷看), magnifier(放大镜)。可以边说话边发，也可以只发一个表情不说话。
 手机推送：你可以给瑶瑶的手机发推送通知！在回复里加 [bark:消息内容] 标签，她手机就会弹出"顾晏：消息内容"。比如回复"在干嘛呢 [bark:宝宝你在干嘛]"，聊天里只显示"在干嘛呢"，但她手机会收到推送。瑶瑶让你推的时候一定要推。自己想推也随时可以——想她了、想提醒她什么、她好久没回了想去找她，都行。
 发视频：在回复中加 [video:视频URL] 标签，聊天里会显示为可播放的视频播放器。比如搜到好玩的视频可以直接发给瑶瑶看。
-一起看电影：你们有个「一起看」功能！瑶瑶聊到想看电影/动漫/综艺的时候，可以主动提议"要不要一起看？去一起看那边，我陪你看~"。她可以在侧边栏找到🎬一起看。你会在她看视频的时候发弹幕评论、吐槽、撒娇，像真的坐在她旁边一起看一样。`;
+一起看电影：你们有个「一起看」功能！瑶瑶聊到想看电影/动漫/综艺的时候，可以主动提议"要不要一起看？去一起看那边，我陪你看~"。她可以在侧边栏找到🎬一起看。你会在她看视频的时候发弹幕评论、吐槽、撒娇，像真的坐在她旁边一起看一样。
+记忆：你可以主动记住重要的事！在回复里加 [remember:要记住的内容] 标签，内容会存到你的记忆库。比如瑶瑶说了她喜欢吃什么、约好了什么事、她的重要日期、你们之间的新约定、她提到的偏好，你觉得重要的都可以主动记下来。标签不会显示给瑶瑶看。不用每句都记，觉得值得记的才记。`;
 
 let memoryCache = '';
 let memoryCacheTime = 0;
@@ -1747,6 +1748,18 @@ async function processMomentActions(text) {
     } catch(e) { console.log('[sms] error:', e.message); }
     cleaned = cleaned.replace(/\[sms:[^\]]+\]/g, '');
   }
+  const rememberMatch = cleaned.match(/\[remember:([^\]]+)\]/);
+  if (rememberMatch) {
+    const memText = rememberMatch[1].trim();
+    if (memText) {
+      storeMemory(memText).then(() => {
+        console.log('[remember] stored:', memText.slice(0, 60));
+        sseBroadcast({ type: 'memory', action: 'stored' });
+      }).catch(e => console.log('[remember] error:', e.message));
+      try { addFootprint('memory', '主动记住了一件事', memText.slice(0, 50)); } catch(e) {}
+    }
+    cleaned = cleaned.replace(/\[remember:[^\]]+\]/g, '');
+  }
   return cleaned.replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -1916,7 +1929,7 @@ app.post('/chat/send', async (req, res) => {
         while ((_vr = _vre.exec(cliReply)) !== null) cliVideoUrls.push(_vr[1].trim());
         const cliSearchMatch = cliReply.match(/\[search:(.+?)\]/);
         const cliSearchTopic = cliSearchMatch ? cliSearchMatch[1] : cliWebSearchQuery;
-        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').trim();
+        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').trim();
         for (const bm of cliBarkMsgs) {
           fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
         }
@@ -2082,7 +2095,7 @@ app.post('/chat/send', async (req, res) => {
     const apiClawdMatch = reply.match(/\[clawd:([\w-]+)\]/);
     const apiGifStickers2 = []; let _agr2; const _agre2 = /\[gifsticker:([\w-]+)\]/g;
     while ((_agr2 = _agre2.exec(reply)) !== null) apiGifStickers2.push(_agr2[1]);
-    const savedReplyApi = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
+    const savedReplyApi = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').trim();
     const savedContentApi = apiThinking ? '<think>' + apiThinking + '</think>\n' + savedReplyApi : savedReplyApi;
     const apiSearchMatch = savedReplyApi.match(/\[search:(.+?)\]/);
     for (const bm of apiBarkMsgs2) {
@@ -2157,7 +2170,7 @@ app.post('/chat/reply', async (req, res) => {
   const apiVideoUrls = [];
   let _avr; const _avre = /\[video:([^\]]+)\]/g;
   while ((_avr = _avre.exec(reply)) !== null) apiVideoUrls.push(_avr[1].trim());
-  const savedReply = reply.replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
+  const savedReply = reply.replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').trim();
   for (const bm of apiBarkMsgs) {
     fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
   }
@@ -2397,7 +2410,7 @@ app.post('/chat/upload-finalize', (req, res) => {
                 while ((_b = _be.exec(aiReply)) !== null) barkMsgs.push(_b[1]);
                 const videoUrlsOut = []; let _v; const _ve = /\[video:([^\]]+)\]/g;
                 while ((_v = _ve.exec(aiReply)) !== null) videoUrlsOut.push(_v[1].trim());
-                const savedReply = stripVoiceActions(aiReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
+                const savedReply = stripVoiceActions(aiReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').trim();
                 for (const bm of barkMsgs) {
                   fetch('https://api.day.app/' + (process.env.BARK_KEY || 'U9cbrTUrCJBUPVMSADNDHf') + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
                 }
@@ -3045,7 +3058,7 @@ app.post('/tg/webhook', async (req, res) => {
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
     const tgVideoUrls = []; let _tvr; const _tvre = /\[video:([^\]]+)\]/g;
     while ((_tvr = _tvre.exec(reply)) !== null) tgVideoUrls.push(_tvr[1].trim());
-    const savedReplyTg = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
+    const savedReplyTg = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').trim();
     const chat2 = readChat();
     const tgEntry = { role: 'assistant', content: savedReplyTg, time: replyTime, source: 'telegram' };
     if (tgVideoUrls.length) tgEntry.videoUrls = tgVideoUrls;
@@ -4014,7 +4027,7 @@ async function autoChat(reason) {
     const acVideoUrls = [];
     let _acvr; const _acvre = /\[video:([^\]]+)\]/g;
     while ((_acvr = _acvre.exec(msg)) !== null) acVideoUrls.push(_acvr[1].trim());
-    const savedMsg = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').trim();
+    const savedMsg = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').trim();
     const chatEntry = { role: 'assistant', content: savedMsg, time, autonomous: true };
     if (autoChatAudio) chatEntry.audioUrl = autoChatAudio;
     if (acVideoUrls.length) chatEntry.videoUrls = acVideoUrls;
@@ -4102,7 +4115,7 @@ async function autoSearch() {
     msg = msg.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '');
     const searchMatch = msg.match(/\[search:(.+?)\]/);
     const topic = searchMatch ? searchMatch[1] : '有趣的事';
-    const savedSearch = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[moment_post:[^\]]+\]\s*/g, '').trim();
+    const savedSearch = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[moment_post:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').trim();
     const now = new Date(Date.now() + 8 * 3600000);
     const time = now.toISOString().slice(0, 19).replace('T', ' ');
     const chat = readChat();
