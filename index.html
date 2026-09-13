@@ -176,6 +176,15 @@ body {
 .thinking-cloud { display: inline-flex; cursor: pointer; padding: 1px 0; color: var(--text-faint); transition: color .15s; }
 .thinking-cloud:hover { color: var(--text-soft); }
 .thinking-cloud svg { width: 16px; height: 16px; }
+.think-inline { margin-bottom: 6px; border-radius: 8px; background: rgba(120,120,120,.08); overflow: hidden; }
+.think-inline-header { display: flex; align-items: center; gap: 6px; padding: 6px 10px; cursor: pointer; user-select: none; font-size: 12px; color: var(--text-faint); transition: color .15s; }
+.think-inline-header:hover { color: var(--text-soft); }
+.think-inline-header svg { width: 14px; height: 14px; flex-shrink: 0; }
+.think-inline-arrow { font-size: 10px; transition: transform .2s; flex-shrink: 0; }
+.think-inline-arrow.open { transform: rotate(90deg); }
+.think-inline-preview { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.think-inline-body { display: none; padding: 4px 10px 8px; font-size: 12.5px; line-height: 1.6; color: var(--text-soft); border-top: 1px solid rgba(120,120,120,.1); max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+.think-inline-body.show { display: block; }
 .msg-bubble {
   padding: 8px 13px; border-radius: var(--radius);
   font-size: 14px; line-height: 1.5;
@@ -1137,6 +1146,15 @@ function renderMessage(msg, idx, stagger) {
     if (qt.length > 40) qt = qt.slice(0,40) + '…';
     colHtml += '<div class="msg-quote">' + escHtml(qt) + '</div>';
   }
+  if (think && isKe) {
+    var thinkPreview = (think.split('\n')[0] || '').trim();
+    if (thinkPreview.length > 50) thinkPreview = thinkPreview.slice(0, 50) + '...';
+    colHtml += '<div class="think-inline"><div class="think-inline-header" onclick="toggleInlineThink(this)">'
+      + '<span class="think-inline-arrow">▶</span>'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9 9c0-1.7 1.3-3 3-3s3 1.3 3 3c0 1.2-.7 2.2-1.8 2.7-.3.2-.7.5-.7.8V14M12 17h.01"/></svg>'
+      + '<span class="think-inline-preview">' + escHtml(thinkPreview) + '</span></div>'
+      + '<div class="think-inline-body">' + escHtml(think).replace(/\n/g, '<br>') + '</div></div>';
+  }
   var allImgs = [];
   if (msg.images && msg.images.length) { msg.images.forEach(function(im){ allImgs.push(im); }); }
   else if (msg.image) { allImgs.push(msg.image); }
@@ -1854,6 +1872,17 @@ setInterval(function() {
   if (!sending) syncNewMessages();
 }, 15000);
 
+function toggleInlineThink(header) {
+  var arrow = header.querySelector('.think-inline-arrow');
+  var body = header.nextElementSibling;
+  if (body.classList.contains('show')) {
+    body.classList.remove('show');
+    arrow.classList.remove('open');
+  } else {
+    body.classList.add('show');
+    arrow.classList.add('open');
+  }
+}
 function openThinking(idx, cloudEl) {
   var text = thinkingStore[idx] || '';
   var images = [];
