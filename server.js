@@ -1331,8 +1331,34 @@ async function getChatSystem() {
   } catch(e) {}
   let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx;
   if (memoryCache) {
-    const trimmedMem = memoryCache.length > 3000 ? memoryCache.slice(0, 3000) + '\n...(更多记忆省略)' : memoryCache;
-    return base + '\n\n以下是你和瑶瑶的记忆，请自然地融入对话中：\n' + trimmedMem;
+    const sections = memoryCache.split(/\n*===\s*(.+?)\s*===\n*/);
+    let corePart = '';
+    let recentPart = '';
+    for (let i = 1; i < sections.length; i += 2) {
+      const title = sections[i];
+      const body = (sections[i + 1] || '').trim();
+      if (/核心/.test(title)) {
+        corePart = body;
+      } else {
+        const entries = body.split(/\n---\n/).filter(e => e.trim());
+        entries.sort((a, b) => {
+          const ta = a.match(/记忆桶:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}-\d{2}-\d{2})/);
+          const tb = b.match(/记忆桶:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}-\d{2}-\d{2})/);
+          const da = ta ? ta[1].replace(/-/g, '') : '0';
+          const db = tb ? tb[1].replace(/-/g, '') : '0';
+          return db.localeCompare(da);
+        });
+        recentPart = entries.join('\n---\n');
+      }
+    }
+    if (!corePart && !recentPart) {
+      corePart = memoryCache;
+    }
+    let memOut = '';
+    if (recentPart) memOut += '【最近的记忆（越靠前越近）】\n' + recentPart;
+    if (corePart) memOut += (memOut ? '\n\n' : '') + '【核心记忆】\n' + corePart;
+    if (memOut.length > 5000) memOut = memOut.slice(0, 5000) + '\n...(更多记忆省略)';
+    return base + '\n\n以下是你和瑶瑶的记忆，最近的排在前面，像真人一样最近的事记得最清楚：\n' + memOut;
   }
   return base;
 }
