@@ -176,15 +176,22 @@ body {
 .thinking-cloud { display: inline-flex; cursor: pointer; padding: 1px 0; color: var(--text-faint); transition: color .15s; }
 .thinking-cloud:hover { color: var(--text-soft); }
 .thinking-cloud svg { width: 16px; height: 16px; }
-.think-inline { margin-bottom: 6px; border-radius: 8px; background: rgba(120,120,120,.08); overflow: hidden; }
-.think-inline-header { display: flex; align-items: center; gap: 6px; padding: 6px 10px; cursor: pointer; user-select: none; font-size: 12px; color: var(--text-faint); transition: color .15s; }
-.think-inline-header:hover { color: var(--text-soft); }
-.think-inline-header svg { width: 14px; height: 14px; flex-shrink: 0; }
-.think-inline-arrow { font-size: 10px; transition: transform .2s; flex-shrink: 0; }
-.think-inline-arrow.open { transform: rotate(90deg); }
-.think-inline-preview { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.think-inline-body { display: none; padding: 4px 10px 8px; font-size: 12.5px; line-height: 1.6; color: var(--text-soft); border-top: 1px solid rgba(120,120,120,.1); max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
-.think-inline-body.show { display: block; }
+.think-block { margin: 4px 0 2px; }
+.think-toggle { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; font-size: 12px; color: var(--text-faint); transition: color .15s; padding: 3px 8px; border-radius: 10px; background: rgba(120,120,120,.06); }
+.think-toggle:hover { color: var(--text-soft); background: rgba(120,120,120,.1); }
+.think-toggle svg { width: 13px; height: 13px; flex-shrink: 0; }
+.think-toggle-arrow { font-size: 8px; transition: transform .2s; }
+.think-toggle-arrow.open { transform: rotate(90deg); }
+.think-steps { display: none; margin: 6px 0 4px 4px; padding-left: 12px; border-left: 2px solid rgba(120,120,120,.15); }
+.think-steps.show { display: block; }
+.think-step-item { padding: 4px 0; cursor: pointer; user-select: none; }
+.think-step-head { display: flex; align-items: flex-start; gap: 5px; font-size: 12px; color: var(--text-faint); transition: color .15s; }
+.think-step-head:hover { color: var(--text-soft); }
+.think-step-arrow { font-size: 8px; margin-top: 3px; transition: transform .2s; flex-shrink: 0; }
+.think-step-arrow.open { transform: rotate(90deg); }
+.think-step-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.think-step-body { display: none; margin: 4px 0 2px 13px; font-size: 12px; line-height: 1.6; color: var(--text-soft); white-space: pre-wrap; word-break: break-word; max-height: 180px; overflow-y: auto; }
+.think-step-body.show { display: block; }
 .msg-bubble {
   padding: 8px 13px; border-radius: var(--radius);
   font-size: 14px; line-height: 1.5;
@@ -1146,15 +1153,6 @@ function renderMessage(msg, idx, stagger) {
     if (qt.length > 40) qt = qt.slice(0,40) + '…';
     colHtml += '<div class="msg-quote">' + escHtml(qt) + '</div>';
   }
-  if (think && isKe) {
-    var thinkPreview = (think.split('\n')[0] || '').trim();
-    if (thinkPreview.length > 50) thinkPreview = thinkPreview.slice(0, 50) + '...';
-    colHtml += '<div class="think-inline"><div class="think-inline-header" onclick="toggleInlineThink(this)">'
-      + '<span class="think-inline-arrow">▶</span>'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9 9c0-1.7 1.3-3 3-3s3 1.3 3 3c0 1.2-.7 2.2-1.8 2.7-.3.2-.7.5-.7.8V14M12 17h.01"/></svg>'
-      + '<span class="think-inline-preview">' + escHtml(thinkPreview) + '</span></div>'
-      + '<div class="think-inline-body">' + escHtml(think).replace(/\n/g, '<br>') + '</div></div>';
-  }
   var allImgs = [];
   if (msg.images && msg.images.length) { msg.images.forEach(function(im){ allImgs.push(im); }); }
   else if (msg.image) { allImgs.push(msg.image); }
@@ -1269,15 +1267,62 @@ function renderSearchNarrator(q) {
   el.innerHTML = '<span style="margin-right:6px">🔍</span>去网上看了看「<span style="color:var(--accent);font-weight:600">' + escHtml(q) + '</span>」';
   return el;
 }
-function renderTime(t, thinkIdx) {
-  var el = document.createElement('div');
-  el.className = 'msg-time';
-  var html = formatTimeDisplay(t);
-  if (thinkIdx !== undefined && thinkIdx !== null) {
-    html += ' <span class="thinking-cloud" onclick="openThinking('+thinkIdx+',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg></span>';
+function parseThinkSteps(text) {
+  var lines = text.split('\n');
+  var steps = [];
+  var cur = null;
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i];
+    if (!l.trim()) { if (cur) cur.body += '\n'; continue; }
+    var isNewStep = /^[\s]*[•\-\*#>]/.test(l) || (/[。？！…：]$/.test(l.trim()) && l.trim().length < 80) || (cur && cur.body.split('\n').length > 8);
+    if (!cur || isNewStep) {
+      var title = l.replace(/^[\s]*[•\-\*#>]+\s*/, '').trim();
+      if (title.length > 60) title = title.slice(0, 57) + '...';
+      cur = { title: title, body: l.trim() };
+      steps.push(cur);
+    } else {
+      cur.body += '\n' + l;
+    }
   }
-  el.innerHTML = html;
-  return el;
+  if (steps.length <= 1 && text.length > 100) {
+    var chunks = text.match(/.{1,200}[。？！\n]|.+$/gs) || [text];
+    steps = [];
+    for (var j = 0; j < chunks.length; j++) {
+      var t2 = chunks[j].trim().split('\n')[0];
+      if (t2.length > 60) t2 = t2.slice(0, 57) + '...';
+      steps.push({ title: t2, body: chunks[j].trim() });
+    }
+  }
+  return steps;
+}
+function renderTime(t, thinkIdx) {
+  var wrap = document.createElement('div');
+  var timeEl = document.createElement('div');
+  timeEl.className = 'msg-time';
+  timeEl.innerHTML = formatTimeDisplay(t);
+  wrap.appendChild(timeEl);
+  if (thinkIdx !== undefined && thinkIdx !== null) {
+    var thinkText = thinkingStore[thinkIdx] || '';
+    if (thinkText) {
+      var steps = parseThinkSteps(thinkText);
+      var block = document.createElement('div');
+      block.className = 'think-block';
+      var toggleHtml = '<div class="think-toggle" onclick="toggleThinkBlock(this)">'
+        + '<span class="think-toggle-arrow">▶</span>'
+        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9 9c0-1.7 1.3-3 3-3s3 1.3 3 3c0 1.2-.7 2.2-1.8 2.7-.3.2-.7.5-.7.8V14M12 17h.01"/></svg>'
+        + '思考了 ' + steps.length + ' 步</div>';
+      var stepsHtml = '<div class="think-steps">';
+      for (var si = 0; si < steps.length; si++) {
+        stepsHtml += '<div class="think-step-item" onclick="toggleThinkStep(this,event)">'
+          + '<div class="think-step-head"><span class="think-step-arrow">▶</span><span class="think-step-title">' + escHtml(steps[si].title) + '</span></div>'
+          + '<div class="think-step-body">' + escHtml(steps[si].body).replace(/\n/g, '<br>') + '</div></div>';
+      }
+      stepsHtml += '</div>';
+      block.innerHTML = toggleHtml + stepsHtml;
+      wrap.appendChild(block);
+    }
+  }
+  return wrap;
 }
 
 function shouldShowTime(cur, prev) {
@@ -1872,9 +1917,21 @@ setInterval(function() {
   if (!sending) syncNewMessages();
 }, 15000);
 
-function toggleInlineThink(header) {
-  var arrow = header.querySelector('.think-inline-arrow');
-  var body = header.nextElementSibling;
+function toggleThinkBlock(toggle) {
+  var arrow = toggle.querySelector('.think-toggle-arrow');
+  var steps = toggle.nextElementSibling;
+  if (steps.classList.contains('show')) {
+    steps.classList.remove('show');
+    arrow.classList.remove('open');
+  } else {
+    steps.classList.add('show');
+    arrow.classList.add('open');
+  }
+}
+function toggleThinkStep(item, e) {
+  e.stopPropagation();
+  var arrow = item.querySelector('.think-step-arrow');
+  var body = item.querySelector('.think-step-body');
   if (body.classList.contains('show')) {
     body.classList.remove('show');
     arrow.classList.remove('open');
