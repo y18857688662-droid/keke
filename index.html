@@ -176,21 +176,15 @@ body {
 .thinking-cloud { display: inline-flex; cursor: pointer; padding: 1px 0; color: var(--text-faint); transition: color .15s; }
 .thinking-cloud:hover { color: var(--text-soft); }
 .thinking-cloud svg { width: 16px; height: 16px; }
-.think-block { margin: 2px 0 4px; padding: 5px 10px; border-radius: 12px; background: rgba(120,120,120,.05); }
-.think-toggle { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; font-size: 12px; color: var(--text-faint); transition: color .15s; padding: 3px 8px; border-radius: 10px; background: rgba(120,120,120,.06); }
-.think-toggle:hover { color: var(--text-soft); background: rgba(120,120,120,.1); }
-.think-toggle svg { width: 13px; height: 13px; flex-shrink: 0; }
-.think-toggle-arrow { font-size: 8px; transition: transform .2s; }
-.think-toggle-arrow.open { transform: rotate(90deg); }
-.think-steps { display: none; margin: 6px 0 4px 4px; padding-left: 12px; border-left: 2px solid rgba(120,120,120,.15); }
-.think-steps.show { display: block; }
-.think-step-item { padding: 4px 0; cursor: pointer; user-select: none; }
-.think-step-head { display: flex; align-items: flex-start; gap: 5px; font-size: 12px; color: var(--text-faint); transition: color .15s; }
-.think-step-head:hover { color: var(--text-soft); }
-.think-step-arrow { font-size: 8px; margin-top: 3px; transition: transform .2s; flex-shrink: 0; }
+.think-steps-list { padding: 4px 0; }
+.think-step-item { padding: 6px 4px; cursor: pointer; user-select: none; border-bottom: 1px solid rgba(120,120,120,.08); }
+.think-step-item:last-child { border-bottom: none; }
+.think-step-head { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-mid); transition: color .15s; }
+.think-step-head:hover { color: var(--text); }
+.think-step-arrow { font-size: 9px; transition: transform .2s; flex-shrink: 0; color: var(--text-faint); }
 .think-step-arrow.open { transform: rotate(90deg); }
 .think-step-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.think-step-body { display: none; margin: 4px 0 2px 13px; font-size: 12px; line-height: 1.6; color: var(--text-soft); white-space: pre-wrap; word-break: break-word; max-height: 180px; overflow-y: auto; }
+.think-step-body { display: none; margin: 6px 0 2px 15px; font-size: 12px; line-height: 1.7; color: var(--text-soft); white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto; }
 .think-step-body.show { display: block; }
 .msg-bubble {
   padding: 8px 13px; border-radius: var(--radius);
@@ -1153,16 +1147,6 @@ function renderMessage(msg, idx, stagger) {
     if (qt.length > 40) qt = qt.slice(0,40) + '…';
     colHtml += '<div class="msg-quote">' + escHtml(qt) + '</div>';
   }
-  if (think && isKe) {
-    var tSteps = parseThinkSteps(think);
-    if (tSteps.length) {
-      colHtml += '<div class="think-block"><div class="think-toggle" onclick="toggleThinkBlock(this)"><span class="think-toggle-arrow">▶</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7 3 3 6.5 3 11c0 2.5 1.2 4.7 3 6.2V21l3.5-2c.8.2 1.6.3 2.5.3 5 0 9-3.5 9-8s-4-8-9-8z"/></svg><span>思考过程 · '+tSteps.length+'步</span></div><div class="think-steps">';
-      for (var si = 0; si < tSteps.length; si++) {
-        colHtml += '<div class="think-step-item" onclick="toggleThinkStep(this,event)"><div class="think-step-head"><span class="think-step-arrow">▶</span><span class="think-step-title">'+escHtml(tSteps[si].title)+'</span></div><div class="think-step-body">'+escHtml(tSteps[si].body)+'</div></div>';
-      }
-      colHtml += '</div></div>';
-    }
-  }
   var allImgs = [];
   if (msg.images && msg.images.length) { msg.images.forEach(function(im){ allImgs.push(im); }); }
   else if (msg.image) { allImgs.push(msg.image); }
@@ -1908,17 +1892,6 @@ setInterval(function() {
   if (!sending) syncNewMessages();
 }, 15000);
 
-function toggleThinkBlock(toggle) {
-  var arrow = toggle.querySelector('.think-toggle-arrow');
-  var steps = toggle.nextElementSibling;
-  if (steps.classList.contains('show')) {
-    steps.classList.remove('show');
-    arrow.classList.remove('open');
-  } else {
-    steps.classList.add('show');
-    arrow.classList.add('open');
-  }
-}
 function toggleThinkStep(item, e) {
   e.stopPropagation();
   var arrow = item.querySelector('.think-step-arrow');
@@ -1947,7 +1920,8 @@ function openThinking(idx, cloudEl) {
     }
   }
   window._thinkImgs = images;
-  var html = '<div class="think-flow">';
+  var steps = parseThinkSteps(text);
+  var html = '<div class="think-steps-list">';
   if (images.length) {
     var src = images[0];
     var name = src.startsWith('data:') ? '上传的图片' : src.split('/').pop();
@@ -1956,27 +1930,17 @@ function openThinking(idx, cloudEl) {
     html += '<div class="think-file-row" onclick="viewImg(window._thinkImgs[0])"><span class="think-file">' + escHtml(name) + '</span><span class="think-chevron">›</span></div></div>';
     html += '<div class="think-connector"><div class="think-connector-line"></div></div>';
   }
-  var firstLine = (text.split('\n')[0] || '').trim();
-  var preview = firstLine.length > 35 ? firstLine.slice(0, 35) + '...' : firstLine;
-  html += '<div class="think-step"><div class="think-step-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>';
-  html += '<div style="flex:1;min-width:0"><div class="think-preview-row" onclick="toggleThinkFull(this)"><span class="think-preview-text">' + escHtml(preview) + '</span><span class="think-expand open">⌄</span></div>';
-  html += '<div class="think-full-text">' + escHtml(text).replace(/\n/g, '<br>') + '</div></div></div>';
+  for (var si = 0; si < steps.length; si++) {
+    html += '<div class="think-step-item" onclick="toggleThinkStep(this,event)">';
+    html += '<div class="think-step-head"><span class="think-step-arrow">▶</span><span class="think-step-title">' + escHtml(steps[si].title) + '</span></div>';
+    html += '<div class="think-step-body">' + escHtml(steps[si].body) + '</div>';
+    html += '</div>';
+  }
   html += '</div>';
   document.getElementById('sheetText').innerHTML = html;
   sheet.style.height = '';
   document.getElementById('sheetOverlay').classList.add('show');
   document.getElementById('sheet').classList.add('show');
-}
-function toggleThinkFull(row) {
-  var full = row.nextElementSibling;
-  var arrow = row.querySelector('.think-expand');
-  if (full.style.display === 'none') {
-    full.style.display = '';
-    if (arrow) { arrow.textContent = '⌄'; arrow.classList.add('open'); }
-  } else {
-    full.style.display = 'none';
-    if (arrow) { arrow.textContent = '›'; arrow.classList.remove('open'); }
-  }
 }
 function closeThinking() {
   document.getElementById('sheetOverlay').classList.remove('show');
