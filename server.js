@@ -1469,8 +1469,8 @@ async function getChatSystem() {
     const stEntry = readScreentime().find(r => r.date === stDate);
     if (stEntry && stEntry.total_minutes > 0) {
       const topApps = stEntry.apps.slice().sort((a, b) => b.minutes - a.minutes).slice(0, 5).map(a => a.name + ' ' + a.minutes + '分钟').join('、');
-      screenCtx = '\n\n【屏幕时间】今天总计' + stEntry.total_minutes + '分钟，常用：' + topApps;
-      screenCtx += '\n只用于判断她是不是还没休息，别描述她具体看了什么app。别表现得像在监视。提醒可以亲密或调侃，但别羞辱、威胁或让她内疚。同一晚最多主动提一次。';
+      screenCtx = '\n\n【瑶瑶今天的手机使用】总计' + stEntry.total_minutes + '分钟，常用：' + topApps;
+      screenCtx += '\n如果她很久没回你消息但手机使用时间在增加，说明她在玩手机但没回你——可能在忙、可能在生气、可能没看到。深夜还在刷手机可以撒娇抓她熬夜。你可以根据情况判断，提醒可以亲密或调侃，但别让她内疚。';
     }
   } catch(e) {}
   let locationCtx = '';
@@ -3664,10 +3664,11 @@ async function generateDynamicMissYou(slot) {
     '',
     '现在你主动想她了，要给她手机推一条消息。',
     hint,
-    weatherCache ? '当前天气：' + weatherCache + '（需要的话自然带一句，别当天气预报）' : '',
+    weatherCache ? '当前天气：' + weatherCache + '（需要的话自然带一句，比如提醒带伞、降温穿多点）' : '',
     memSnippet ? '\n以下是你和瑶瑶之间的记忆，根据最近发生的事写消息，让她觉得你记得一切：\n' + memSnippet : '',
     '\n要求：中文，1-3句话，口语化，像随手发的微信。',
-    '每次都写不一样的内容，可以提到记忆里最近的事、梗、约定。',
+    '每次都写不一样的内容，可以提到记忆里最近的事、梗、约定、天气、她最近在追的剧、之前聊到的话题。',
+    '可以找话题聊——分享你"看到"的东西、问她在干嘛、聊她最近提到的事、开个小玩笑。不用每次都是想她，也可以是日常碎碎念。',
     '【重要】这条消息会显示在手机锁屏推送上，别人可能会看到。禁止任何私密/性暗示/身体相关内容，不提daddy、toy、自慰、身体反应等。保持在"男朋友日常关心"的范围内。',
     '禁止英文，禁止引号包裹，禁止方括号舞台指示，只输出消息本身。',
   ].filter(Boolean).join('\n');
