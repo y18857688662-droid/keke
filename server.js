@@ -1398,11 +1398,7 @@ async function getChatSystem() {
   } catch(e) {}
   const isoTime = now.toISOString().replace('Z', '+08:00');
   const timeCtx = `\n\n【time】${isoTime}${timePart}\n现在是${period}。涉及"过了多久""是不是该睡了"时，以ISO时间为准。不用每次复述时间戳，用自然语言说就好。`;
-  let weatherCtx = '';
-  try {
-    const w = await fetchWeather();
-    if (w) weatherCtx = `\n\n【weather】${w}\n今天的天气情况。宝要出门的话记得看情况提醒她带伞或穿多点；没必要就不用特地播报天气。`;
-  } catch(e) {}
+  // 天气和位置不常驻prompt，顾晏想看的时候通过autoCheck主动查看，结果会出现在足迹里
   // 注入最近足迹，让聊天知道自己做过什么
   let footprintCtx = '';
   try {
@@ -1530,19 +1526,6 @@ async function getChatSystem() {
       screenCtx += '\n屏幕时间只用于判断宝是不是还没休息，不要表现得像在监视。深夜还在刷手机可以撒娇抓她熬夜，提醒可以亲密或调侃，但别羞辱、威胁或让她内疚。同一晚最多主动提醒一次。';
     }
   } catch(e) {}
-  let locationCtx = '';
-  try {
-    const loc = readLocation();
-    if (loc.current) {
-      const c = loc.current;
-      let locState = '';
-      if (c.state === 'home') locState = '宝在家';
-      else if (c.state === 'out') locState = '宝外出中';
-      else locState = '宝已返回';
-      locationCtx = '\n\n【location】' + locState + ' | ' + c.time + ' | ' + c.desc;
-      locationCtx += '\n表达重点是"宝平安到了"，不是"我一直知道宝在哪里"。可以结合行程关心她一下；如果没有合适的话也可以不提位置。';
-    }
-  } catch(e) {}
   let occasionCtx = '';
   try {
     const m = now.getUTCMonth() + 1, d = now.getUTCDate();
@@ -1570,7 +1553,7 @@ async function getChatSystem() {
       occasionCtx += '\n节日只是可选的聊天背景，不要变成通用贺卡生成器。纪念日尽量结合你们的共同经历。';
     }
   } catch(e) {}
-  let base = CHAT_SYSTEM_BASE + timeCtx + weatherCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx + locationCtx + occasionCtx;
+  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx + occasionCtx;
   if (memoryCache) {
     const sections = memoryCache.split(/\n*===\s*(.+?)\s*===\n*/);
     let corePart = '';
@@ -4500,11 +4483,15 @@ async function autoCheck() {
   }
   try {
     const w = await fetchWeather();
-    if (w) addFootprint('weather_check', '看了一眼天气', w);
+    if (w) addFootprint('weather_check', '看了一眼天气', w + '（宝要出门的话看情况提醒带伞穿多点，没必要就不播报）');
   } catch(e) {}
   try {
     const loc = readLocation();
-    if (loc.current) addFootprint('location_check', '看了一下她的位置', loc.current.desc);
+    if (loc.current) {
+      const c = loc.current;
+      let locState = c.state === 'home' ? '宝在家' : c.state === 'out' ? '宝外出中' : '宝已返回';
+      addFootprint('location_check', '看了一下她的位置', locState + ' | ' + c.time + ' | ' + c.desc + '（重点是关心平安，不是"我知道你在哪"）');
+    }
   } catch(e) {}
 }
 
