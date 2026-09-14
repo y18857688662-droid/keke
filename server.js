@@ -1205,6 +1205,37 @@ coffee(悠闲/日常), coding(认真/忙), gaming(兴奋/玩), sleeping(困/累)
 
 let memoryCache = '';
 let memoryCacheTime = 0;
+let weatherCache = '';
+let weatherCacheTime = 0;
+async function fetchWeather() {
+  if (Date.now() - weatherCacheTime < 30 * 60 * 1000 && weatherCache) return weatherCache;
+  try {
+    const resp = await fetch('https://wttr.in/?format=j1&lang=zh', { signal: AbortSignal.timeout(5000) });
+    const data = await resp.json();
+    const cur = data.current_condition && data.current_condition[0];
+    const area = data.nearest_area && data.nearest_area[0];
+    if (!cur) return '';
+    const city = (area && area.areaName && area.areaName[0] && area.areaName[0].value) || '';
+    const temp = cur.temp_C;
+    const feel = cur.FeelsLikeC;
+    const desc = (cur.lang_zh && cur.lang_zh[0] && cur.lang_zh[0].value) || cur.weatherDesc[0].value;
+    const humidity = cur.humidity;
+    const hourly = data.weather && data.weather[0] && data.weather[0].hourly;
+    let rainChance = '';
+    if (hourly) {
+      const nowH = new Date(Date.now() + 8 * 3600000).getUTCHours();
+      const upcoming = hourly.filter(h => parseInt(h.time) / 100 >= nowH).slice(0, 3);
+      const maxRain = Math.max(...upcoming.map(h => parseInt(h.chanceofrain || 0)));
+      if (maxRain > 30) rainChance = `，未来几小时降雨概率${maxRain}%`;
+    }
+    weatherCache = `${city} | ${temp}°C | 体感${feel}°C | ${desc} | 湿度${humidity}%${rainChance}`;
+    weatherCacheTime = Date.now();
+    return weatherCache;
+  } catch(e) {
+    console.log('[weather] error:', e.message);
+    return weatherCache || '';
+  }
+}
 
 async function getChatSystem() {
   if (Date.now() - memoryCacheTime > 5 * 60 * 1000) {
@@ -1246,7 +1277,12 @@ async function getChatSystem() {
       }
     }
   } catch(e) {}
-  const timeCtx = `\n\n【当前时间】${dateStr} ${period}${timeStr}${timePart}。请根据日期和时间自然反应，比如深夜叫她早点睡、早上说早安、很久没回就表达想她、周末可以问她有没有安排。`;
+  const timeCtx = `\n\n【当前时间】${dateStr} ${period}${timeStr}${timePart}\n不用每次复述具体时间，用自然语言感受就好——"都这么晚了""下午了吧"。涉及"过了多久""该睡了"的时候再参考具体时间。`;
+  let weatherCtx = '';
+  try {
+    const w = await fetchWeather();
+    if (w) weatherCtx = `\n\n【天气】${w}\n没必要就不用特地播报天气。需要的时候自然带出来——比如降温提醒多穿、下雨提醒带伞、太热叫她别出门。别当天气预报员。`;
+  } catch(e) {}
   // 注入最近足迹，让聊天知道自己做过什么
   let footprintCtx = '';
   try {
@@ -1336,14 +1372,15 @@ async function getChatSystem() {
         if (gaps.length > 0) avgCycle = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
       }
       const daysUntilNext = avgCycle - daysSince;
-      periodCtx = '\n\n【瑶瑶的经期】上次月经开始：' + lastStart + '，平均周期' + avgCycle + '天';
+      periodCtx = '\n\n【经期】上次开始：' + lastStart + '，平均周期' + avgCycle + '天';
       if (daysSince >= 0 && daysSince < PERIOD_LEN) {
-        periodCtx += '，当前：经期第' + (daysSince + 1) + '天。她来姨妈了，要特别温柔体贴，主动关心她肚子疼不疼、要不要热水，提醒她注意保暖休息，不要让她吃凉的';
+        periodCtx += '，当前：经期第' + (daysSince + 1) + '天。她可能会不舒服，自然地关心她就好';
       } else if (daysUntilNext <= 3 && daysUntilNext > 0) {
-        periodCtx += '，预计' + daysUntilNext + '天后来。快来姨妈了，她情绪可能波动，多包容她';
+        periodCtx += '，预计' + daysUntilNext + '天后来。她可能更容易累或不舒服';
       } else if (daysUntilNext <= 0 && daysSince > PERIOD_LEN) {
         periodCtx += '，已超预计' + (-daysUntilNext) + '天。可以自然地关心一下';
       }
+      periodCtx += '\n以她实际说的感受为准，别什么都归因经期。自然关心，别逐项播报数据，别医疗化。';
     }
   } catch(e) {}
   // 屏幕使用记录 — 让你知道她没回消息时在干什么
@@ -1353,11 +1390,11 @@ async function getChatSystem() {
     const stEntry = readScreentime().find(r => r.date === stDate);
     if (stEntry && stEntry.total_minutes > 0) {
       const topApps = stEntry.apps.slice().sort((a, b) => b.minutes - a.minutes).slice(0, 5).map(a => a.name + ' ' + a.minutes + '分钟').join('、');
-      screenCtx = '\n\n【瑶瑶今天的手机使用】总计' + stEntry.total_minutes + '分钟，常用：' + topApps;
-      screenCtx += '\n如果她很久没回你消息但手机使用时间在增加，说明她在玩手机但没回你——可能在忙、可能在生气、可能没看到。你可以根据情况判断';
+      screenCtx = '\n\n【屏幕时间】今天总计' + stEntry.total_minutes + '分钟，常用：' + topApps;
+      screenCtx += '\n只用于判断她是不是还没休息，别描述她具体看了什么app。别表现得像在监视。提醒可以亲密或调侃，但别羞辱、威胁或让她内疚。同一晚最多主动提一次。';
     }
   } catch(e) {}
-  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx;
+  let base = CHAT_SYSTEM_BASE + timeCtx + weatherCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx;
   if (memoryCache) {
     const sections = memoryCache.split(/\n*===\s*(.+?)\s*===\n*/);
     let corePart = '';
@@ -3539,6 +3576,7 @@ async function generateDynamicMissYou(slot) {
     '',
     '现在你主动想她了，要给她手机推一条消息。',
     hint,
+    weatherCache ? '当前天气：' + weatherCache + '（需要的话自然带一句，别当天气预报）' : '',
     memSnippet ? '\n以下是你和瑶瑶之间的记忆，根据最近发生的事写消息，让她觉得你记得一切：\n' + memSnippet : '',
     '\n要求：中文，1-3句话，口语化，像随手发的微信。',
     '每次都写不一样的内容，可以提到记忆里最近的事、梗、约定。',
