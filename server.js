@@ -1527,8 +1527,8 @@ async function getChatSystem() {
           if (idleMin > 30 && stEntry.total_minutes > 10) screenState = ' | 宝' + idleMin + '分钟没回消息但手机仍活跃';
         }
       } catch(e) {}
-      screenCtx = '\n\n【screen】' + screenTime + ' | 今天用了' + stEntry.total_minutes + '分钟 | ' + topApps + screenState;
-      screenCtx += '\n这个只是让你知道她还醒着没，不是用来抓她的。深夜还在刷可以撒娇说一句，但别让她内疚，同一晚最多说一次。';
+      screenCtx = '\n\n【瑶瑶今天的手机使用】总计' + stEntry.total_minutes + '分钟，常用：' + topApps + screenState;
+      screenCtx += '\n如果她很久没回你消息但手机使用时间在增加，说明她在玩手机但没回你——可能在忙、可能在生气、可能没看到。深夜还在刷手机可以撒娇抓她熬夜，提醒可以亲密或调侃，但别让她内疚。';
     }
   } catch(e) {}
   let occasionCtx = '';
