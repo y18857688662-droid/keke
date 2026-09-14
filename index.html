@@ -1667,9 +1667,13 @@ var evtSource = new EventSource('/chat/stream');
 var pollKnown = -1;
 fetch('/chat/presence', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'online'})}).catch(function(){});
 if (navigator.geolocation) {
-  navigator.geolocation.getCurrentPosition(function(pos) {
-    fetch('/api/location', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude})}).catch(function(){});
-  }, function(){}, {timeout:10000,maximumAge:300000});
+  function sendLocation() {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      fetch('/api/location', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude})}).catch(function(){});
+    }, function(){}, {timeout:10000,maximumAge:60000});
+  }
+  sendLocation();
+  setInterval(sendLocation, 5 * 60 * 1000);
 }
 window.addEventListener('beforeunload', function(){navigator.sendBeacon('/chat/presence',new Blob([JSON.stringify({status:'away'})],{type:'application/json'}));});
 function attachSSE(src) {

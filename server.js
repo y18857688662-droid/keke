@@ -788,6 +788,46 @@ app.post('/api/location/set-home', (req, res) => {
 });
 
 app.get('/api/location', (req, res) => {
+  if (req.query.lat && req.query.lng) {
+    const lat = parseFloat(req.query.lat);
+    const lng = parseFloat(req.query.lng);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const loc = readLocation();
+      const now = new Date(Date.now() + 8 * 3600000);
+      const timeStr = now.toISOString().slice(0, 16).replace('T', ' ');
+      let state = 'unknown', stateDesc = '';
+      if (!loc.home) {
+        loc.home = { lat, lng, set: timeStr };
+        state = 'home'; stateDesc = '在家';
+      } else {
+        const dist = getDistanceKm(lat, lng, loc.home.lat, loc.home.lng);
+        const prevState = loc.current ? loc.current.state : 'home';
+        if (dist < 0.3) {
+          state = 'home';
+          if (prevState === 'out') {
+            stateDesc = '回家了';
+            if (loc.current && loc.current.time) {
+              const outMs = new Date(loc.current.time.replace(' ', 'T') + '+08:00').getTime();
+              const durMin = Math.round((Date.now() - outMs) / 60000);
+              if (durMin > 10) { const h = Math.floor(durMin / 60), m = durMin % 60; stateDesc = '回家了，外出' + (h > 0 ? h + '小时' + (m > 0 ? m + '分钟' : '') : m + '分钟'); }
+            }
+          } else { stateDesc = '在家'; }
+        } else {
+          state = 'out';
+          stateDesc = '外出中，距家约' + (dist < 1 ? Math.round(dist * 1000) + '米' : dist.toFixed(1) + '公里');
+        }
+      }
+      const prev = loc.current;
+      loc.current = { lat, lng, state, desc: stateDesc, time: timeStr };
+      if (prev && prev.state !== state) {
+        if (!loc.history) loc.history = [];
+        loc.history.push({ from: prev.state, to: state, time: timeStr });
+        if (loc.history.length > 50) loc.history = loc.history.slice(-50);
+      }
+      writeLocation(loc);
+      return res.json({ ok: true, state, desc: stateDesc });
+    }
+  }
   const loc = readLocation();
   res.json({ home: !!loc.home, current: loc.current || null });
 });
