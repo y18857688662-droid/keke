@@ -115,6 +115,12 @@ function markEnd(){
 function dayTap(ds){
   if(P.indexOf(ds)>=0){if(confirm('撤销 '+ds+' 这条经期记录？'))post('/period/remove',{date:ds});return}
   if(ds>TODAY)return;
+  var last=P.length?P[P.length-1]:'';
+  var inRange=last&&d2n(ds)>=d2n(last)&&d2n(ds)-d2n(last)<=15&&!ENDS[last];
+  if(inRange){
+    var ch=confirm('补记 '+ds+' 为经期结束日？\n\n点「取消」可以改为补记经期第一天');
+    if(ch){post('/period/end',{date:ds});return}
+  }
   if(confirm('补记 '+ds+' 为经期第一天？'))post('/period/start',{date:ds});
 }
 fetch('/period/data').then(function(r){return r.json()}).then(function(j){
