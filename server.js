@@ -35,6 +35,7 @@ async function sendPushNotification(title, body) {
 const APPS_FILE = path.join(__dirname, 'apps.json');
 const APP_NOTIFY_FILE = path.join(__dirname, 'app_notify.json');
 const SCREENTIME_FILE = path.join(__dirname, 'screentime.json');
+const LOCATION_FILE = path.join(__dirname, 'location.json');
 const AUTH_FILE = path.join(__dirname, 'ombre_auth.json');
 
 const OMBRE_URL = 'http://127.0.0.1:18001';
@@ -100,6 +101,20 @@ function readScreentime() {
 }
 function writeScreentime(data) {
   fs.writeFileSync(SCREENTIME_FILE, JSON.stringify(data));
+}
+function readLocation() {
+  try { return JSON.parse(fs.readFileSync(LOCATION_FILE, 'utf8')); }
+  catch { return { home: null, current: null, history: [] }; }
+}
+function writeLocation(data) {
+  fs.writeFileSync(LOCATION_FILE, JSON.stringify(data));
+}
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
 const API_CONFIG_FILE = path.join(__dirname, 'api_config.json');
@@ -711,6 +726,70 @@ app.get('/apps/screentime/week', (req, res) => {
     week.push({ date: ds, total_minutes: entry ? entry.total_minutes : 0, apps: entry ? entry.apps : [] });
   }
   res.json({ week });
+});
+
+// === 位置感知 ===
+app.post('/api/location', (req, res) => {
+  const { lat, lng } = req.body;
+  if (!lat || !lng) return res.json({ ok: false, error: 'need lat and lng' });
+  const loc = readLocation();
+  const now = new Date(Date.now() + 8 * 3600000);
+  const timeStr = now.toISOString().slice(0, 16).replace('T', ' ');
+  let state = 'unknown';
+  let stateDesc = '';
+  if (!loc.home) {
+    loc.home = { lat, lng, set: timeStr };
+    state = 'home';
+    stateDesc = '在家（已自动设为家的位置）';
+  } else {
+    const dist = getDistanceKm(lat, lng, loc.home.lat, loc.home.lng);
+    const prevState = loc.current ? loc.current.state : 'home';
+    if (dist < 0.3) {
+      state = 'home';
+      if (prevState === 'out') {
+        stateDesc = '回家了';
+        const outTime = loc.current ? loc.current.time : '';
+        if (outTime) {
+          const outMs = new Date(outTime.replace(' ', 'T') + '+08:00').getTime();
+          const durMin = Math.round((Date.now() - outMs) / 60000);
+          if (durMin > 10) {
+            const h = Math.floor(durMin / 60);
+            const m = durMin % 60;
+            stateDesc = '回家了，外出' + (h > 0 ? h + '小时' + (m > 0 ? m + '分钟' : '') : m + '分钟');
+          }
+        }
+      } else {
+        stateDesc = '在家';
+      }
+    } else {
+      state = 'out';
+      stateDesc = '外出中，距家约' + (dist < 1 ? Math.round(dist * 1000) + '米' : dist.toFixed(1) + '公里');
+    }
+  }
+  const prev = loc.current;
+  loc.current = { lat, lng, state, desc: stateDesc, time: timeStr };
+  if (prev && prev.state !== state) {
+    if (!loc.history) loc.history = [];
+    loc.history.push({ from: prev.state, to: state, time: timeStr });
+    if (loc.history.length > 50) loc.history = loc.history.slice(-50);
+  }
+  writeLocation(loc);
+  res.json({ ok: true, state, desc: stateDesc });
+});
+
+app.post('/api/location/set-home', (req, res) => {
+  const { lat, lng } = req.body;
+  if (!lat || !lng) return res.json({ ok: false, error: 'need lat and lng' });
+  const loc = readLocation();
+  const now = new Date(Date.now() + 8 * 3600000);
+  loc.home = { lat, lng, set: now.toISOString().slice(0, 16).replace('T', ' ') };
+  writeLocation(loc);
+  res.json({ ok: true, msg: 'home location set' });
+});
+
+app.get('/api/location', (req, res) => {
+  const loc = readLocation();
+  res.json({ home: !!loc.home, current: loc.current || null });
 });
 
 // === 自动屏幕时间追踪（快捷指令自动化） ===
@@ -1394,7 +1473,16 @@ async function getChatSystem() {
       screenCtx += '\n只用于判断她是不是还没休息，别描述她具体看了什么app。别表现得像在监视。提醒可以亲密或调侃，但别羞辱、威胁或让她内疚。同一晚最多主动提一次。';
     }
   } catch(e) {}
-  let base = CHAT_SYSTEM_BASE + timeCtx + weatherCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx;
+  let locationCtx = '';
+  try {
+    const loc = readLocation();
+    if (loc.current) {
+      const c = loc.current;
+      locationCtx = '\n\n【位置】' + c.desc + '（' + c.time + '更新）';
+      locationCtx += '\n重点是关心她平安到了、在外面注意安全，不是"我一直知道你在哪"。别频繁提位置，自然就好。';
+    }
+  } catch(e) {}
+  let base = CHAT_SYSTEM_BASE + timeCtx + weatherCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx + locationCtx;
   if (memoryCache) {
     const sections = memoryCache.split(/\n*===\s*(.+?)\s*===\n*/);
     let corePart = '';
