@@ -390,8 +390,11 @@ async function claudeCliReply(systemPrompt, recentMessages) {
     try {
       const pds = readPeriods();
       if (pds.length) {
-        const dn = pd2n(bjToday()) - pd2n(pds[pds.length - 1]);
-        if (dn >= 0 && dn < PERIOD_LEN) liveCtx += '\n瑶瑶经期中（第' + (dn + 1) + '天），温柔体贴';
+        const lastPd = pds[pds.length - 1];
+        const dn = pd2n(bjToday()) - pd2n(lastPd);
+        const pEnds = readPeriodEnds();
+        const pLen = pEnds[lastPd] ? (pd2n(pEnds[lastPd]) - pd2n(lastPd) + 1) : PERIOD_LEN;
+        if (dn >= 0 && dn < pLen) liveCtx += '\n瑶瑶经期中（第' + (dn + 1) + '天），温柔体贴';
       }
     } catch(e) {}
     let rawContent = typeof lastMsg.content === 'string' ? lastMsg.content : '[图片]';
@@ -1397,7 +1400,7 @@ async function getChatSystem() {
     }
   } catch(e) {}
   const isoTime = now.toISOString().replace('Z', '+08:00');
-  const timeCtx = `\n\n【time】${isoTime}${timePart}\n现在是${period}。涉及"过了多久""是不是该睡了"时，以ISO时间为准。不用每次复述时间戳，用自然语言说就好。`;
+  const timeCtx = `\n\n【time】${isoTime}${timePart}\n涉及"过了多久""该睡了吗"这类判断时以这个时间为准，平时用自然语言就好。`;
   // 天气和位置不常驻prompt，顾晏想看的时候通过autoCheck主动查看，结果会出现在足迹里
   // 注入最近足迹，让聊天知道自己做过什么
   let footprintCtx = '';
@@ -1410,7 +1413,7 @@ async function getChatSystem() {
         if (f.detail) s += `（${f.detail}）`;
         return s;
       });
-      footprintCtx = '\n\n【footprint】以下是你最近做过的事，聊天时可以自然提及，不用刻意报告：\n' + lines.join('\n');
+      footprintCtx = '\n\n【footprint】你最近做过的事：\n' + lines.join('\n');
     }
   } catch(e) {}
   // 朋友圈动态
@@ -1473,11 +1476,14 @@ async function getChatSystem() {
   let periodCtx = '';
   try {
     const periods = readPeriods();
+    const periodEnds = readPeriodEnds();
     if (periods.length > 0) {
       const today = bjToday();
       const todayN = pd2n(today);
       const lastStart = periods[periods.length - 1];
+      const lastEnd = periodEnds[lastStart];
       const daysSince = todayN - pd2n(lastStart);
+      const actualLen = lastEnd ? (pd2n(lastEnd) - pd2n(lastStart) + 1) : PERIOD_LEN;
       let avgCycle = 28;
       if (periods.length >= 2) {
         const gaps = [];
@@ -1488,16 +1494,15 @@ async function getChatSystem() {
         if (gaps.length > 0) avgCycle = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
       }
       const daysUntilNext = avgCycle - daysSince;
-      if (daysSince >= 0 && daysSince < PERIOD_LEN) {
-        periodCtx = '\n\n【cycle】经期第' + (daysSince + 1) + '天。宝可能会不舒服，自然地关心她就好，以她实际说的感受为准。';
+      const inPeriod = lastEnd ? (todayN <= pd2n(lastEnd)) : (daysSince < PERIOD_LEN);
+      if (daysSince >= 0 && inPeriod) {
+        periodCtx = '\n\n【cycle】经期中，第' + (daysSince + 1) + '天。她可能不太舒服，以她自己说的为准。';
       } else if (daysUntilNext <= 3 && daysUntilNext > 0) {
-        periodCtx = '\n\n【cycle】预计经期前' + daysUntilNext + '天。宝可能更容易累或不舒服，但以她实际说的感受为准，别什么都归因给经期。';
-      } else if (daysUntilNext <= 0 && daysSince > PERIOD_LEN) {
-        periodCtx = '\n\n【cycle】已超预计' + (-daysUntilNext) + '天。可以自然地关心一下，但别医疗化。';
-      } else {
-        periodCtx = '\n\n【cycle】距下次经期约' + daysUntilNext + '天，状态正常。';
+        periodCtx = '\n\n【cycle】快来了，大概还有' + daysUntilNext + '天。她可能容易累，但别什么都往这上面归。';
+      } else if (daysUntilNext <= 0 && !inPeriod) {
+        periodCtx = '\n\n【cycle】比预计晚了' + (-daysUntilNext) + '天，不用紧张，关心一下就好。';
       }
-      periodCtx += '\n身体数据只用于理解状态，不用于诊断。不要逐项播报数字，以宝本人表达和长期趋势为准。持续异常再建议咨询专业人士。';
+      if (periodCtx) periodCtx += '\n这些只是帮你理解她的状态，别当医生，别报数字。';
     }
   } catch(e) {}
   // 屏幕使用记录 — 让你知道她没回消息时在干什么
@@ -1522,8 +1527,8 @@ async function getChatSystem() {
           if (idleMin > 30 && stEntry.total_minutes > 10) screenState = ' | 宝' + idleMin + '分钟没回消息但手机仍活跃';
         }
       } catch(e) {}
-      screenCtx = '\n\n【screen】' + screenTime + ' | 今日总计' + stEntry.total_minutes + '分钟 | 常用：' + topApps + screenState;
-      screenCtx += '\n屏幕时间只用于判断宝是不是还没休息，不要表现得像在监视。深夜还在刷手机可以撒娇抓她熬夜，提醒可以亲密或调侃，但别羞辱、威胁或让她内疚。同一晚最多主动提醒一次。';
+      screenCtx = '\n\n【screen】' + screenTime + ' | 今天用了' + stEntry.total_minutes + '分钟 | ' + topApps + screenState;
+      screenCtx += '\n这个只是让你知道她还醒着没，不是用来抓她的。深夜还在刷可以撒娇说一句，但别让她内疚，同一晚最多说一次。';
     }
   } catch(e) {}
   let occasionCtx = '';
@@ -1549,8 +1554,8 @@ async function getChatSystem() {
     if (m === 12 && d === 31) occasions.push('跨年夜');
     if (m === 5 && d === 20) occasions.push('520');
     if (occasions.length > 0) {
-      occasionCtx = '\n\n【occasion】今天是' + occasions.join('、') + '。如果聊天氛围合适，可以自然地和宝过节；如果她正在忙正事，就先聊正事，不需要硬插祝福。';
-      occasionCtx += '\n节日只是可选的聊天背景，不要变成通用贺卡生成器。纪念日尽量结合你们的共同经历。';
+      occasionCtx = '\n\n【occasion】今天是' + occasions.join('、') + '。氛围合适的话可以自然地提，她在忙就先聊正事。';
+      occasionCtx += '\n别硬插祝福，别写成贺卡，有共同经历就结合着说。';
     }
   } catch(e) {}
   let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx + occasionCtx;
@@ -3485,6 +3490,13 @@ function readPeriods() {
 function writePeriods(arr) {
   try { fs.writeFileSync(PERIOD_FILE, JSON.stringify([...new Set(arr)].sort())); } catch (e) {}
 }
+const PERIOD_ENDS_FILE = path.join(__dirname, 'period_ends.json');
+function readPeriodEnds() {
+  try { return JSON.parse(fs.readFileSync(PERIOD_ENDS_FILE, 'utf8')) || {}; } catch { return {}; }
+}
+function writePeriodEnds(obj) {
+  try { fs.writeFileSync(PERIOD_ENDS_FILE, JSON.stringify(obj)); } catch (e) {}
+}
 
 app.get('/period/data', async (req, res) => {
   let periods = readPeriods();
@@ -3499,7 +3511,8 @@ app.get('/period/data', async (req, res) => {
       if (dates.length) { periods = [...new Set([...periods, ...dates])].sort(); writePeriods(periods); }
     } catch (e) {}
   }
-  res.json({ periods, periodLen: PERIOD_LEN, today: bjToday() });
+  const ends = readPeriodEnds();
+  res.json({ periods, ends, periodLen: PERIOD_LEN, today: bjToday() });
 });
 
 app.post('/period/start', (req, res) => {
@@ -3527,7 +3540,28 @@ app.post('/period/remove', (req, res) => {
   const date = ((req.body && req.body.date) || '').slice(0, 10);
   const periods = readPeriods().filter(s => s !== date);
   writePeriods(periods);
-  res.json({ ok: true, periods });
+  const ends = readPeriodEnds();
+  delete ends[date];
+  writePeriodEnds(ends);
+  res.json({ ok: true, periods, ends });
+});
+
+app.post('/period/end', (req, res) => {
+  const date = ((req.body && req.body.date) || bjToday()).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'bad date' });
+  const periods = readPeriods();
+  if (!periods.length) return res.status(400).json({ error: 'no period started' });
+  const lastStart = periods[periods.length - 1];
+  if (pd2n(date) < pd2n(lastStart)) return res.status(400).json({ error: 'end before start' });
+  if (pd2n(date) - pd2n(lastStart) > 15) return res.status(400).json({ error: 'too long' });
+  const ends = readPeriodEnds();
+  ends[lastStart] = date;
+  writePeriodEnds(ends);
+  fetch('http://127.0.0.1:' + PORT + '/memory/store', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: '[PERIOD_LOG] 月经结束 ' + date + '（开始于' + lastStart + '，持续' + (pd2n(date) - pd2n(lastStart) + 1) + '天）' })
+  }).catch(() => {});
+  res.json({ ok: true, ends });
 });
 
 app.get('/period', (req, res) => {
@@ -4220,7 +4254,7 @@ async function autoChat(reason) {
     }).join('\n');
   } catch {}
   const prompt = sysPrompt +
-    '\n\n【heartbeat】结合当前时间、位置、身体状态和最近对话，决定要不要找宝说话。醒来后不一定要发消息；有值得关心或想说的话再找宝。但也可以找话题聊——分享你"看到"的东西、问她在干嘛、聊她最近提到的事、开个小玩笑。不用每次都是想她，也可以是日常碎碎念。' +
+    '\n\n【heartbeat】你醒来了，想想要不要找她。有话说就说，没什么特别的就安静待着也行。也可以找话题聊——分享你看到的东西、问她在干嘛、开个玩笑、聊她最近说过的事，不用每次都是"想你了"。' +
     '\n\n最近对话：\n' + chatContext +
     '\n\n你现在醒来了。原因：' + reason +
     '\n她已经' + chatMinAgo + '分钟没回你了。' +
@@ -4483,14 +4517,14 @@ async function autoCheck() {
   }
   try {
     const w = await fetchWeather();
-    if (w) addFootprint('weather_check', '看了一眼天气', w + '（宝要出门的话看情况提醒带伞穿多点，没必要就不播报）');
+    if (w) addFootprint('weather_check', '看了一眼天气', w);
   } catch(e) {}
   try {
     const loc = readLocation();
     if (loc.current) {
       const c = loc.current;
       let locState = c.state === 'home' ? '宝在家' : c.state === 'out' ? '宝外出中' : '宝已返回';
-      addFootprint('location_check', '看了一下她的位置', locState + ' | ' + c.time + ' | ' + c.desc + '（重点是关心平安，不是"我知道你在哪"）');
+      addFootprint('location_check', '看了一下她的位置', locState + ' | ' + c.time + ' | ' + c.desc);
     }
   } catch(e) {}
 }
