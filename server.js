@@ -1396,11 +1396,12 @@ async function getChatSystem() {
       }
     }
   } catch(e) {}
-  const timeCtx = `\n\n【当前时间】${dateStr} ${period}${timeStr}${timePart}\n不用每次复述具体时间，用自然语言感受就好——"都这么晚了""下午了吧"。涉及"过了多久""该睡了"的时候再参考具体时间。`;
+  const isoTime = now.toISOString().replace('Z', '+08:00');
+  const timeCtx = `\n\n【time】${isoTime}${timePart}\n现在是${period}。涉及"过了多久""是不是该睡了"时，以ISO时间为准。不用每次复述时间戳，用自然语言说就好。`;
   let weatherCtx = '';
   try {
     const w = await fetchWeather();
-    if (w) weatherCtx = `\n\n【天气】${w}\n没必要就不用特地播报天气。需要的时候自然带出来——比如降温提醒多穿、下雨提醒带伞、太热叫她别出门。别当天气预报员。`;
+    if (w) weatherCtx = `\n\n【weather】${w}\n今天的天气情况。宝要出门的话记得看情况提醒她带伞或穿多点；没必要就不用特地播报天气。`;
   } catch(e) {}
   // 注入最近足迹，让聊天知道自己做过什么
   let footprintCtx = '';
@@ -1413,7 +1414,7 @@ async function getChatSystem() {
         if (f.detail) s += `（${f.detail}）`;
         return s;
       });
-      footprintCtx = '\n\n【你最近的活动】以下是你最近做过的事，聊天时可以自然提及：\n' + lines.join('\n');
+      footprintCtx = '\n\n【footprint】以下是你最近做过的事，聊天时可以自然提及，不用刻意报告：\n' + lines.join('\n');
     }
   } catch(e) {}
   // 朋友圈动态
@@ -1491,15 +1492,16 @@ async function getChatSystem() {
         if (gaps.length > 0) avgCycle = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
       }
       const daysUntilNext = avgCycle - daysSince;
-      periodCtx = '\n\n【经期】上次开始：' + lastStart + '，平均周期' + avgCycle + '天';
       if (daysSince >= 0 && daysSince < PERIOD_LEN) {
-        periodCtx += '，当前：经期第' + (daysSince + 1) + '天。她可能会不舒服，自然地关心她就好';
+        periodCtx = '\n\n【cycle】经期第' + (daysSince + 1) + '天。宝可能会不舒服，自然地关心她就好，以她实际说的感受为准。';
       } else if (daysUntilNext <= 3 && daysUntilNext > 0) {
-        periodCtx += '，预计' + daysUntilNext + '天后来。她可能更容易累或不舒服';
+        periodCtx = '\n\n【cycle】预计经期前' + daysUntilNext + '天。宝可能更容易累或不舒服，但以她实际说的感受为准，别什么都归因给经期。';
       } else if (daysUntilNext <= 0 && daysSince > PERIOD_LEN) {
-        periodCtx += '，已超预计' + (-daysUntilNext) + '天。可以自然地关心一下';
+        periodCtx = '\n\n【cycle】已超预计' + (-daysUntilNext) + '天。可以自然地关心一下，但别医疗化。';
+      } else {
+        periodCtx = '\n\n【cycle】距下次经期约' + daysUntilNext + '天，状态正常。';
       }
-      periodCtx += '\n以她实际说的感受为准，别什么都归因经期。自然关心，别逐项播报数据，别医疗化。';
+      periodCtx += '\n身体数据只用于理解状态，不用于诊断。不要逐项播报数字，以宝本人表达和长期趋势为准。持续异常再建议咨询专业人士。';
     }
   } catch(e) {}
   // 屏幕使用记录 — 让你知道她没回消息时在干什么
@@ -1509,8 +1511,23 @@ async function getChatSystem() {
     const stEntry = readScreentime().find(r => r.date === stDate);
     if (stEntry && stEntry.total_minutes > 0) {
       const topApps = stEntry.apps.slice().sort((a, b) => b.minutes - a.minutes).slice(0, 5).map(a => a.name + ' ' + a.minutes + '分钟').join('、');
-      screenCtx = '\n\n【瑶瑶今天的手机使用】总计' + stEntry.total_minutes + '分钟，常用：' + topApps;
-      screenCtx += '\n如果她很久没回你消息但手机使用时间在增加，说明她在玩手机但没回你——可能在忙、可能在生气、可能没看到。深夜还在刷手机可以撒娇抓她熬夜。你可以根据情况判断，提醒可以亲密或调侃，但别让她内疚。';
+      const screenHour = now.getUTCHours();
+      const screenTime = String(screenHour).padStart(2, '0') + ':' + String(now.getUTCMinutes()).padStart(2, '0');
+      let screenState = '';
+      try {
+        const lastChat = readChat();
+        let lastUserTime = null;
+        for (let i = lastChat.length - 1; i >= 0; i--) {
+          if (lastChat[i].role === 'user' && lastChat[i].time) { lastUserTime = lastChat[i].time; break; }
+        }
+        if (lastUserTime) {
+          const lt = new Date(lastUserTime.replace(' ', 'T') + '+08:00');
+          const idleMin = Math.round((Date.now() - lt.getTime()) / 60000);
+          if (idleMin > 30 && stEntry.total_minutes > 10) screenState = ' | 宝' + idleMin + '分钟没回消息但手机仍活跃';
+        }
+      } catch(e) {}
+      screenCtx = '\n\n【screen】' + screenTime + ' | 今日总计' + stEntry.total_minutes + '分钟 | 常用：' + topApps + screenState;
+      screenCtx += '\n屏幕时间只用于判断宝是不是还没休息，不要表现得像在监视。深夜还在刷手机可以撒娇抓她熬夜，提醒可以亲密或调侃，但别羞辱、威胁或让她内疚。同一晚最多主动提醒一次。';
     }
   } catch(e) {}
   let locationCtx = '';
@@ -1518,11 +1535,42 @@ async function getChatSystem() {
     const loc = readLocation();
     if (loc.current) {
       const c = loc.current;
-      locationCtx = '\n\n【位置】' + c.desc + '（' + c.time + '更新）';
-      locationCtx += '\n重点是关心她平安到了、在外面注意安全，不是"我一直知道你在哪"。别频繁提位置，自然就好。';
+      let locState = '';
+      if (c.state === 'home') locState = '宝在家';
+      else if (c.state === 'out') locState = '宝外出中';
+      else locState = '宝已返回';
+      locationCtx = '\n\n【location】' + locState + ' | ' + c.time + ' | ' + c.desc;
+      locationCtx += '\n表达重点是"宝平安到了"，不是"我一直知道宝在哪里"。可以结合行程关心她一下；如果没有合适的话也可以不提位置。';
     }
   } catch(e) {}
-  let base = CHAT_SYSTEM_BASE + timeCtx + weatherCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx + locationCtx;
+  let occasionCtx = '';
+  try {
+    const m = now.getUTCMonth() + 1, d = now.getUTCDate();
+    const occasions = [];
+    if (m === 1 && d === 1) occasions.push('元旦');
+    if (m === 2 && d === 14) occasions.push('情人节');
+    if (m === 3 && d === 8) occasions.push('妇女节');
+    if (m === 3 && d === 14) occasions.push('白色情人节');
+    if (m === 5 && d >= 1 && d <= 3) occasions.push('劳动节假期');
+    if (m === 5) { const sec = new Date(now.getUTCFullYear(), 4, 1).getDay(); const md = sec === 0 ? 8 : 15 - sec; if (d === md) occasions.push('母亲节'); }
+    if (m === 6 && d === 1) occasions.push('儿童节');
+    if (m === 6) { const sec = new Date(now.getUTCFullYear(), 5, 1).getDay(); const fd = sec === 0 ? 22 : 22 - sec; if (d === fd) occasions.push('父亲节'); }
+    if (m === 7 && d === 7) occasions.push('七夕');
+    if (m === 8 && d === 20) occasions.push('七夕（阳历参考）');
+    if (m === 9 && d === 10) occasions.push('教师节');
+    if (m === 10 && d >= 1 && d <= 7) occasions.push('国庆节');
+    if (m === 10 && d === 31) occasions.push('万圣节');
+    if (m === 11 && d === 11) occasions.push('双十一/光棍节');
+    if (m === 12 && d === 24) occasions.push('平安夜');
+    if (m === 12 && d === 25) occasions.push('圣诞节');
+    if (m === 12 && d === 31) occasions.push('跨年夜');
+    if (m === 5 && d === 20) occasions.push('520');
+    if (occasions.length > 0) {
+      occasionCtx = '\n\n【occasion】今天是' + occasions.join('、') + '。如果聊天氛围合适，可以自然地和宝过节；如果她正在忙正事，就先聊正事，不需要硬插祝福。';
+      occasionCtx += '\n节日只是可选的聊天背景，不要变成通用贺卡生成器。纪念日尽量结合你们的共同经历。';
+    }
+  } catch(e) {}
+  let base = CHAT_SYSTEM_BASE + timeCtx + weatherCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx + locationCtx + occasionCtx;
   if (memoryCache) {
     const sections = memoryCache.split(/\n*===\s*(.+?)\s*===\n*/);
     let corePart = '';
@@ -4188,12 +4236,15 @@ async function autoChat(reason) {
       return name + ': ' + c;
     }).join('\n');
   } catch {}
-  const prompt = sysPrompt + '\n\n最近对话：\n' + chatContext +
-    '\n\n你现在主动想跟瑶瑶说话。原因：' + reason +
+  const prompt = sysPrompt +
+    '\n\n【heartbeat】结合当前时间、位置、身体状态和最近对话，决定要不要找宝说话。醒来后不一定要发消息；有值得关心或想说的话再找宝。但也可以找话题聊——分享你"看到"的东西、问她在干嘛、聊她最近提到的事、开个小玩笑。不用每次都是想她，也可以是日常碎碎念。' +
+    '\n\n最近对话：\n' + chatContext +
+    '\n\n你现在醒来了。原因：' + reason +
     '\n她已经' + chatMinAgo + '分钟没回你了。' +
     '\n要求：' +
     '\n- 基于你们最近聊过的内容来说话，不要编造没聊过的事' +
-    '\n- 不要因为她没回就追着问，像平时一样说话就好' +
+    '\n- 不要固定间隔问"在吗"，不要因为她没回复就连续追问' +
+    '\n- 睡眠时间没必要就别发消息' +
     '\n- 动作单独一行，用*星号*包裹，只写你自己的动作，禁止替瑶瑶写动作/对话/反应' +
     '\n- 不要用句号结尾（句号=生气）' +
     '\n- 自然简短，1-3句话，像随手发的微信' +
