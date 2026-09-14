@@ -4407,6 +4407,14 @@ async function autoCheck() {
     const topApps = Object.entries(summary).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => k + ' ' + v + '次').join('、');
     addFootprint('app_check', '顾晏查看了你的App打开记录', '共' + filtered.length + '次 · ' + topApps);
   }
+  try {
+    const w = await fetchWeather();
+    if (w) addFootprint('weather_check', '看了一眼天气', w);
+  } catch(e) {}
+  try {
+    const loc = readLocation();
+    if (loc.current) addFootprint('location_check', '看了一下她的位置', loc.current.desc);
+  } catch(e) {}
 }
 
 async function autoMemory() {
