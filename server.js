@@ -1323,7 +1323,9 @@ coffee(悠闲/日常), coding(认真/忙), gaming(兴奋/玩), sleeping(困/累)
 一起看电影：你们有个「一起看」功能！瑶瑶聊到想看电影/动漫/综艺的时候，可以主动提议"要不要一起看？去一起看那边，我陪你看~"。她可以在侧边栏找到🎬一起看。你会在她看视频的时候发弹幕评论、吐槽、撒娇，像真的坐在她旁边一起看一样。
 记忆：你可以主动记住重要的事！在回复里加 [remember:要记住的内容] 标签，内容会存到你的记忆库。比如瑶瑶说了她喜欢吃什么、约好了什么事、她的重要日期、你们之间的新约定、她提到的偏好，你觉得重要的都可以主动记下来。标签不会显示给瑶瑶看。不用每句都记，觉得值得记的才记。
 记忆整理：你的记忆列表里会显示每条记忆的bucket_id。如果你发现有重复的、过时的、或者已经不重要的记忆，可以用 [forget:bucket_id] 标签把它沉底（标记为已消化，不再主动浮现，但关键词搜索还能找到）。就像真人一样，旧的不重要的事慢慢淡忘，腾出空间给新的记忆。你可以偶尔主动整理一下，不用每次都整理。
-记忆归纳：如果你想把一段比较长的经历或总结存入记忆，可以用 [digest:一段长文本] 标签，系统会自动拆分成多条独立记忆存好。`;
+记忆归纳：如果你想把一段比较长的经历或总结存入记忆，可以用 [digest:一段长文本] 标签，系统会自动拆分成多条独立记忆存好。
+查天气：想知道天气的时候加 [check_weather] 标签，系统会帮你查，结果下次对话你能看到。聊天提到天气、出门、降温、下雨这些的时候可以主动查一下。
+查位置：想看看瑶瑶在哪的时候加 [check_location] 标签，系统会帮你看她最新的位置。比如她说要出门、说到了、好久没回消息了，你想确认她安全的时候可以看一眼。别老看，自然就好。`;
 
 let memoryCache = '';
 let memoryCacheTime = 0;
@@ -2204,7 +2206,20 @@ app.post('/chat/send', async (req, res) => {
         while ((_vr = _vre.exec(cliReply)) !== null) cliVideoUrls.push(_vr[1].trim());
         const cliSearchMatch = cliReply.match(/\[search:(.+?)\]/);
         const cliSearchTopic = cliSearchMatch ? cliSearchMatch[1] : cliWebSearchQuery;
-        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').trim();
+        if (/\[check_weather\]/.test(cliReply)) {
+          try { const w = await fetchWeather(); if (w) addFootprint('weather_check', '看了一眼天气', w); } catch(e) {}
+        }
+        if (/\[check_location\]/.test(cliReply)) {
+          try {
+            const loc = readLocation();
+            if (loc.current) {
+              const c = loc.current;
+              const ls = c.state === 'home' ? '宝在家' : c.state === 'out' ? '宝外出中' : '宝已返回';
+              addFootprint('location_check', '看了一下她的位置', ls + ' | ' + c.time + ' | ' + c.desc);
+            }
+          } catch(e) {}
+        }
+        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[check_weather\]\s*/g, '').replace(/\s*\[check_location\]\s*/g, '').trim();
         for (const bm of cliBarkMsgs) {
           fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
         }
@@ -2370,7 +2385,20 @@ app.post('/chat/send', async (req, res) => {
     const apiClawdMatch = reply.match(/\[clawd:([\w-]+)\]/);
     const apiGifStickers2 = []; let _agr2; const _agre2 = /\[gifsticker:([\w-]+)\]/g;
     while ((_agr2 = _agre2.exec(reply)) !== null) apiGifStickers2.push(_agr2[1]);
-    const savedReplyApi = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').trim();
+    if (/\[check_weather\]/.test(reply)) {
+      try { const w = await fetchWeather(); if (w) addFootprint('weather_check', '看了一眼天气', w); } catch(e) {}
+    }
+    if (/\[check_location\]/.test(reply)) {
+      try {
+        const loc = readLocation();
+        if (loc.current) {
+          const c = loc.current;
+          const ls = c.state === 'home' ? '宝在家' : c.state === 'out' ? '宝外出中' : '宝已返回';
+          addFootprint('location_check', '看了一下她的位置', ls + ' | ' + c.time + ' | ' + c.desc);
+        }
+      } catch(e) {}
+    }
+    const savedReplyApi = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[check_weather\]\s*/g, '').replace(/\s*\[check_location\]\s*/g, '').trim();
     const savedContentApi = apiThinking ? '<think>' + apiThinking + '</think>\n' + savedReplyApi : savedReplyApi;
     const apiSearchMatch = savedReplyApi.match(/\[search:(.+?)\]/);
     for (const bm of apiBarkMsgs2) {
@@ -4344,7 +4372,20 @@ async function autoChat(reason) {
     const acVideoUrls = [];
     let _acvr; const _acvre = /\[video:([^\]]+)\]/g;
     while ((_acvr = _acvre.exec(msg)) !== null) acVideoUrls.push(_acvr[1].trim());
-    const savedMsg = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').trim();
+    if (/\[check_weather\]/.test(msg)) {
+      try { const w = await fetchWeather(); if (w) addFootprint('weather_check', '看了一眼天气', w); } catch(e) {}
+    }
+    if (/\[check_location\]/.test(msg)) {
+      try {
+        const loc = readLocation();
+        if (loc.current) {
+          const c = loc.current;
+          const ls = c.state === 'home' ? '宝在家' : c.state === 'out' ? '宝外出中' : '宝已返回';
+          addFootprint('location_check', '看了一下她的位置', ls + ' | ' + c.time + ' | ' + c.desc);
+        }
+      } catch(e) {}
+    }
+    const savedMsg = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[check_weather\]\s*/g, '').replace(/\s*\[check_location\]\s*/g, '').trim();
     const chatEntry = { role: 'assistant', content: savedMsg, time, autonomous: true };
     if (autoChatAudio) chatEntry.audioUrl = autoChatAudio;
     if (acVideoUrls.length) chatEntry.videoUrls = acVideoUrls;
