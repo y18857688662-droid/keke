@@ -1195,6 +1195,9 @@ function renderMessage(msg, idx, stagger) {
       } else if (imgMatch) {
         if (textParts.length) { colHtml += '<div class="msg-bubble" onclick="quoteThis(this)">' + textParts.join('<br>') + '</div>'; textParts = []; }
         colHtml += '<div class="msg-bubble" style="padding:4px"><img class="msg-img" src="'+imgMatch[1]+'" onclick="viewImg(this.src)"></div>';
+      } else if (line.startsWith('*') && line.endsWith('*') && line.length > 2) {
+        if (textParts.length) { colHtml += '<div class="msg-bubble" onclick="quoteThis(this)">' + textParts.join('<br>') + '</div>'; textParts = []; }
+        colHtml += '<div class="msg-action">' + escHtml(line.slice(1,-1)) + '</div>';
       } else {
         textParts.push(escHtml(line));
       }
