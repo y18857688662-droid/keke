@@ -1662,6 +1662,12 @@ sendBtn.addEventListener('click', sendMessage);
 inputField.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
+inputField.addEventListener('paste', function(e) {
+  e.preventDefault();
+  var text = (e.clipboardData || window.clipboardData).getData('text') || '';
+  text = text.replace(/\r\n/g, ' ').replace(/[\r\n]/g, ' ');
+  document.execCommand('insertText', false, text);
+});
 
 var evtSource = new EventSource('/chat/stream');
 var pollKnown = -1;
@@ -1698,7 +1704,7 @@ function attachSSE(src) {
         var hs2 = document.querySelector('.header-status');
         if (hs2) hs2.innerHTML = '<span class="status-dot"></span>在线';
       }
-      if (data.type === 'message' && data.role === 'assistant' && !sending && data.time !== lastRenderedTime) {
+      if (data.type === 'message' && data.role === 'assistant' && !sending && data.time !== lastRenderedTime && !msgContainer.querySelector('.msg-group[data-time="'+data.time+'"]')) {
         lastMsgCount++;
         pollKnown++;
         lastRenderedTime = data.time;
@@ -1820,10 +1826,11 @@ function syncNewMessages() {
   fetch('/chat/history?_t=' + Date.now()).then(function(r){return r.json()}).then(function(data) {
     if (!data.messages || !data.messages.length) return;
     var existing = msgContainer.querySelectorAll('.msg-group[data-time]');
+    var renderedSet = {};
     var lastTime = '';
-    for (var i = existing.length - 1; i >= 0; i--) {
+    for (var i = 0; i < existing.length; i++) {
       var t = existing[i].getAttribute('data-time');
-      if (t) { lastTime = t; break; }
+      if (t) { renderedSet[t] = true; lastTime = t; }
     }
     if (!lastTime) {
       renderAll(data.messages);
@@ -1833,7 +1840,7 @@ function syncNewMessages() {
     var added = 0;
     for (var j = 0; j < data.messages.length; j++) {
       var m = data.messages[j];
-      if (m.time && m.time > lastTime) {
+      if (m.time && m.time > lastTime && !renderedSet[m.time]) {
         var el = renderMessage(m, pollKnown + added);
         if (el._searchQuery) msgContainer.appendChild(renderSearchNarrator(el._searchQuery));
         if (m.time && m.role === 'assistant') msgContainer.appendChild(renderTime(m.time, el._thinkIdx));
@@ -1843,6 +1850,7 @@ function syncNewMessages() {
             msgContainer.appendChild(renderMessage({role:'assistant', content:'[gifsticker:'+m.gifStickers[gi]+']'}, -1));
           }
         }
+        renderedSet[m.time] = true;
         if (m.time) lastRenderedTime = m.time;
         added++;
       }
