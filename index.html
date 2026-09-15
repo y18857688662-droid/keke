@@ -1185,24 +1185,18 @@ function renderMessage(msg, idx, stagger) {
   var bubbleIdx = 0;
   var voiceNum = 0;
   if (!isKe && !allLines.some(function(l){ return /^\[voice\]/i.test(l); })) {
-    var textParts = [];
     allLines.forEach(function(line) {
       var vidLineMatch = line.match(/^(https?:\/\/\S+\.(mp4|webm|mov|MP4|WEBM|MOV))$/i);
       var imgMatch = line.match(/^\[图片\]\(([^)]+)\)$/);
       if (vidLineMatch) {
-        if (textParts.length) { colHtml += '<div class="msg-bubble" onclick="quoteThis(this)">' + textParts.join('<br>') + '</div>'; textParts = []; }
         colHtml += '<div class="msg-video"><video src="'+escHtml(vidLineMatch[1])+'" controls playsinline preload="metadata"></video></div>';
       } else if (imgMatch) {
-        if (textParts.length) { colHtml += '<div class="msg-bubble" onclick="quoteThis(this)">' + textParts.join('<br>') + '</div>'; textParts = []; }
         colHtml += '<div class="msg-bubble" style="padding:4px"><img class="msg-img" src="'+imgMatch[1]+'" onclick="viewImg(this.src)"></div>';
       } else if (line.startsWith('*') && line.endsWith('*') && line.length > 2) {
-        if (textParts.length) { colHtml += '<div class="msg-bubble" onclick="quoteThis(this)">' + textParts.join('<br>') + '</div>'; textParts = []; }
         colHtml += '<div class="msg-action">' + escHtml(line.slice(1,-1)) + '</div>';
       } else {
-        textParts.push(escHtml(line));
+        colHtml += '<div class="msg-bubble" onclick="quoteThis(this)">' + escHtml(line).replace(/ /g, '<br>') + '</div>';
       }
-    });
-    if (textParts.length) colHtml += '<div class="msg-bubble" onclick="quoteThis(this)">' + textParts.join('<br>') + '</div>';
   } else {
   allLines.forEach(function(line, idx) {
     if (/^\[voice\]/i.test(line)) {
@@ -1526,7 +1520,7 @@ function sendMessage() {
   if (currentQuote) userMsg.quote = currentQuote;
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
-  var body = {message: text};
+  var body = {message: display};
   if (currentQuote) body.quote = currentQuote;
   clearQuote();
   fetch('/chat/send', {
@@ -1682,6 +1676,12 @@ var sendBtn = document.querySelector('.send-btn');
 sendBtn.addEventListener('click', sendMessage);
 inputField.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+inputField.addEventListener('paste', function(e) {
+  e.preventDefault();
+  var text = (e.clipboardData || window.clipboardData).getData('text') || '';
+  text = text.replace(/\r\n/g, ' ').replace(/[\r\n]/g, ' ');
+  document.execCommand('insertText', false, text);
 });
 var evtSource = new EventSource('/chat/stream');
 var pollKnown = -1;
