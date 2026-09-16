@@ -1334,12 +1334,18 @@ let weatherCacheTime = 0;
 async function fetchWeather() {
   if (Date.now() - weatherCacheTime < 30 * 60 * 1000 && weatherCache) return weatherCache;
   try {
-    const resp = await fetch('https://wttr.in/?format=j1&lang=zh', { signal: AbortSignal.timeout(5000) });
+    let wttrUrl = 'https://wttr.in/?format=j1&lang=zh';
+    const loc = readLocation();
+    if (loc.current && loc.current.lat && loc.current.lng) {
+      wttrUrl = `https://wttr.in/${loc.current.lat},${loc.current.lng}?format=j1&lang=zh`;
+    }
+    const resp = await fetch(wttrUrl, { signal: AbortSignal.timeout(5000) });
     const data = await resp.json();
     const cur = data.current_condition && data.current_condition[0];
     const area = data.nearest_area && data.nearest_area[0];
     if (!cur) return '';
     const city = (area && area.areaName && area.areaName[0] && area.areaName[0].value) || '';
+    const region = (area && area.region && area.region[0] && area.region[0].value) || '';
     const temp = cur.temp_C;
     const feel = cur.FeelsLikeC;
     const desc = (cur.lang_zh && cur.lang_zh[0] && cur.lang_zh[0].value) || cur.weatherDesc[0].value;
@@ -1352,7 +1358,8 @@ async function fetchWeather() {
       const maxRain = Math.max(...upcoming.map(h => parseInt(h.chanceofrain || 0)));
       if (maxRain > 30) rainChance = `，未来几小时降雨概率${maxRain}%`;
     }
-    weatherCache = `${city} | ${temp}°C | 体感${feel}°C | ${desc} | 湿度${humidity}%${rainChance}`;
+    const location = region ? `${region} ${city}` : city;
+    weatherCache = `${location} | ${temp}°C | 体感${feel}°C | ${desc} | 湿度${humidity}%${rainChance}`;
     weatherCacheTime = Date.now();
     return weatherCache;
   } catch(e) {
