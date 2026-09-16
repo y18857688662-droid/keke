@@ -1570,6 +1570,7 @@ function compressImage(file, maxDim, quality) {
 function sendImage(file, caption) {
   compressImage(file, 1600, 0.85).then(function(base64) {
     var displayContent = caption || '[图片]';
+    sending = true;
     var userMsg = {role:'user', content: displayContent, image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
     msgContainer.appendChild(renderMessage(userMsg, -1));
     scrollBottom();
@@ -1578,9 +1579,23 @@ function sendImage(file, caption) {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({message: displayContent, image: base64})
     }).then(function(r){return r.json()}).then(function(data) {
-      if (!data.ok) alert('图片发送失败');
-      pollKnown++;
-    }).catch(function(){ alert('图片发送失败，请重试'); });
+      sending = false;
+      if (data.ok && data.reply) {
+        pollKnown += 2;
+        lastRenderedTime = data.time;
+        var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl, searchQuery: data.searchQuery, videoUrls: data.videoUrls};
+        var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
+        if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
+        msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
+        msgContainer.appendChild(replyEl);
+        scrollBottom();
+        petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.reply));
+        renderAiGifStickers(data.gifStickers);
+      } else {
+        pollKnown++;
+        if (!data.ok) alert('图片发送失败');
+      }
+    }).catch(function(){ sending = false; alert('图片发送失败，请重试'); });
   });
 }
 
@@ -1684,8 +1699,13 @@ inputField.addEventListener('keydown', function(e) {
 inputField.addEventListener('paste', function(e) {
   e.preventDefault();
   var text = (e.clipboardData || window.clipboardData).getData('text') || '';
-  text = text.replace(/\r\n/g, ' ').replace(/[\r\n]/g, ' ');
-  document.execCommand('insertText', false, text);
+  text = text.replace(/\r\n/g, '\u2028').replace(/[\r\n]/g, '\u2028');
+  var ta = e.target;
+  var start = ta.selectionStart;
+  var end = ta.selectionEnd;
+  ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+  ta.selectionStart = ta.selectionEnd = start + text.length;
+  if (typeof autoResize === 'function') autoResize(ta);
 });
 var evtSource = new EventSource('/chat/stream');
 var pollKnown = -1;
