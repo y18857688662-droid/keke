@@ -1527,11 +1527,15 @@ function sendMessage() {
   var body = {message: display};
   if (currentQuote) body.quote = currentQuote;
   clearQuote();
+  var sendCtrl = new AbortController();
+  var sendTimer = setTimeout(function(){ sendCtrl.abort(); }, 120000);
   fetch('/chat/send', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: sendCtrl.signal
   }).then(function(r){return r.json()}).then(function(data) {
+    clearTimeout(sendTimer);
     sending = false;
     if (data.ok && data.reply) {
       pollKnown += 2;
@@ -1545,8 +1549,14 @@ function sendMessage() {
       petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.reply));
       renderAiGifStickers(data.gifStickers);
     } else { pollKnown++; }
-  }).catch(function() {
+  }).catch(function(e) {
+    clearTimeout(sendTimer);
     sending = false;
+    if (e && e.name === 'AbortError') {
+      var hs = document.querySelector('.header-status');
+      if (hs) hs.innerHTML = '<span class="status-dot" style="background:#ccc"></span>回复超时了，再发一条试试';
+      pollKnown++;
+    }
   });
 }
 
@@ -1574,11 +1584,15 @@ function sendImage(file, caption) {
     var userMsg = {role:'user', content: displayContent, image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
     msgContainer.appendChild(renderMessage(userMsg, -1));
     scrollBottom();
+    var imgCtrl = new AbortController();
+    var imgTimer = setTimeout(function(){ imgCtrl.abort(); }, 120000);
     fetch('/chat/send', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({message: displayContent, image: base64})
+      body: JSON.stringify({message: displayContent, image: base64}),
+      signal: imgCtrl.signal
     }).then(function(r){return r.json()}).then(function(data) {
+      clearTimeout(imgTimer);
       sending = false;
       if (data.ok && data.reply) {
         pollKnown += 2;
@@ -1595,7 +1609,15 @@ function sendImage(file, caption) {
         pollKnown++;
         if (!data.ok) alert('图片发送失败');
       }
-    }).catch(function(){ sending = false; alert('图片发送失败，请重试'); });
+    }).catch(function(e) {
+      clearTimeout(imgTimer);
+      sending = false;
+      if (e && e.name === 'AbortError') {
+        var hs = document.querySelector('.header-status');
+        if (hs) hs.innerHTML = '<span class="status-dot" style="background:#ccc"></span>回复超时了，再发一条试试';
+        pollKnown++;
+      } else { alert('图片发送失败，请重试'); }
+    });
   });
 }
 
