@@ -770,6 +770,7 @@ var thinkingCounter = 0;
 var msgContainer = document.getElementById('messages');
 var inputField = document.querySelector('.input-field');
 var sending = false;
+var sendingAt = 0;
 var lastRenderedTime = '';
 var lastMsgCount = 0;
 var currentQuote = null;
@@ -1485,7 +1486,7 @@ function renderAiGifStickers(stickers) {
 function sendGifSticker(id) {
   document.getElementById('stickerPanel').classList.remove('show');
   if (sending) return;
-  sending = true;
+  sending = true; sendingAt = Date.now();
   var g = CLAWD_GIFS.find(function(x){return x.id===id});
   if (!g) { sending = false; return; }
   var content = '[gifsticker:'+id+']';
@@ -1516,7 +1517,7 @@ function sendMessage() {
   var text = inputField.value.trim();
   if (!text || sending) return;
   document.getElementById('stickerPanel').classList.remove('show');
-  sending = true;
+  sending = true; sendingAt = Date.now();
   inputField.value = '';
   inputField.style.height = 'auto';
   var display = text.replace(/\/\//g, '\n');
@@ -1540,14 +1541,16 @@ function sendMessage() {
     if (data.ok && data.reply) {
       pollKnown += 2;
       lastRenderedTime = data.time;
-      var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl, searchQuery: data.searchQuery, videoUrls: data.videoUrls};
-      var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
-      if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
-      msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
-      msgContainer.appendChild(replyEl);
-      scrollBottom();
-      petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.reply));
-      renderAiGifStickers(data.gifStickers);
+      if (!msgContainer.querySelector('.msg-group[data-time="'+data.time+'"]')) {
+        var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl, searchQuery: data.searchQuery, videoUrls: data.videoUrls};
+        var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
+        if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
+        msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
+        msgContainer.appendChild(replyEl);
+        scrollBottom();
+        petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.reply));
+        renderAiGifStickers(data.gifStickers);
+      }
     } else { pollKnown++; }
   }).catch(function(e) {
     clearTimeout(sendTimer);
@@ -1580,7 +1583,7 @@ function compressImage(file, maxDim, quality) {
 function sendImage(file, caption) {
   compressImage(file, 1600, 0.85).then(function(base64) {
     var displayContent = caption || '[图片]';
-    sending = true;
+    sending = true; sendingAt = Date.now();
     var userMsg = {role:'user', content: displayContent, image: base64, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
     msgContainer.appendChild(renderMessage(userMsg, -1));
     scrollBottom();
@@ -1597,14 +1600,16 @@ function sendImage(file, caption) {
       if (data.ok && data.reply) {
         pollKnown += 2;
         lastRenderedTime = data.time;
-        var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl, searchQuery: data.searchQuery, videoUrls: data.videoUrls};
-        var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
-        if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
-        msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
-        msgContainer.appendChild(replyEl);
-        scrollBottom();
-        petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.reply));
-        renderAiGifStickers(data.gifStickers);
+        if (!msgContainer.querySelector('.msg-group[data-time="'+data.time+'"]')) {
+          var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl, searchQuery: data.searchQuery, videoUrls: data.videoUrls};
+          var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
+          if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
+          msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
+          msgContainer.appendChild(replyEl);
+          scrollBottom();
+          petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.reply));
+          renderAiGifStickers(data.gifStickers);
+        }
       } else {
         pollKnown++;
         if (!data.ok) alert('图片发送失败');
@@ -1764,7 +1769,7 @@ function attachSSE(src) {
         var hs2 = document.querySelector('.header-status');
         if (hs2) hs2.innerHTML = '<span class="status-dot"></span>在线';
       }
-      if (data.type === 'message' && data.role === 'assistant' && !sending && data.time !== lastRenderedTime && !msgContainer.querySelector('.msg-group[data-time="'+data.time+'"]')) {
+      if (data.type === 'message' && data.role === 'assistant' && data.time !== lastRenderedTime && !msgContainer.querySelector('.msg-group[data-time="'+data.time+'"]')) {
         lastMsgCount++;
         pollKnown++;
         lastRenderedTime = data.time;
@@ -1817,11 +1822,15 @@ function sseReconnect() {
   evtSource = new EventSource('/chat/stream');
   lastSSEPing = Date.now();
   attachSSE(evtSource);
-  if (!sending) setTimeout(syncNewMessages, 1000);
+  setTimeout(syncNewMessages, 1000);
 }
 setInterval(function() {
-  if (evtSource.readyState === 2 || (Date.now() - lastSSEPing > 45000)) {
+  if (evtSource.readyState === 2 || (Date.now() - lastSSEPing > 30000)) {
     sseReconnect();
+  }
+  if (sending && Date.now() - sendingAt > 150000) {
+    sending = false;
+    syncNewMessages();
   }
 }, 5000);
 window.addEventListener('pageshow', function(e) {
@@ -1933,7 +1942,7 @@ document.addEventListener('visibilitychange', function() {
   }
 });
 setInterval(function() {
-  if (!sending) syncNewMessages();
+  syncNewMessages();
 }, 15000);
 
 function openThinking(idx, cloudEl) {

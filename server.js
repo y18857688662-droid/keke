@@ -2099,14 +2099,14 @@ app.get('/chat/stream', (req, res) => {
   res.flushHeaders();
   res.write('data: {"type":"connected"}\n\n');
   sseClients.add(res);
-  const hb = setInterval(() => { try { res.write('data: {"type":"ping"}\n\n'); } catch { clearInterval(hb); } }, 25000);
+  const hb = setInterval(() => { try { res.write('data: {"type":"ping"}\n\n'); } catch { clearInterval(hb); sseClients.delete(res); } }, 15000);
   req.on('close', () => { clearInterval(hb); sseClients.delete(res); });
 });
 
 function sseBroadcast(event) {
   const data = JSON.stringify(event);
   for (const client of sseClients) {
-    try { client.write(`data: ${data}\n\n`); } catch {}
+    try { client.write(`data: ${data}\n\n`); } catch { sseClients.delete(client); }
   }
 }
 
