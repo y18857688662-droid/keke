@@ -1167,7 +1167,7 @@ function renderMessage(msg, idx, stagger) {
     var gfId = gifMatch[1];
     var gf = CLAWD_GIFS.find(function(x){return x.id===gfId});
     var gfName = gf ? gf.name : gfId;
-    colHtml += '<div class="msg-gif-sticker" title="'+gfName+'"><img src="/static/clawd-'+gfId+'.gif" alt="'+gfName+'"></div>';
+    colHtml += '<div class="msg-gif-sticker" title="'+gfName+'"><img src="/static/clawd-'+gfId+'.gif" alt="'+gfName+'" onerror="this.parentNode.innerHTML=\'<span style=padding:8px>'+gfName+'</span>\'"></div>';
     colHtml += '</div>';
     group.innerHTML = avaHtml + colHtml;
     return group;
@@ -1467,7 +1467,7 @@ function toggleStickers() {
       var html = '<div class="gif-sticker-grid">';
       for (var i = 0; i < CLAWD_GIFS.length; i++) {
         var g = CLAWD_GIFS[i];
-        html += '<div class="gif-sticker-cell" onclick="sendGifSticker(\''+g.id+'\')" title="'+g.name+'"><img src="/static/clawd-'+g.id+'.gif" alt="'+g.name+'" loading="lazy"><div class="gif-sticker-label">'+g.name+'</div></div>';
+        html += '<div class="gif-sticker-cell" onclick="sendGifSticker(\''+g.id+'\')" title="'+g.name+'"><img src="/static/clawd-'+g.id+'.gif" alt="'+g.name+'" loading="lazy" onerror="this.style.display=\'none\'"><div class="gif-sticker-label">'+g.name+'</div></div>';
       }
       html += '</div>';
       ct.innerHTML = html;
