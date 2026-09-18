@@ -1820,11 +1820,16 @@ function sseReconnect() {
   if (!sending) setTimeout(syncNewMessages, 1000);
 }
 setInterval(function() {
-  if (sending) return;
   if (evtSource.readyState === 2 || (Date.now() - lastSSEPing > 45000)) {
     sseReconnect();
   }
 }, 5000);
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted) sseReconnect();
+});
+window.addEventListener('online', function() {
+  sseReconnect();
+});
 var fpIcons = {chat:'💬',search:'🔍',think:'💭',memory:'📖',idle:'😴',thought:'💭',wake:'⏰'};
 var fpTags = {search:'search',think:'碎碎念',chat:'聊天',memory:'记忆',thought:'碎碎念',wake:'醒来'};
 function toggleFootprints() {
@@ -1924,7 +1929,7 @@ document.addEventListener('visibilitychange', function() {
   fetch('/chat/presence', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:document.visibilityState==='visible'?'online':'away'})}).catch(function(){});
   if (document.visibilityState === 'visible') {
     syncNewMessages();
-    if (evtSource.readyState === 2) sseReconnect();
+    sseReconnect();
   }
 });
 setInterval(function() {
