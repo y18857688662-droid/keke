@@ -2236,6 +2236,7 @@ app.post('/chat/send', async (req, res) => {
         chat2.forEach(m => { if (m.pending) delete m.pending; });
         const cliEntry = { role: 'assistant', content: savedContent, time: replyTime };
         if (cliVideoUrls.length) cliEntry.videoUrls = cliVideoUrls;
+        if (cliGifStickers.length) cliEntry.gifStickers = cliGifStickers;
         if (cliSearchTopic) {
           cliEntry.searchQuery = cliSearchTopic;
           try { addFootprint('search', '搜了「' + cliSearchTopic + '」'); } catch(e) {}
@@ -2416,6 +2417,7 @@ app.post('/chat/send', async (req, res) => {
     chat2.forEach(m => { if (m.pending) delete m.pending; });
     const replyMsg = { role: 'assistant', content: savedContentApi, time: replyTime };
     if (apiVideoUrls.length) replyMsg.videoUrls = apiVideoUrls;
+    if (apiGifStickers2.length) replyMsg.gifStickers = apiGifStickers2;
     if (apiSearchMatch) {
       replyMsg.searchQuery = apiSearchMatch[1];
       try { addFootprint('search', '搜了「' + apiSearchMatch[1] + '」'); } catch(e) {}
@@ -2487,6 +2489,7 @@ app.post('/chat/reply', async (req, res) => {
   }
   const msg = { role: 'assistant', content: savedReply, time };
   if (apiVideoUrls.length) msg.videoUrls = apiVideoUrls;
+  if (apiGifStickers.length) msg.gifStickers = apiGifStickers;
   if (searchMatch) {
     msg.searchQuery = searchMatch[1];
     try { addFootprint('search', '搜了「' + searchMatch[1] + '」'); } catch(e) {}
@@ -2729,6 +2732,7 @@ app.post('/chat/upload-finalize', (req, res) => {
                 c3.forEach(m => { if (m.pending) delete m.pending; });
                 const vidEntry = { role: 'assistant', content: savedReply, time: replyTime };
                 if (videoUrlsOut.length) vidEntry.videoUrls = videoUrlsOut;
+                if (gifStickers.length) vidEntry.gifStickers = gifStickers;
                 c3.push(vidEntry);
                 if (c3.length > 200) c3.splice(0, c3.length - 200);
                 writeChat(c3);
