@@ -1124,7 +1124,7 @@ function sendAudio(base64, transcript) {
   fetch('/chat/send', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({message: contentText, audio: base64})
+    body: JSON.stringify({message: contentText, audio: base64, time: userMsg.time})
   }).then(function(r){return r.json()}).then(function(d) {
     pollKnown++;
   }).catch(function(){});
@@ -1923,7 +1923,7 @@ function sendMessage() {
   if (currentQuote) userMsg.quote = currentQuote;
   msgContainer.appendChild(renderMessage(userMsg, -1));
   scrollBottom();
-  var body = {message: display};
+  var body = {message: display, time: userMsg.time};
   if (currentQuote) body.quote = currentQuote;
   clearQuote();
   var sendCtrl = new AbortController();
@@ -1990,7 +1990,7 @@ function sendImage(file, caption) {
     fetch('/chat/send', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({message: displayContent, image: base64}),
+      body: JSON.stringify({message: displayContent, image: base64, time: userMsg.time}),
       signal: imgCtrl.signal
     }).then(function(r){return r.json()}).then(function(data) {
       clearTimeout(imgTimer);
@@ -2048,7 +2048,7 @@ function sendFile(file) {
       fetch('/chat/upload-finalize', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({uploadId: uploadId, filename: fname, totalChunks: totalChunks})
+        body: JSON.stringify({uploadId: uploadId, filename: fname, totalChunks: totalChunks, time: userMsg.time})
       }).then(function(r){return r.json()}).then(function(data) {
         if (!data.ok) alert('文件发送失败: ' + (data.error || '未知错误'));
         pollKnown++;
@@ -2090,7 +2090,7 @@ function sendVideo(file) {
       fetch('/chat/upload-finalize', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({uploadId: uploadId, filename: fname, totalChunks: totalChunks})
+        body: JSON.stringify({uploadId: uploadId, filename: fname, totalChunks: totalChunks, time: userMsg.time})
       }).then(function(r){return r.json()}).then(function(data) {
         if (!data.ok) alert('视频发送失败: ' + (data.error || ''));
         else { pollKnown++; URL.revokeObjectURL(localUrl); }

@@ -2169,7 +2169,7 @@ app.post('/chat/send', async (req, res) => {
   if (!msg && !image && !audio) return res.json({ ok: false, error: 'empty message' });
   trackUserMessage();
   const now = new Date(Date.now() + 8 * 3600000);
-  const time = now.toISOString().slice(0, 19).replace('T', ' ');
+  const time = req.body.time || now.toISOString().slice(0, 19).replace('T', ' ');
   const chat = readChat();
   if (audio) {
     const audioId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -2703,7 +2703,7 @@ app.post('/chat/upload-finalize', (req, res) => {
     fs.rmSync(dir, { recursive: true, force: true });
     const fileUrl = '/uploads/' + safeName;
     const now = new Date(Date.now() + 8 * 3600000);
-    const time = now.toISOString().slice(0, 19).replace('T', ' ');
+    const time = req.body.time || now.toISOString().slice(0, 19).replace('T', ' ');
     const chat = readChat();
     const fileExt = ext.toLowerCase();
     if (VIDEO_EXTS.has(fileExt)) {
