@@ -526,6 +526,37 @@ body {
 .ec-cmd-btn:active { background:#E8E1F1; }
 .ec-action-btn { display:block; width:100%; text-align:left; background:#fff; border:2px solid #E8E1F1; border-radius:8px; padding:10px 14px; margin:5px 0; font-size:13px; color:#514A59; cursor:pointer; }
 .ec-action-btn:active { background:#FAF8FC; border-color:#9B8DB5; }
+.gc-page { background:#F0F7ED; border-radius:12px; padding:12px; }
+.gc-card { background:#fff; border-radius:14px; padding:14px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:8px; }
+.gc-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.gc-title { font-size:15px; font-weight:700; color:#3A5A2E; }
+.gc-badge { background:#E8F5E2; color:#4A7A3A; font-size:10px; padding:3px 10px; border-radius:12px; font-weight:600; border:1px solid #C5E4BC; }
+.gc-event { background:#FAFDF8; border-radius:10px; padding:10px 12px; margin-bottom:10px; font-size:13px; color:#3A5A2E; line-height:1.6; border-left:3px solid #7BB56A; }
+.gc-stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.gc-stat { background:#FAFDF8; border-radius:10px; padding:8px 10px; }
+.gc-stat-label { font-size:10px; color:#6A8A5E; font-weight:600; letter-spacing:.5px; margin-bottom:4px; }
+.gc-stat-bar { height:6px; background:#E0ECD8; border-radius:3px; overflow:hidden; }
+.gc-stat-fill { height:100%; border-radius:3px; transition:width .3s; }
+.gc-stat-fill.hunger { background:#7BB56A; }
+.gc-stat-fill.thirst { background:#5BA8C8; }
+.gc-stat-fill.mood { background:#E8A87C; }
+.gc-stat-fill.bond { background:#D4829C; }
+.gc-stat-val { font-size:10px; color:#6A8A5E; text-align:right; margin-top:2px; }
+.gc-info { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.gc-tag { background:#E8F5E2; border:1px solid #C5E4BC; border-radius:16px; padding:3px 10px; font-size:11px; color:#4A7A3A; }
+.gc-items { background:#FAFDF8; border-radius:10px; padding:10px 12px; margin-bottom:10px; }
+.gc-items-title { font-size:11px; font-weight:600; color:#6A8A5E; margin-bottom:6px; }
+.gc-item-row { font-size:12px; color:#3A5A2E; line-height:1.8; }
+.gc-body { font-size:13px; line-height:1.8; color:#3A5A2E; white-space:pre-wrap; word-break:break-word; }
+.gc-footer { margin-top:10px; padding-top:8px; border-top:1px solid #E0ECD8; display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#8AAA7E; }
+.gc-cmd-input { display:flex; gap:8px; margin-bottom:8px; }
+.gc-cmd-input input { flex:1; padding:8px 12px; background:#fff; border:1.5px solid #C5E4BC; border-radius:20px; color:#3A5A2E; font-size:13px; outline:none; }
+.gc-cmd-input input:focus { border-color:#7BB56A; }
+.gc-cmd-input input::placeholder { color:#8AAA7E; }
+.gc-cmd-input button { padding:8px 16px; background:#7BB56A; color:#fff; border:none; border-radius:20px; font-size:12px; cursor:pointer; font-weight:600; }
+.gc-cmd-btns { display:flex; flex-wrap:wrap; gap:6px; }
+.gc-cmd-btn { background:#E8F5E2; border:1.5px solid #C5E4BC; border-radius:16px; padding:5px 12px; font-size:11px; color:#4A7A3A; font-weight:600; cursor:pointer; transition:background .15s; }
+.gc-cmd-btn:active { background:#D4EDCA; }
 .game-history-section { margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
 .game-history-card { background:var(--input-bg); border-radius:12px; padding:12px; margin-bottom:8px; }
 .game-history-card .gh-who { font-size:12px; font-weight:500; color:var(--accent); }
@@ -1753,6 +1784,11 @@ function startGameFull(id, name) {
     hdr.style.background = '#E8DDD0'; hdr.style.borderColor = '#E8A87C';
     titleEl.style.color = '#3A2E28';
     ct.innerHTML = '<div style="text-align:center;padding:40px;color:#3A2E28">加载中...</div>';
+  } else if (id === 'garden_cat') {
+    overlay.style.background = '#F0F7ED'; ct.style.background = '#F0F7ED';
+    hdr.style.background = '#D4EDCA'; hdr.style.borderColor = '#7BB56A';
+    titleEl.style.color = '#3A5A2E';
+    ct.innerHTML = '<div style="text-align:center;padding:40px;color:#3A5A2E">加载中...</div>';
   } else {
     overlay.style.background = ''; ct.style.background = '';
     hdr.style.background = ''; hdr.style.borderColor = '';
@@ -1761,7 +1797,7 @@ function startGameFull(id, name) {
   }
   titleEl.textContent = (gameBadges[id] || 'GAME') + ' · ' + (name || id).toUpperCase();
   fetch('/game/guide', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:id})}).then(function(r){return r.json()}).then(function(data) {
-    if (!data.ok) { ct.innerHTML = '<div style="text-align:center;padding:40px;color:rgba(255,255,255,0.5)">加载失败</div>'; return; }
+    if (!data.ok) { ct.innerHTML = '<div class="game-loading">加载失败</div>'; return; }
     var guideText = data.text;
     try { var gp = JSON.parse(guideText); if (gp.guide) guideText = gp.guide; } catch {}
     var humanGuide = parseGuideForHuman(guideText);
@@ -1776,6 +1812,11 @@ function startGameFull(id, name) {
       html += '<div class="ec-observe">' + formatGameText(humanGuide) + '</div>';
       html += '<div class="ec-footer"><div class="ec-status">● READY</div><div style="font-size:10px;color:#8A8490">CEDAR TOY</div></div></div>';
       html += '<div style="text-align:center;margin-top:10px"><button class="ec-cmd-btn" style="background:#66557D;color:#fff;padding:10px 28px;font-size:13px;border-color:#66557D" onclick="gameActionFull(\'start\')">ENTER →</button></div></div>';
+    } else if (id === 'garden_cat') {
+      html += '<div class="gc-page"><div class="gc-card"><div class="gc-hdr"><div class="gc-title">🐱 花园与猫咪</div><div class="gc-badge">CAT</div></div>';
+      html += '<div class="gc-body">' + formatGameText(humanGuide) + '</div>';
+      html += '<div class="gc-footer"><div>● READY</div><div>CEDAR TOY</div></div></div>';
+      html += '<div style="text-align:center;margin-top:10px"><button class="gc-cmd-btn" style="background:#7BB56A;color:#fff;padding:10px 28px;font-size:13px;border-color:#7BB56A" onclick="gameActionFull(\'start\')">ENTER →</button></div></div>';
     } else {
     html += '<div class="gs-screen">';
     html += '<div class="gs-head"><div class="gs-mission">MISSION: ' + escHtml((name || id).toUpperCase()) + '</div><div class="gs-badge">' + (gameBadges[id] || 'GAME') + '</div></div>';
@@ -1785,7 +1826,7 @@ function startGameFull(id, name) {
     html += '<div class="gs-console"><div class="gs-dot pink"></div><div class="gs-dot alt"></div><div class="gs-slot"></div><button class="gs-cmd-btn" style="margin-left:auto;background:var(--accent);color:#fff;border-color:var(--accent);padding:8px 20px;font-weight:700;letter-spacing:1px" onclick="gameActionFull(\'start\')">ENTER →</button></div>';
     }
     ct.innerHTML = html;
-  }).catch(function(){ ct.innerHTML = '<div class="game-loading" style="color:rgba(255,255,255,0.5)">网络错误</div>'; });
+  }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div>'; });
 }
 
 function gameActionFull(action, extra) {
@@ -1798,6 +1839,9 @@ function gameActionFull(action, extra) {
   } else if (g === 'eco') {
     loadHtml = '<div class="ec-page" style="text-align:center;padding:40px 16px"><div style="color:#66557D;font-size:13px">加载中...</div></div>';
     errBtn = function(msg){ return '<div class="ec-page" style="text-align:center;padding:30px 16px"><div style="color:#66557D;margin-bottom:12px">'+msg+'</div><button class="ec-cmd-btn" style="padding:10px 20px" onclick="loadGameListFull()">← BACK</button></div>'; };
+  } else if (g === 'garden_cat') {
+    loadHtml = '<div class="gc-page" style="text-align:center;padding:40px 16px"><div style="color:#3A5A2E;font-size:13px">加载中...</div></div>';
+    errBtn = function(msg){ return '<div class="gc-page" style="text-align:center;padding:30px 16px"><div style="color:#3A5A2E;margin-bottom:12px">'+msg+'</div><button class="gc-cmd-btn" style="padding:10px 20px" onclick="loadGameListFull()">← 返回</button></div>'; };
   } else {
     loadHtml = '<div class="game-loading">加载中...</div>';
     errBtn = function(msg){ return '<div style="text-align:center;padding:30px 16px"><div style="color:var(--text-mid);margin-bottom:12px">'+msg+'</div><button style="padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;cursor:pointer" onclick="loadGameListFull()">← 返回</button></div>'; };
@@ -1868,6 +1912,17 @@ function renderGameFullResponse(text, gameData) {
       html += '</div>';
     }
     html += '</div>';
+  } else if (game === 'garden_cat') {
+    html += renderGardenCat(text, gd);
+    html += '<div style="margin-top:8px;background:#F0F7ED;border-radius:14px;padding:10px">';
+    html += '<div class="gc-cmd-input"><input id="gameCmdInput" type="text" placeholder="🐱 输入指令..." onkeydown="if(event.key===\'Enter\'){gameSendCmd()}"><button onclick="gameSendCmd()">SEND</button></div>';
+    var gcBtns = getCmdButtons(game, gd);
+    if (gcBtns.length) {
+      html += '<div class="gc-cmd-btns">';
+      for (var gi = 0; gi < gcBtns.length; gi++) html += '<button class="gc-cmd-btn" onclick="gameActionFull(\'cmd\',{command:\''+escHtml(gcBtns[gi])+'\'})">'+escHtml(gcBtns[gi])+'</button>';
+      html += '</div>';
+    }
+    html += '</div>';
   } else {
   html += '<div class="gs-screen">';
   html += '<div class="gs-head"><div class="gs-mission">' + badge + '</div><div class="gs-badge">' + icon + '</div></div>';
@@ -1884,7 +1939,7 @@ function renderGameFullResponse(text, gameData) {
     html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:1})">偏向 B</button>';
     html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:0})">B ▸ ' + escHtml(optB) + '</button>';
   } else {
-    var displayText = text.replace(/```[\s\S]*?```/g, '').replace(/\{[^{}]*"[a-zA-Z_]+":\s*[^{}]+\}/g, '').replace(/\n{3,}/g,'\n\n').trim();
+    var displayText = stripJson(text);
     html += '<div class="gs-body">' + formatGameText(displayText) + '</div>';
   }
   if (info.length) {
@@ -1995,7 +2050,7 @@ function renderWorkkk(text, gd) {
 }
 
 function renderDuel(text, gd) {
-  var displayText = text.replace(/```[\s\S]*?```/g, '').replace(/\{[^{}]*"[a-zA-Z_]+":\s*[^{}]+\}/g, '').replace(/\n{3,}/g,'\n\n').trim();
+  var displayText = stripJson(text);
   var h = '<div class="du-page">';
   h += '<div class="du-card"><div class="du-hdr"><div><div class="du-eyebrow">CEDAR TOY</div><div class="du-title">双弈 · DUEL</div></div><div class="du-badge">♟️ DUEL</div></div>';
   h += '<div class="du-screen">' + formatGameText(displayText) + '</div>';
@@ -2006,7 +2061,7 @@ function renderDuel(text, gd) {
 }
 
 function renderEco(text, gd) {
-  var displayText = text.replace(/```[\s\S]*?```/g, '').replace(/\{[^{}]*"[a-zA-Z_]+":\s*[^{}]+\}/g, '').replace(/\n{3,}/g,'\n\n').trim();
+  var displayText = stripJson(text);
   var score = '--';
   var scoreM = displayText.match(/(?:评分|得分|分数|score)[：:\s]*(\d+)/i);
   if (scoreM) score = scoreM[1];
@@ -2017,6 +2072,79 @@ function renderEco(text, gd) {
   h += '<div class="ec-footer"><div class="ec-status">● 生态运转中</div><div style="font-size:10px;color:#8A8490">CEDAR TOY</div></div>';
   h += '</div>';
   h += '</div>';
+  return h;
+}
+
+function renderGardenCat(text, gd) {
+  var clean = stripJson(text);
+  var state = null;
+  try { var m = text.match(/\{[\s\S]*"player_id"[\s\S]*\}/); if (m) state = JSON.parse(m[0]); } catch {}
+  if (!state && gd) { try { state = typeof gd === 'object' ? gd : JSON.parse(gd); } catch {} }
+  if (state && state.state) state = state.state;
+  var hunger = 50, thirst = 50, mood = 50, bond = 0, money = 0, weather = '', daypart = '', event = '';
+  var items = [], seeds = [];
+  if (state) {
+    if (state.cat_summary) {
+      var cs = state.cat_summary;
+      var hm = cs.match(/饱食度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (hm) hunger = parseInt(hm[1]);
+      var tm = cs.match(/口渴度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (tm) thirst = parseInt(tm[1]);
+      var mm = cs.match(/心情[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (mm) mood = parseInt(mm[1]);
+      var bm = cs.match(/亲密度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (bm) bond = parseInt(bm[1]);
+    }
+    money = state.money || 0;
+    weather = (state.weather_emoji || '') + ' ' + (state.weather_name || state.weather || '');
+    daypart = state.daypart || state.day_period || '';
+    event = state.latest_event || '';
+    if (state.inventory_counts) {
+      var inv = state.inventory_counts;
+      for (var k in inv) { if (inv[k] > 0) items.push(k + ' x' + inv[k]); }
+    }
+    if (state.pots_summary) {
+      var ps = state.pots_summary;
+      for (var pk in ps) seeds.push(pk);
+    }
+  }
+  if (!state) {
+    var hm2 = clean.match(/饱食度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (hm2) hunger = parseInt(hm2[1]);
+    var tm2 = clean.match(/口渴度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (tm2) thirst = parseInt(tm2[1]);
+    var mm2 = clean.match(/心情[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (mm2) mood = parseInt(mm2[1]);
+    var bm2 = clean.match(/亲密度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (bm2) bond = parseInt(bm2[1]);
+    var em = clean.match(/(?:事件|最新)[：:\s]*(.+)/); if (em) event = em[1];
+  }
+  var displayLines = clean.replace(/[🟩🟥🟧🟨⬜⬛■□█▓░]+/g, '').split('\n');
+  var bodyLines = [];
+  for (var i = 0; i < displayLines.length; i++) {
+    var ln = displayLines[i].trim();
+    if (!ln || /^(饱食度|口渴度|心情|亲密度|ok|player_id|state|game_)/.test(ln)) continue;
+    if (/^\d+\/\d+$/.test(ln) || /^(true|false|null)$/.test(ln)) continue;
+    bodyLines.push(ln);
+  }
+  var h = '<div class="gc-page">';
+  h += '<div class="gc-card">';
+  h += '<div class="gc-hdr"><div class="gc-title">🐱 花园与猫咪</div><div class="gc-badge">' + escHtml(daypart) + ' ' + escHtml(weather.trim()) + '</div></div>';
+  if (event) h += '<div class="gc-event">' + escHtml(event) + '</div>';
+  h += '<div class="gc-stats">';
+  h += '<div class="gc-stat"><div class="gc-stat-label">🍖 饱食度</div><div class="gc-stat-bar"><div class="gc-stat-fill hunger" style="width:'+hunger+'%"></div></div><div class="gc-stat-val">'+hunger+'</div></div>';
+  h += '<div class="gc-stat"><div class="gc-stat-label">💧 口渴度</div><div class="gc-stat-bar"><div class="gc-stat-fill thirst" style="width:'+thirst+'%"></div></div><div class="gc-stat-val">'+thirst+'</div></div>';
+  h += '<div class="gc-stat"><div class="gc-stat-label">😸 心情</div><div class="gc-stat-bar"><div class="gc-stat-fill mood" style="width:'+mood+'%"></div></div><div class="gc-stat-val">'+mood+'</div></div>';
+  h += '<div class="gc-stat"><div class="gc-stat-label">💕 亲密度</div><div class="gc-stat-bar"><div class="gc-stat-fill bond" style="width:'+bond+'%"></div></div><div class="gc-stat-val">'+bond+'</div></div>';
+  h += '</div>';
+  h += '<div class="gc-info">';
+  h += '<div class="gc-tag">💰 ' + money + '</div>';
+  if (state && state.garden_name) h += '<div class="gc-tag">🏡 ' + escHtml(state.garden_name) + '</div>';
+  if (state && state.game_day) h += '<div class="gc-tag">📅 第' + state.game_day + '天</div>';
+  h += '</div>';
+  if (items.length || seeds.length) {
+    h += '<div class="gc-items"><div class="gc-items-title">🎒 背包</div>';
+    for (var ii = 0; ii < items.length; ii++) h += '<div class="gc-item-row">' + escHtml(items[ii]) + '</div>';
+    for (var si = 0; si < seeds.length; si++) h += '<div class="gc-item-row">🌱 ' + escHtml(seeds[si]) + '</div>';
+    h += '</div>';
+  }
+  if (bodyLines.length) {
+    h += '<div class="gc-body">' + formatGameText(bodyLines.join('\n')) + '</div>';
+  }
+  h += '<div class="gc-footer"><div>● 花园运转中</div><div>CEDAR TOY</div></div>';
+  h += '</div></div>';
   return h;
 }
 
@@ -2035,7 +2163,8 @@ function getCmdButtons(game, gd) {
     memoria: ['look','status','help'],
     crucible_echoes: ['look','status','help'],
     duel: ['rooms','create','join','status','help'],
-    eco: ['observe','feed','status','codex','help']
+    eco: ['observe','feed','status','codex','help'],
+    garden_cat: ['status','feed','water','pet','garden','shop','help']
   };
   return defaults[game] || ['status','help'];
 }
@@ -2051,8 +2180,18 @@ function gameSendWorkkk(thought, action) {
   gameActionFull('work_action', {action: action, thought: thought || ''});
 }
 
+function stripJson(text) {
+  var result = '';
+  var depth = 0;
+  for (var i = 0; i < text.length; i++) {
+    if (text[i] === '{') { depth++; continue; }
+    if (text[i] === '}') { if (depth > 0) depth--; continue; }
+    if (depth === 0) result += text[i];
+  }
+  return result.replace(/```[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n\n').trim();
+}
 function formatGameText(text) {
-  return escHtml(text).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+  return escHtml(text).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\\n/g,'\n').replace(/\n/g,'<br>');
 }
 
 var chatGameState = {game:null, active:false};
