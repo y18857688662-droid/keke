@@ -414,38 +414,38 @@ body {
 .game-guide-meta { font-size:11px; color:var(--text-mid); margin-bottom:12px; }
 .game-start-btn { display:block; width:100%; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px; font-size:15px; font-weight:500; cursor:pointer; }
 .game-start-btn:active { opacity:.8; }
-.gs-screen { position:relative; background:#2D2D2D; border:3px solid #1A1A1A; box-shadow:0 0 16px rgba(0,0,0,0.2); color:rgba(255,255,255,0.85); padding:16px; margin-bottom:12px; overflow:hidden; border-radius:4px; }
-.gs-screen::before { content:""; position:absolute; inset:0; background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.15) 50%),linear-gradient(90deg,rgba(255,0,0,0.04),rgba(0,255,0,0.01),rgba(0,0,118,0.04)); background-size:100% 4px,3px 100%; z-index:1; pointer-events:none; }
+.gs-screen { position:relative; background:var(--surface); border:2px solid var(--border); box-shadow:0 2px 8px rgba(0,0,0,0.06); color:var(--text); padding:16px; margin-bottom:12px; overflow:hidden; border-radius:12px; }
+.gs-screen::before { display:none; }
 .gs-screen * { position:relative; z-index:2; }
 .gs-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
 .gs-mission { color:var(--accent); font-size:14px; font-weight:700; letter-spacing:0.5px; }
-.gs-badge { background:var(--accent); color:#fff; font-size:9px; padding:2px 8px; font-weight:700; letter-spacing:1px; }
-.gs-body { font-size:13px; line-height:1.8; white-space:pre-wrap; word-break:break-word; color:rgba(255,255,255,0.8); }
+.gs-badge { background:var(--accent); color:#fff; font-size:9px; padding:2px 8px; font-weight:700; letter-spacing:1px; border-radius:4px; }
+.gs-body { font-size:13px; line-height:1.8; white-space:pre-wrap; word-break:break-word; color:var(--text); }
 .gs-body b { color:var(--accent); }
-.gs-footer { margin-top:12px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; }
-.gs-icons { display:flex; gap:10px; color:rgba(255,255,255,0.3); font-size:14px; }
+.gs-footer { margin-top:12px; padding-top:8px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.gs-icons { display:flex; gap:10px; color:var(--text-mid,#999); font-size:14px; }
 .gs-icons .lit { color:var(--accent); opacity:1; }
-.gs-blink { font-size:9px; color:rgba(255,255,255,0.7); animation:gsblink 1.4s infinite; }
+.gs-blink { font-size:9px; color:var(--text-mid,#999); animation:gsblink 1.4s infinite; }
 @keyframes gsblink { 0%,100%{opacity:1} 50%{opacity:0} }
-.gs-console { display:flex; align-items:center; gap:10px; background:var(--accent); padding:8px 12px; border-radius:0 0 4px 4px; margin-top:-12px; margin-bottom:12px; }
+.gs-console { display:flex; align-items:center; gap:10px; background:var(--accent); padding:8px 12px; border-radius:0 0 12px 12px; margin-top:-12px; margin-bottom:12px; }
 .gs-dot { width:12px; height:12px; border-radius:50%; border:2px solid rgba(255,255,255,0.4); flex-shrink:0; }
 .gs-dot.pink { background:rgba(255,255,255,0.6); }
 .gs-dot.alt { background:rgba(255,255,255,0.2); }
 .gs-slot { width:30px; height:8px; background:rgba(0,0,0,0.2); border-radius:2px; }
 .gs-cmd-area { margin-top:10px; }
 .gs-cmd-input { display:flex; gap:8px; margin-bottom:8px; }
-.gs-cmd-input input { flex:1; padding:8px 12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:4px; color:#fff; font-size:13px; outline:none; }
-.gs-cmd-input input::placeholder { color:rgba(255,255,255,0.35); }
-.gs-cmd-input button { padding:8px 16px; background:var(--accent); color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer; font-weight:600; letter-spacing:0.5px; }
+.gs-cmd-input input { flex:1; padding:8px 12px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; outline:none; }
+.gs-cmd-input input::placeholder { color:var(--text-mid,#999); }
+.gs-cmd-input button { padding:8px 16px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-size:12px; cursor:pointer; font-weight:600; letter-spacing:0.5px; }
 .gs-cmd-btns { display:flex; flex-wrap:wrap; gap:6px; }
-.gs-cmd-btn { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:6px 12px; font-size:11px; color:rgba(255,255,255,0.7); cursor:pointer; transition:background .15s; }
-.gs-cmd-btn:active { background:rgba(255,255,255,0.18); }
-.gs-action-btn { display:block; width:100%; text-align:left; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:4px; padding:10px 14px; margin:5px 0; font-size:13px; color:rgba(255,255,255,0.8); cursor:pointer; transition:background .15s; }
-.gs-action-btn:active { background:rgba(255,255,255,0.15); }
+.gs-cmd-btn { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:11px; color:var(--text); cursor:pointer; transition:background .15s; }
+.gs-cmd-btn:active { background:var(--border); }
+.gs-action-btn { display:block; width:100%; text-align:left; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin:5px 0; font-size:13px; color:var(--text); cursor:pointer; transition:background .15s; }
+.gs-action-btn:active { background:var(--border); }
 .gs-progress { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
-.gs-progress-bar { flex:1; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden; }
+.gs-progress-bar { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
 .gs-progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .3s; }
-.gs-progress-text { font-size:11px; color:rgba(255,255,255,0.5); }
+.gs-progress-text { font-size:11px; color:var(--text-mid,#999); }
 .wk-page { background:#F5F0E8; border-radius:12px; padding:12px; }
 .wk-card { background:#fff; border-radius:14px; padding:12px 14px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:8px; }
 .wk-hdr { text-align:center; font-size:13px; font-weight:700; color:#3A2E28; letter-spacing:.04em; }
@@ -1890,7 +1890,7 @@ function renderGameFullResponse(text, gameData) {
   if (info.length) {
     for (var ii = 0; ii < info.length; ii++) {
       if (info[ii] && !/^请用/.test(info[ii]) && !/^A\+B/.test(info[ii]))
-        html += '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px">' + escHtml(info[ii]) + '</div>';
+        html += '<div style="font-size:11px;color:var(--text-mid,#999);margin-top:4px">' + escHtml(info[ii]) + '</div>';
     }
   }
   html += '<div class="gs-footer"><div class="gs-icons"><span class="lit">' + icon + '</span><span>◌</span><span>□</span></div><div class="gs-blink">READY_</div></div>';
