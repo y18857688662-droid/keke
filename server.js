@@ -5809,9 +5809,37 @@ app.post('/game/guide', async (req, res) => {
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
+const GAME_START_MAP = {
+  mbti: { action: 'mbti_start', params: { mode: 'short' } },
+  enneagram: { action: 'enneagram_start', params: { mode: 'quick' } },
+  dnd: { action: 'dnd_start', params: { mode: 'full' } },
+  love: { action: 'love_start', params: { mode: 'full' } },
+  ecr: { action: 'ecr_start', params: { mode: 'full' } },
+  humanity: { action: 'humanity_start', params: { mode: 'full' } },
+  sins_virtues: { action: 'sins_virtues_start', params: { mode: 'full' } },
+  bdsmtest: { action: 'bdsmtest_start', params: { mode: 'normal' } },
+  fishing: { action: 'new' }, leek: { action: 'new' }, moonlit: { action: 'new' },
+  delve: { action: 'new' }, travel: { action: 'new' }, arcade: { action: 'new' },
+  imitator_td: { action: 'new' }, white_room: { action: 'new' },
+  burger: { action: 'new' }, market: { action: 'new' },
+  crucible_echoes: { action: 'new' }, memoria: { action: 'new', params: { level: 1 } },
+  workkk: { action: 'work_action', params: { action: 'get_status', thought: '看看今天的工作' } },
+  bar: { action: 'version' }, ai_life: { action: 'start_game' },
+  detroit: { action: 'list_saves' }, forest: { action: 'lines' },
+  eco: { action: 'eco_new' }, ciyuwu: { action: 'ciyuwu_new' },
+  garden_cat: { action: 'status' }, camping_plaza: { action: 'state' },
+  turtle_soup: { action: 'list_puzzles' }, duel: { action: 'tools/list' },
+  tarot: { action: 'invite' },
+};
+
 app.post('/game/play', async (req, res) => {
   try {
-    const { game, action, params } = req.body;
+    let { game, action, params } = req.body;
+    if (action === 'start' && GAME_START_MAP[game]) {
+      const map = GAME_START_MAP[game];
+      action = map.action;
+      params = { ...(map.params || {}), ...(params || {}) };
+    }
     let text = await mcpCall(GAME_MCP_URL, 'play', { game, action, params: params || {} });
     try {
       const parsed = JSON.parse(text);
@@ -5873,7 +5901,10 @@ app.post('/game/chat-answer', async (req, res) => {
 // 顾晏邀请一起玩游戏 — 服务端启动游戏
 async function startChatGame(game, initiator) {
   try {
-    let text = await mcpCall(GAME_MCP_URL, 'play', { game, action: 'start', params: { player_id: initiator || 'gy' } });
+    const map = GAME_START_MAP[game];
+    const startAction = map ? map.action : 'start';
+    const startParams = { player_id: initiator || 'gy', ...(map ? (map.params || {}) : {}) };
+    let text = await mcpCall(GAME_MCP_URL, 'play', { game, action: startAction, params: startParams });
     try {
       const parsed = JSON.parse(text);
       if (parsed.result && parsed.result.content) {
