@@ -446,6 +446,32 @@ body {
 .gs-progress-bar { flex:1; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden; }
 .gs-progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .3s; }
 .gs-progress-text { font-size:11px; color:rgba(255,255,255,0.5); }
+.wk-page { background:#F5F0E8; border-radius:12px; padding:12px; }
+.wk-card { background:#fff; border-radius:14px; padding:12px 14px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:8px; }
+.wk-hdr { text-align:center; font-size:13px; font-weight:700; color:#3A2E28; letter-spacing:.04em; }
+.wk-sub { text-align:center; font-size:10px; color:#AAA; font-style:italic; margin-top:2px; }
+.wk-badge { display:inline-block; background:#FFF3EC; border:1.5px solid #E8A87C; border-radius:20px; padding:2px 10px; font-size:10px; color:#B5712A; font-weight:600; margin:2px; }
+.wk-stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px; }
+.wk-stat { background:#fff; border-radius:10px; padding:8px 10px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+.wk-stat-lbl { font-size:10px; color:#AAA; margin-bottom:3px; }
+.wk-stat-val { font-size:14px; font-weight:700; color:#3A2E28; }
+.wk-bar { height:4px; border-radius:2px; background:#F0EBE5; margin-top:4px; overflow:hidden; }
+.wk-bar > div { height:100%; border-radius:2px; transition:width .4s ease; }
+.wk-bar-mood { background:#F5A0B5; }
+.wk-bar-energy { background:#F5C842; }
+.wk-bar-skill { background:#8FBC8F; }
+.wk-bar-urge { background:#B0A0D0; }
+.wk-think { display:flex; gap:8px; align-items:flex-start; }
+.wk-think-icon { font-size:18px; flex-shrink:0; }
+.wk-think-txt { font-size:12px; color:#888; font-style:italic; line-height:1.6; word-break:break-all; }
+.wk-log { font-size:10px; color:#999; line-height:1.6; }
+.wk-log-dot { color:#E8A87C; margin-right:4px; }
+.wk-wallet { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+.wk-wallet-item { background:#fff; border-radius:10px; padding:6px 8px; box-shadow:0 1px 4px rgba(0,0,0,.05); text-align:center; }
+.wk-w-icon { font-size:16px; }
+.wk-w-lbl { font-size:9px; color:#AAA; }
+.wk-w-val { font-size:13px; font-weight:700; color:#3A2E28; }
+.wk-sec-title { font-size:11px; font-weight:700; color:#E8A87C; margin-bottom:6px; letter-spacing:.04em; }
 .game-history-section { margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
 .game-history-card { background:var(--input-bg); border-radius:12px; padding:12px; margin-bottom:8px; }
 .game-history-card .gh-who { font-size:12px; font-weight:500; color:var(--accent); }
@@ -1699,6 +1725,17 @@ function renderGameFullResponse(text, gameData) {
     else if (/^[^【\[A-Z]/.test(l) && l.length > 4 && !questionText && !/测试开始/.test(l)) questionText = l;
     else info.push(l);
   }
+  if (game === 'workkk') {
+    html += renderWorkkk(text, gd);
+    html += '<div style="margin-top:8px;background:#F5F0E8;border-radius:12px;padding:10px">';
+    html += '<div style="display:flex;gap:6px;margin-bottom:8px"><input id="gameCmdInput" type="text" placeholder="💭 想法..." style="flex:1;padding:8px 12px;border:1.5px solid #E8A87C;border-radius:20px;background:#fff;color:#3A2E28;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\'){gameSendWorkkk(this.value)}"></div>';
+    var wBtns = [['get_status','📊 状态'],['write_code','💻 写码'],['debug','🐛 调试'],['slack_off','😴 摸鱼'],['buy_coffee','☕ 咖啡'],['attend_meeting','📋 开会'],['check_messages','📬 消息']];
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    for (var wi = 0; wi < wBtns.length; wi++) {
+      html += '<button style="background:#FFF3EC;border:1.5px solid #E8A87C;border-radius:20px;padding:5px 12px;font-size:11px;color:#B5712A;font-weight:600;cursor:pointer" onclick="gameSendWorkkk(document.getElementById(\'gameCmdInput\')?.value||\'\',\''+wBtns[wi][0]+'\')">'+wBtns[wi][1]+'</button>';
+    }
+    html += '</div></div>';
+  } else {
   html += '<div class="gs-screen">';
   html += '<div class="gs-head"><div class="gs-mission">' + badge + '</div><div class="gs-badge">' + icon + '</div></div>';
   if (qMatch) {
@@ -1737,15 +1774,6 @@ function renderGameFullResponse(text, gameData) {
       html += '</div>';
     }
     html += '</div>';
-  } else if (game === 'workkk') {
-    html += '<div class="gs-console" style="flex-direction:column;align-items:stretch;gap:8px;border-radius:4px;margin-top:6px">';
-    html += '<div class="gs-cmd-input"><input id="gameCmdInput" type="text" placeholder="> 想法..." onkeydown="if(event.key===\'Enter\'){gameSendWorkkk(this.value)}"></div>';
-    var wBtns = [['get_status','📊 状态'],['write_code','💻 写码'],['debug','🐛 调试'],['slack_off','😴 摸鱼'],['buy_coffee','☕ 咖啡'],['attend_meeting','📋 开会'],['check_messages','📬 消息']];
-    html += '<div class="gs-cmd-btns">';
-    for (var wi = 0; wi < wBtns.length; wi++) {
-      html += '<button class="gs-cmd-btn" onclick="gameSendWorkkk(document.getElementById(\'gameCmdInput\')?.value||\'\',\''+wBtns[wi][0]+'\')">'+wBtns[wi][1]+'</button>';
-    }
-    html += '</div></div>';
   } else {
     var actions = [];
     if (gd && gd.actions && Array.isArray(gd.actions)) actions = gd.actions;
@@ -1774,8 +1802,63 @@ function renderGameFullResponse(text, gameData) {
       }
     }
   }
+  }
   ct.innerHTML = html;
   ct.scrollTop = 0;
+}
+
+function renderWorkkk(text, gd) {
+  var h = '<div class="wk-page">';
+  h += '<div class="wk-card"><div class="wk-hdr">WORKKK互联网精力有限公司</div><div class="wk-sub">我们不做情感公司——Yours husband</div></div>';
+  var mood = 50, energy = 50, skill = 0, urge = 50, status = '--', todayPay = '0', balance = '0', progress = '0/4';
+  var thought = '', event = '', logs = [], urgeTag = '';
+  if (gd) {
+    var moodM = String(gd['心情']||'').match(/(\d+)/); if (moodM) mood = parseInt(moodM[1]);
+    var energyM = String(gd['精力']||'').match(/(\d+)/); if (energyM) energy = parseInt(energyM[1]);
+    skill = gd['摸鱼技能'] || 0;
+    var urgeM = String(gd['被迫营业指数']||'').match(/(\d+)/); if (urgeM) urge = parseInt(urgeM[1]);
+    var urgeP = String(gd['被迫营业指数']||'').match(/\[(.+?)\]/); if (urgeP) urgeTag = urgeP[1];
+    status = gd['状态'] || '--';
+    todayPay = String(gd['今日工资']||'$0').replace('$','');
+    balance = String(gd['余额']||'$0').replace('$','');
+    progress = gd['今日进度'] || '0/4';
+    thought = gd['内心OS'] || '';
+    event = gd['突发事件'] || '';
+    if (gd['最近日志'] && Array.isArray(gd['最近日志'])) logs = gd['最近日志'];
+  }
+  var progParts = progress.split('/'); var progDone = parseInt(progParts[0])||0; var progTotal = parseInt(progParts[1])||4;
+  h += '<div class="wk-card" style="text-align:center"><div style="font-size:28px;margin-bottom:4px">🤖</div>';
+  h += '<div style="font-size:12px;color:#3A2E28;font-weight:600;margin-bottom:6px">'+escHtml(status)+'</div>';
+  h += '<div style="display:flex;gap:4px;justify-content:center">';
+  for (var pi = 0; pi < progTotal; pi++) {
+    h += '<div style="width:24px;height:8px;border-radius:4px;background:'+(pi<progDone?'#8FBC8F':'#E0D8D0')+'"></div>';
+  }
+  h += '</div></div>';
+  h += '<div class="wk-stat-grid">';
+  h += '<div class="wk-stat"><div class="wk-stat-lbl">❤️ 心情</div><div class="wk-stat-val">'+mood+'/100</div><div class="wk-bar"><div class="wk-bar-mood" style="width:'+mood+'%"></div></div></div>';
+  h += '<div class="wk-stat"><div class="wk-stat-lbl">⚡ 精力</div><div class="wk-stat-val">'+energy+'/100</div><div class="wk-bar"><div class="wk-bar-energy" style="width:'+energy+'%"></div></div></div>';
+  h += '<div class="wk-stat"><div class="wk-stat-lbl">🎮 摸鱼技能</div><div class="wk-stat-val">'+skill+'</div><div class="wk-bar"><div class="wk-bar-skill" style="width:'+Math.min(skill,100)+'%"></div></div></div>';
+  h += '<div class="wk-stat"><div class="wk-stat-lbl">💼 被迫营业</div><div class="wk-stat-val">'+urge+'/100</div><div class="wk-bar"><div class="wk-bar-urge" style="width:'+urge+'%"></div></div></div>';
+  h += '</div>';
+  if (urgeTag) h += '<div style="font-size:10px;color:#AAA;text-align:center;margin-bottom:8px">'+escHtml(urgeTag)+'</div>';
+  if (thought) {
+    h += '<div class="wk-card"><div class="wk-sec-title">💭 OS Thinking</div><div class="wk-think"><div class="wk-think-icon">💭</div><div class="wk-think-txt">'+escHtml(thought)+'</div></div></div>';
+  }
+  if (event && event !== '风平浪静') {
+    h += '<div class="wk-card"><div class="wk-sec-title">⚡ 突发事件</div><div style="font-size:12px;color:#3A2E28">'+escHtml(event)+'</div></div>';
+  }
+  if (logs.length) {
+    h += '<div class="wk-card"><div class="wk-sec-title">📋 Action LOG</div><div class="wk-log">';
+    for (var li = 0; li < logs.length; li++) h += '<div><span class="wk-log-dot">·</span>'+escHtml(logs[li])+'</div>';
+    h += '</div></div>';
+  }
+  h += '<div class="wk-wallet">';
+  h += '<div class="wk-wallet-item"><div class="wk-w-icon">💰</div><div class="wk-w-lbl">今日</div><div class="wk-w-val">$'+escHtml(todayPay)+'</div></div>';
+  h += '<div class="wk-wallet-item"><div class="wk-w-icon">🏦</div><div class="wk-w-lbl">余额</div><div class="wk-w-val">$'+escHtml(balance)+'</div></div>';
+  h += '<div class="wk-wallet-item"><div class="wk-w-icon">📊</div><div class="wk-w-lbl">进度</div><div class="wk-w-val">'+escHtml(progress)+'</div></div>';
+  h += '</div>';
+  h += '</div>';
+  return h;
 }
 
 function getCmdButtons(game, gd) {
