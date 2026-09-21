@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#E8EDE4">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Noto+Serif+SC:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Noto+Serif+SC:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23E8EDE4'/%3E%3Ctext x='14' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%237B8F6B'%3EG%3C/text%3E%3Ctext x='50' y='42' font-family='Georgia,serif' font-size='28' font-weight='600' fill='%232C3029' text-anchor='end'%3EY%3C/text%3E%3C/svg%3E">
 <link rel="apple-touch-icon" sizes="180x180" href="/icon-gy.png?v=4">
 <title>顾晏</title>
@@ -472,6 +472,60 @@ body {
 .wk-w-lbl { font-size:9px; color:#AAA; }
 .wk-w-val { font-size:13px; font-weight:700; color:#3A2E28; }
 .wk-sec-title { font-size:11px; font-weight:700; color:#E8A87C; margin-bottom:6px; letter-spacing:.04em; }
+.du-page { background:#FDF6F7; border-radius:14px; padding:14px; font-family:'Silkscreen','Courier New',monospace; }
+.du-card { background:rgba(255,255,255,.94); border:2px solid #E8E1F1; border-radius:14px; box-shadow:4px 4px 0 rgba(81,74,89,.16); padding:14px; margin-bottom:10px; }
+.du-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.du-title { color:#66557D; font-size:14px; font-weight:700; letter-spacing:.06em; }
+.du-badge { background:#9B8DB5; color:#fff; font-size:9px; padding:3px 10px; font-weight:700; letter-spacing:1px; border-radius:4px; }
+.du-eyebrow { color:#B66D79; font-size:10px; font-weight:800; letter-spacing:.13em; margin-bottom:6px; }
+.du-body { font-size:13px; line-height:1.8; color:#5C5463; white-space:pre-wrap; word-break:break-word; }
+.du-body b { color:#66557D; }
+.du-screen { background:#2D2D2D; border:3px solid #9B8DB5; border-radius:10px; padding:14px; color:#F4EDF7; font-size:13px; line-height:1.75; white-space:pre-wrap; word-break:break-word; }
+.du-footer { display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:2px solid #E8E1F1; }
+.du-status { color:#6C9973; font-size:11px; font-weight:700; }
+.du-blink { font-size:9px; color:#8A8490; animation:gsblink 1.4s infinite; }
+.du-cmd-input { display:flex; gap:8px; margin-top:10px; }
+.du-cmd-input input { flex:1; padding:8px 12px; background:#fff; border:2px solid #E8E1F1; border-radius:8px; color:#514A59; font-size:13px; font-family:inherit; outline:none; }
+.du-cmd-input input:focus { border-color:#9B8DB5; outline:3px solid rgba(155,141,181,.25); }
+.du-cmd-input button { padding:8px 16px; background:#66557D; color:#fff; border:2px solid #66557D; border-radius:8px; font-size:12px; cursor:pointer; font-weight:700; font-family:inherit; }
+.du-cmd-btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.du-cmd-btn { background:#fff; border:2px solid #9B8DB5; border-radius:8px; padding:6px 13px; font-size:11px; color:#66557D; cursor:pointer; font-weight:700; font-family:inherit; min-height:36px; }
+.du-cmd-btn:active { background:#E8E1F1; transform:translateY(-1px); }
+.du-action-btn { display:block; width:100%; text-align:left; background:#fff; border:2px solid #E8E1F1; border-radius:8px; padding:10px 14px; margin:5px 0; font-size:13px; color:#5C5463; cursor:pointer; font-family:inherit; }
+.du-action-btn:active { background:#E8E1F1; border-color:#9B8DB5; }
+.du-progress { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.du-progress-bar { flex:1; height:6px; background:#E8E1F1; border-radius:3px; overflow:hidden; }
+.du-progress-fill { height:100%; background:linear-gradient(90deg,#E6A8B1,#9B8DB5); border-radius:3px; transition:width .3s; }
+.du-progress-text { font-size:11px; color:#8A8490; }
+.ec-page { background:#FFFAF0; border-radius:14px; padding:14px; }
+.ec-card { background:rgba(255,255,255,.94); border:2px solid #E8E1F1; border-radius:14px; box-shadow:4px 4px 0 rgba(81,74,89,.16); padding:14px; margin-bottom:10px; }
+.ec-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.ec-title { color:#66557D; font-size:14px; font-weight:700; }
+.ec-badge { background:#6C9973; color:#fff; font-size:9px; padding:3px 10px; font-weight:700; letter-spacing:1px; border-radius:4px; }
+.ec-eyebrow { color:#B66D79; font-size:10px; font-weight:800; letter-spacing:.13em; margin-bottom:6px; }
+.ec-score { width:64px; height:64px; display:grid; place-items:center; background:#66557D; color:#fff; border-radius:50%; font-size:22px; font-weight:800; margin:0 auto 8px; }
+.ec-metrics { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px; }
+.ec-metric { padding:10px; background:#fff; border:2px solid #E8E1F1; border-radius:11px; text-align:center; }
+.ec-metric small { display:block; color:#8A8490; font-size:10px; }
+.ec-metric strong { display:block; margin-top:3px; color:#66557D; font-size:16px; font-weight:700; }
+.ec-body { font-size:13px; line-height:1.75; color:#514A59; white-space:pre-wrap; word-break:break-word; }
+.ec-observe { padding:14px; background:#302D34; color:#F4EDF7; border-radius:10px; font-size:13px; line-height:1.75; white-space:pre-wrap; word-break:break-word; }
+.ec-pop-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.ec-pop-item { padding:10px; background:#FAF8FC; border:1px solid #E8E1F1; border-radius:9px; }
+.ec-pop-item h4 { margin:0 0 4px; color:#66557D; font-size:13px; }
+.ec-pop-item span { font-size:12px; color:#8A8490; }
+.ec-annals li { margin:0 0 6px; padding:6px 10px; background:#fff; border-left:3px solid #9B8DB5; list-style:none; font-size:12px; color:#514A59; }
+.ec-footer { display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:8px; border-top:2px solid #E8E1F1; }
+.ec-status { color:#6C9973; font-size:11px; font-weight:700; }
+.ec-cmd-input { display:flex; gap:8px; margin-top:10px; }
+.ec-cmd-input input { flex:1; padding:8px 12px; background:#fff; border:2px solid #E8E1F1; border-radius:8px; color:#514A59; font-size:13px; outline:none; }
+.ec-cmd-input input:focus { border-color:#9B8DB5; outline:3px solid rgba(155,141,181,.25); }
+.ec-cmd-input button { padding:8px 16px; background:#66557D; color:#fff; border:2px solid #66557D; border-radius:8px; font-size:12px; cursor:pointer; font-weight:700; }
+.ec-cmd-btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.ec-cmd-btn { background:#FAF8FC; border:2px solid #9B8DB5; border-radius:8px; padding:6px 13px; font-size:11px; color:#66557D; cursor:pointer; font-weight:600; }
+.ec-cmd-btn:active { background:#E8E1F1; }
+.ec-action-btn { display:block; width:100%; text-align:left; background:#fff; border:2px solid #E8E1F1; border-radius:8px; padding:10px 14px; margin:5px 0; font-size:13px; color:#514A59; cursor:pointer; }
+.ec-action-btn:active { background:#FAF8FC; border-color:#9B8DB5; }
 .game-history-section { margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
 .game-history-card { background:var(--input-bg); border-radius:12px; padding:12px; margin-bottom:8px; }
 .game-history-card .gh-who { font-size:12px; font-weight:500; color:var(--accent); }
@@ -1590,7 +1644,17 @@ function closeGameFull() {
   gameState.game = null;
 }
 
+function resetGameOverlayTheme() {
+  var overlay = document.getElementById('gameFullOverlay');
+  var hdr = document.querySelector('.game-full-header');
+  var titleEl = document.querySelector('.game-full-title');
+  overlay.style.background = '#1a1a1a';
+  document.getElementById('gameFullBody').style.background = '#1a1a1a';
+  hdr.style.background = '#2D2D2D'; hdr.style.borderColor = '#333';
+  titleEl.style.color = 'rgba(255,255,255,0.85)';
+}
 function loadGameListFull() {
+  resetGameOverlayTheme();
   var ct = document.getElementById('gameFullBody');
   ct.innerHTML = '<div class="game-loading">加载游戏列表...</div>';
   fetch('/game/list').then(function(r){return r.json()}).then(function(data) {
@@ -1672,32 +1736,80 @@ function startGameFull(id, name) {
   gameState.active = true;
   gameState.game = id;
   var ct = document.getElementById('gameFullBody');
-  ct.innerHTML = '<div class="game-loading" style="color:rgba(255,255,255,0.5)">加载中...</div>';
-  document.querySelector('.game-full-title').textContent = (gameBadges[id] || 'GAME') + ' · ' + (name || id).toUpperCase();
+  var overlay = document.getElementById('gameFullOverlay');
+  var hdr = document.querySelector('.game-full-header');
+  var titleEl = document.querySelector('.game-full-title');
+  if (id === 'duel') {
+    overlay.style.background = '#FDF6F7'; ct.style.background = '#FDF6F7';
+    hdr.style.background = '#E8E1F1'; hdr.style.borderColor = '#9B8DB5';
+    titleEl.style.color = '#66557D';
+    ct.innerHTML = '<div style="text-align:center;padding:40px;color:#66557D">加载中...</div>';
+  } else if (id === 'eco') {
+    overlay.style.background = '#FFFAF0'; ct.style.background = '#FFFAF0';
+    hdr.style.background = '#E8E1F1'; hdr.style.borderColor = '#9B8DB5';
+    titleEl.style.color = '#66557D';
+    ct.innerHTML = '<div style="text-align:center;padding:40px;color:#66557D">加载中...</div>';
+  } else if (id === 'workkk') {
+    overlay.style.background = '#F5F0E8'; ct.style.background = '#F5F0E8';
+    hdr.style.background = '#E8DDD0'; hdr.style.borderColor = '#E8A87C';
+    titleEl.style.color = '#3A2E28';
+    ct.innerHTML = '<div style="text-align:center;padding:40px;color:#3A2E28">加载中...</div>';
+  } else {
+    overlay.style.background = '#1a1a1a'; ct.style.background = '#1a1a1a';
+    hdr.style.background = '#2D2D2D'; hdr.style.borderColor = '#333';
+    titleEl.style.color = 'rgba(255,255,255,0.85)';
+    ct.innerHTML = '<div class="game-loading" style="color:rgba(255,255,255,0.5)">加载中...</div>';
+  }
+  titleEl.textContent = (gameBadges[id] || 'GAME') + ' · ' + (name || id).toUpperCase();
   fetch('/game/guide', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:id})}).then(function(r){return r.json()}).then(function(data) {
     if (!data.ok) { ct.innerHTML = '<div class="game-loading" style="color:rgba(255,255,255,0.5)">加载失败</div>'; return; }
     var guideText = data.text;
     try { var gp = JSON.parse(guideText); if (gp.guide) guideText = gp.guide; } catch {}
     var humanGuide = parseGuideForHuman(guideText);
-    var html = '<div class="gs-screen">';
+    var html = '';
+    if (id === 'duel') {
+      html += '<div class="du-page"><div class="du-card"><div class="du-hdr"><div><div class="du-eyebrow">CEDAR TOY</div><div class="du-title">双弈 · DUEL</div></div><div class="du-badge">♟️ DUEL</div></div>';
+      html += '<div class="du-screen">' + formatGameText(humanGuide) + '</div>';
+      html += '<div class="du-footer"><div class="du-status">● READY</div><div class="du-blink">PRESS START_</div></div></div>';
+      html += '<div style="text-align:center;margin-top:10px"><button class="du-cmd-btn" style="background:#66557D;color:#fff;padding:10px 28px;font-size:13px" onclick="gameActionFull(\'start\')">ENTER →</button></div></div>';
+    } else if (id === 'eco') {
+      html += '<div class="ec-page"><div class="ec-card"><div class="ec-hdr"><div><div class="ec-eyebrow">ECOSYSTEM</div><div class="ec-title">瓶中生态</div></div><div class="ec-badge">🌿 ECO</div></div>';
+      html += '<div class="ec-observe">' + formatGameText(humanGuide) + '</div>';
+      html += '<div class="ec-footer"><div class="ec-status">● READY</div><div style="font-size:10px;color:#8A8490">CEDAR TOY</div></div></div>';
+      html += '<div style="text-align:center;margin-top:10px"><button class="ec-cmd-btn" style="background:#66557D;color:#fff;padding:10px 28px;font-size:13px;border-color:#66557D" onclick="gameActionFull(\'start\')">ENTER →</button></div></div>';
+    } else {
+    html += '<div class="gs-screen">';
     html += '<div class="gs-head"><div class="gs-mission">MISSION: ' + escHtml((name || id).toUpperCase()) + '</div><div class="gs-badge">' + (gameBadges[id] || 'GAME') + '</div></div>';
     html += '<div class="gs-body">' + formatGameText(humanGuide) + '</div>';
     html += '<div class="gs-footer"><div class="gs-icons"><span class="lit">' + (gameIcons[id] || '🎮') + '</span><span>◌</span><span>□</span></div><div class="gs-blink">PRESS START_</div></div>';
     html += '</div>';
     html += '<div class="gs-console"><div class="gs-dot pink"></div><div class="gs-dot alt"></div><div class="gs-slot"></div><button class="gs-cmd-btn" style="margin-left:auto;background:var(--accent);color:#fff;border-color:var(--accent);padding:8px 20px;font-weight:700;letter-spacing:1px" onclick="gameActionFull(\'start\')">ENTER →</button></div>';
+    }
     ct.innerHTML = html;
   }).catch(function(){ ct.innerHTML = '<div class="game-loading" style="color:rgba(255,255,255,0.5)">网络错误</div>'; });
 }
 
 function gameActionFull(action, extra) {
   var ct = document.getElementById('gameFullBody');
-  ct.innerHTML = '<div class="gs-screen" style="text-align:center;padding:40px 16px"><div class="gs-blink" style="font-size:13px">LOADING...</div></div>';
+  var g = gameState.game;
+  var loadHtml, errBtn;
+  if (g === 'duel') {
+    loadHtml = '<div class="du-page" style="text-align:center;padding:40px 16px"><div class="du-blink" style="font-size:13px">LOADING...</div></div>';
+    errBtn = function(msg){ return '<div class="du-page" style="text-align:center;padding:30px 16px"><div style="color:#66557D;margin-bottom:12px">'+msg+'</div><button class="du-cmd-btn" style="padding:10px 20px" onclick="loadGameListFull()">← BACK</button></div>'; };
+  } else if (g === 'eco') {
+    loadHtml = '<div class="ec-page" style="text-align:center;padding:40px 16px"><div style="color:#66557D;font-size:13px">加载中...</div></div>';
+    errBtn = function(msg){ return '<div class="ec-page" style="text-align:center;padding:30px 16px"><div style="color:#66557D;margin-bottom:12px">'+msg+'</div><button class="ec-cmd-btn" style="padding:10px 20px" onclick="loadGameListFull()">← BACK</button></div>'; };
+  } else {
+    loadHtml = '<div class="gs-screen" style="text-align:center;padding:40px 16px"><div class="gs-blink" style="font-size:13px">LOADING...</div></div>';
+    errBtn = function(msg){ return '<div class="gs-screen" style="text-align:center;padding:30px 16px"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px">'+msg+'</div><button class="gs-cmd-btn" style="padding:10px 20px" onclick="loadGameListFull()">← BACK</button></div>'; };
+  }
+  ct.innerHTML = loadHtml;
   var params = {player_id:gameState.playerId};
   if (extra) for (var k in extra) params[k] = extra[k];
   fetch('/game/play', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:gameState.game,action:action,params:params})}).then(function(r){return r.json()}).then(function(data) {
-    if (!data.ok) { ct.innerHTML = '<div class="gs-screen" style="text-align:center;padding:30px 16px"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px">REQUEST FAILED</div><button class="gs-cmd-btn" style="padding:10px 20px" onclick="loadGameListFull()">← BACK</button></div>'; return; }
+    if (!data.ok) { ct.innerHTML = errBtn('REQUEST FAILED'); return; }
     renderGameFullResponse(data.text, data.gameData);
-  }).catch(function(){ ct.innerHTML = '<div class="gs-screen" style="text-align:center;padding:30px 16px"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px">NETWORK ERROR</div><button class="gs-cmd-btn" style="padding:10px 20px" onclick="loadGameListFull()">← BACK</button></div>'; });
+  }).catch(function(){ ct.innerHTML = errBtn('NETWORK ERROR'); });
 }
 
 var CMD_GAMES = ['fishing','leek','moonlit','delve','travel','arcade','imitator_td','white_room','burger','market','crucible_echoes','memoria'];
@@ -1735,6 +1847,28 @@ function renderGameFullResponse(text, gameData) {
       html += '<button style="background:#FFF3EC;border:1.5px solid #E8A87C;border-radius:20px;padding:5px 12px;font-size:11px;color:#B5712A;font-weight:600;cursor:pointer" onclick="gameSendWorkkk(document.getElementById(\'gameCmdInput\')?.value||\'\',\''+wBtns[wi][0]+'\')">'+wBtns[wi][1]+'</button>';
     }
     html += '</div></div>';
+  } else if (game === 'duel') {
+    html += renderDuel(text, gd);
+    html += '<div style="margin-top:8px;background:#FDF6F7;border-radius:14px;padding:10px;font-family:Silkscreen,Courier New,monospace">';
+    html += '<div class="du-cmd-input"><input id="gameCmdInput" type="text" placeholder="♟ 输入指令..." onkeydown="if(event.key===\'Enter\'){gameSendCmd()}"><button onclick="gameSendCmd()">SEND</button></div>';
+    var duBtns = getCmdButtons(game, gd);
+    if (duBtns.length) {
+      html += '<div class="du-cmd-btns">';
+      for (var di = 0; di < duBtns.length; di++) html += '<button class="du-cmd-btn" onclick="gameActionFull(\'cmd\',{command:\''+escHtml(duBtns[di])+'\'})">'+escHtml(duBtns[di])+'</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+  } else if (game === 'eco') {
+    html += renderEco(text, gd);
+    html += '<div style="margin-top:8px;background:#FFFAF0;border-radius:14px;padding:10px">';
+    html += '<div class="ec-cmd-input"><input id="gameCmdInput" type="text" placeholder="🌿 输入指令..." onkeydown="if(event.key===\'Enter\'){gameSendCmd()}"><button onclick="gameSendCmd()">SEND</button></div>';
+    var ecBtns = getCmdButtons(game, gd);
+    if (ecBtns.length) {
+      html += '<div class="ec-cmd-btns">';
+      for (var ei = 0; ei < ecBtns.length; ei++) html += '<button class="ec-cmd-btn" onclick="gameActionFull(\'cmd\',{command:\''+escHtml(ecBtns[ei])+'\'})">'+escHtml(ecBtns[ei])+'</button>';
+      html += '</div>';
+    }
+    html += '</div>';
   } else {
   html += '<div class="gs-screen">';
   html += '<div class="gs-head"><div class="gs-mission">' + badge + '</div><div class="gs-badge">' + icon + '</div></div>';
@@ -1861,6 +1995,32 @@ function renderWorkkk(text, gd) {
   return h;
 }
 
+function renderDuel(text, gd) {
+  var displayText = text.replace(/```[\s\S]*?```/g, '').replace(/\{[^{}]*"action"[^{}]*\}/g, '');
+  var h = '<div class="du-page">';
+  h += '<div class="du-card"><div class="du-hdr"><div><div class="du-eyebrow">CEDAR TOY</div><div class="du-title">双弈 · DUEL</div></div><div class="du-badge">♟️ DUEL</div></div>';
+  h += '<div class="du-screen">' + formatGameText(displayText) + '</div>';
+  h += '<div class="du-footer"><div class="du-status">● CONNECTED</div><div class="du-blink">READY_</div></div>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function renderEco(text, gd) {
+  var displayText = text.replace(/```[\s\S]*?```/g, '').replace(/\{[^{}]*"action"[^{}]*\}/g, '');
+  var score = '--';
+  var scoreM = displayText.match(/(?:评分|得分|分数|score)[：:\s]*(\d+)/i);
+  if (scoreM) score = scoreM[1];
+  var h = '<div class="ec-page">';
+  h += '<div class="ec-card"><div class="ec-hdr"><div><div class="ec-eyebrow">ECOSYSTEM</div><div class="ec-title">瓶中生态</div></div><div class="ec-badge">🌿 ECO</div></div>';
+  if (score !== '--') h += '<div class="ec-score">' + escHtml(score) + '</div>';
+  h += '<div class="ec-observe">' + formatGameText(displayText) + '</div>';
+  h += '<div class="ec-footer"><div class="ec-status">● 生态运转中</div><div style="font-size:10px;color:#8A8490">CEDAR TOY</div></div>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
 function getCmdButtons(game, gd) {
   if (gd && gd.commands && Array.isArray(gd.commands)) return gd.commands;
   if (gd && gd.available_commands && Array.isArray(gd.available_commands)) return gd.available_commands;
@@ -1874,7 +2034,9 @@ function getCmdButtons(game, gd) {
     burger: ['status','menu','help'],
     market: ['status','portfolio','help'],
     memoria: ['look','status','help'],
-    crucible_echoes: ['look','status','help']
+    crucible_echoes: ['look','status','help'],
+    duel: ['rooms','create','join','status','help'],
+    eco: ['observe','feed','status','codex','help']
   };
   return defaults[game] || ['status','help'];
 }
