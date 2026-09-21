@@ -1706,6 +1706,10 @@ function resetGameOverlayTheme() {
 }
 function loadGameListFull() {
   resetGameOverlayTheme();
+  gameState.active = false;
+  gameState.game = null;
+  var titleEl = document.querySelector('.game-full-title');
+  if (titleEl) titleEl.textContent = '🎮 游戏';
   var ct = document.getElementById('gameFullBody');
   ct.innerHTML = '<div class="game-loading">加载游戏列表...</div>';
   fetch('/game/list').then(function(r){return r.json()}).then(function(data) {
