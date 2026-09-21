@@ -1642,11 +1642,15 @@ function gameActionFull(action, extra) {
 function renderGameFullResponse(text) {
   var ct = document.getElementById('gameFullBody');
   var html = '';
+  // try parse JSON for structured game data
+  var gd = null;
+  try { gd = JSON.parse(text); } catch {}
   var qMatch = text.match(/第(\d+)题.*?共(\d+)题/);
   if (qMatch) {
     var cur = parseInt(qMatch[1]), total = parseInt(qMatch[2]);
     html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;background:var(--accent);width:'+(cur/total*100)+'%;border-radius:3px;transition:width .3s"></div></div><span style="font-size:12px;color:var(--text-mid)">'+cur+'/'+total+'</span></div>';
   }
+  // detect A/B test format
   var lines = text.split('\n');
   var questionText = '', optA = '', optB = '', info = [];
   var hasAB = false;
@@ -1658,20 +1662,56 @@ function renderGameFullResponse(text) {
     else if (/^请用\s*mbti_answer/.test(l) || /^a_score/.test(l)) continue;
     else if (/第\d+题/.test(l) && !questionText) continue;
     else if (hasAB) info.push(l);
-    else if (/^[^【\[A-Z]/.test(l) && l.length > 4 && !questionText && !/MBTI测试开始/.test(l)) questionText = l;
+    else if (/^[^【\[A-Z]/.test(l) && l.length > 4 && !questionText && !/测试开始/.test(l)) questionText = l;
     else info.push(l);
   }
+  var optStyle = 'display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer;line-height:1.4';
   if (hasAB && questionText) {
     html += '<div class="game-guide-card" style="margin-bottom:0"><div class="game-guide-title" style="font-size:15px;margin-bottom:12px">' + escHtml(questionText) + '</div>';
-    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer;line-height:1.4" onclick="gameActionFull(\'mbti_answer\',{a_score:5})">完全 A：' + escHtml(optA) + '</button>';
-    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'mbti_answer\',{a_score:4})">偏向 A</button>';
-    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'mbti_answer\',{a_score:3})">略偏 A</button>';
-    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'mbti_answer\',{a_score:2})">略偏 B</button>';
-    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'mbti_answer\',{a_score:1})">偏向 B</button>';
-    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'mbti_answer\',{a_score:0})">完全 B：' + escHtml(optB) + '</button>';
+    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:5})">完全 A：' + escHtml(optA) + '</button>';
+    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:4})">偏向 A</button>';
+    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:3})">略偏 A</button>';
+    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:2})">略偏 B</button>';
+    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:1})">偏向 B</button>';
+    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:0})">完全 B：' + escHtml(optB) + '</button>';
     html += '</div>';
   } else {
-    html += '<div class="game-guide-card"><div class="game-guide-desc">' + formatGameText(text) + '</div></div>';
+    // show game content
+    var displayText = text.replace(/```[\s\S]*?```/g, '').replace(/\{[^{}]*"action"[^{}]*\}/g, '');
+    html += '<div class="game-guide-card"><div class="game-guide-desc">' + formatGameText(displayText) + '</div>';
+    // detect action buttons from JSON data or 【action】 markers
+    var actions = [];
+    if (gd && gd.actions && Array.isArray(gd.actions)) {
+      actions = gd.actions;
+    } else if (gd && gd.options && Array.isArray(gd.options)) {
+      actions = gd.options;
+    } else if (gd && gd.choices && Array.isArray(gd.choices)) {
+      actions = gd.choices;
+    }
+    if (actions.length > 0) {
+      html += '<div style="margin-top:10px">';
+      for (var ai = 0; ai < actions.length; ai++) {
+        var act = actions[ai];
+        var actName = typeof act === 'string' ? act : (act.action || act.label || act.value || act.id || act.name || JSON.stringify(act));
+        var actLabel = typeof act === 'string' ? act : (act.label || act.name || act.action || act.value || actName);
+        var actParams = (typeof act === 'object' && act.params) ? JSON.stringify(act.params).replace(/'/g,"\\'") : '{}';
+        html += '<button style="'+optStyle+'" onclick="gameActionFull(\''+escHtml(String(actName))+'\','+escHtml(actParams)+')">'+escHtml(String(actLabel))+'</button>';
+      }
+      html += '</div>';
+    } else {
+      // detect 【action】 markers in text
+      var actMatches = text.match(/【([^】]+)】/g);
+      if (actMatches && actMatches.length) {
+        html += '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">';
+        for (var ami = 0; ami < actMatches.length; ami++) {
+          var actText = actMatches[ami].replace(/[【】]/g, '');
+          if (actText.length > 20) continue;
+          html += '<button style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\''+escHtml(actText)+'\')">'+escHtml(actText)+'</button>';
+        }
+        html += '</div>';
+      }
+    }
+    html += '</div>';
   }
   if (info.length) {
     for (var ii = 0; ii < info.length; ii++) {

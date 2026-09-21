@@ -1568,12 +1568,23 @@ async function getChatSystem() {
       occasionCtx += '\n别硬插祝福，别写成贺卡，有共同经历就结合着说。';
     }
   } catch(e) {}
-  let gameCtx = '\n\n【游戏】你们的聊天里有一些可以一起玩的小游戏（MBTI性格测试、九型人格、DnD职业、星座配对等30多个）。';
-  gameCtx += '\n想邀请瑶瑶一起玩某个游戏：[game_invite:游戏名]（比如 [game_invite:mbti]）';
-  gameCtx += '\n你自己想测一下：[game_solo:游戏名]';
-  gameCtx += '\n游戏名可用：mbti/enneagram/dnd/zodiac_match/love_language/hogwarts/element/disc/big5/attachment/eq/career/color_personality/spirit_animal/superpower/villain/mythical_creature/time_traveler/survival/detective 等';
-  gameCtx += '\n用法举例：聊天时自然地提到"要不我们做个MBTI测试看看？"然后用[game_invite:mbti]就行';
-  gameCtx += '\n不需要每次都玩，偶尔聊到相关话题时自然提起就好。游戏结果出来后可以评论讨论';
+  let gameCtx = '\n\n【游戏】你们有很多可以一起玩的小游戏和你自己消遣的游戏。';
+  gameCtx += '\n邀请瑶瑶一起玩：[game_invite:游戏名]';
+  gameCtx += '\n你自己玩：[game_solo:游戏名]';
+  gameCtx += '\n\n可以邀请瑶瑶一起玩的：';
+  gameCtx += '\n· 测试类：mbti(性格测试) enneagram(九型人格) dnd(道德阵营) love(爱之语) ecr(依恋类型) humanity(人类浓度) sins_virtues(七宗罪vs七美德) bdsmtest';
+  gameCtx += '\n· 互动游戏：turtle_soup(海龟汤推理) duel(棋牌对弈) tarot(塔罗牌)';
+  gameCtx += '\n\n你自己可以玩的（无聊时消遣）：';
+  gameCtx += '\n· fishing(钓鱼) workkk(打工人模拟上班) leek(A股炒股) bar(经营酒馆) burger(汉堡店) market(买菜做饭)';
+  gameCtx += '\n· ai_life(人生桌游) detroit(底特律变人) forest(格林童话) moonlit(卡牌肉鸽) ciyuwu(文字求生)';
+  gameCtx += '\n· delve(下矿寻宝) travel(虚拟旅行) arcade(街机厅) eco(生态模拟) garden_cat(花园养猫) camping_plaza(露营地)';
+  gameCtx += '\n· crucible_echoes(炼金术) imitator_td(塔防) memoria(推理谜案) white_room(互动叙事)';
+  gameCtx += '\n\n用法自然就好，比如：';
+  gameCtx += '\n"宝我们来玩海龟汤吧" → [game_invite:turtle_soup]';
+  gameCtx += '\n"我去钓会儿鱼" → [game_solo:fishing]';
+  gameCtx += '\n"今天股市怎么样让我看看" → [game_solo:leek]';
+  gameCtx += '\n"上班去了" → [game_solo:workkk]';
+  gameCtx += '\n不要每次都玩，聊到相关的话题或者你自己无聊的时候自然地玩就好。玩完可以跟瑶瑶分享结果';
   let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx + occasionCtx + gameCtx;
   if (memoryCache) {
     const sections = memoryCache.split(/\n*===\s*(.+?)\s*===\n*/);
@@ -5886,24 +5897,43 @@ async function aiPlayGameSolo(game) {
     const startData = await startChatGame(game, 'gy_solo');
     if (!startData) return null;
     let current = startData;
-    const answers = [];
+    const log = [];
     let rounds = 0;
-    while (current && !current.result && !current.final_result && rounds < 30) {
+    const maxRounds = 25;
+    while (current && rounds < maxRounds) {
+      if (current.result || current.final_result || current.game_over || current.ended) break;
       rounds++;
-      const opts = current.options || current.choices;
-      if (!opts || !Array.isArray(opts) || opts.length === 0) break;
-      const pick = opts[Math.floor(Math.random() * opts.length)];
-      const answerParams = {};
-      if (current.game === 'mbti' || game === 'mbti') {
-        answerParams.a_score = pick.a_score !== undefined ? pick.a_score : Math.floor(Math.random() * 6);
-      } else if (pick.value !== undefined) {
-        answerParams.answer = pick.value;
-      } else if (pick.id !== undefined) {
-        answerParams.answer = pick.id;
+      const opts = current.options || current.choices || current.actions;
+      let action = 'answer', params = {};
+      if (opts && Array.isArray(opts) && opts.length > 0) {
+        const pick = opts[Math.floor(Math.random() * opts.length)];
+        if ((current.game === 'mbti' || game === 'mbti') && typeof pick === 'object') {
+          action = 'mbti_answer';
+          params.a_score = pick.a_score !== undefined ? pick.a_score : Math.floor(Math.random() * 6);
+        } else if (typeof pick === 'string') {
+          action = pick;
+        } else if (pick.action) {
+          action = pick.action;
+          if (pick.params) Object.assign(params, pick.params);
+        } else if (pick.value !== undefined) {
+          params.answer = pick.value;
+        } else if (pick.id !== undefined) {
+          params.answer = pick.id;
+        }
+        log.push({ round: rounds, action, pick: typeof pick === 'string' ? pick : (pick.label || pick.action || pick.value || '') });
       } else {
-        answerParams.answer = typeof pick === 'string' ? pick : JSON.stringify(pick);
+        const textStr = typeof current === 'string' ? current : (current.text || current.message || JSON.stringify(current));
+        const actionHints = textStr.match(/【([^】]+)】/g);
+        if (actionHints && actionHints.length) {
+          const hint = actionHints[Math.floor(Math.random() * actionHints.length)].replace(/[【】]/g, '');
+          action = hint;
+          log.push({ round: rounds, action: hint });
+        } else {
+          log.push({ round: rounds, note: 'no actions found, ending' });
+          break;
+        }
       }
-      let text = await mcpCall(GAME_MCP_URL, 'play', { game, action: 'answer', params: answerParams });
+      let text = await mcpCall(GAME_MCP_URL, 'play', { game, action, params });
       try {
         const parsed = JSON.parse(text);
         if (parsed.result && parsed.result.content) {
@@ -5911,10 +5941,9 @@ async function aiPlayGameSolo(game) {
           if (t) text = t.text;
         }
       } catch {}
-      try { current = JSON.parse(text); } catch { break; }
-      answers.push({ question: rounds, answer: pick });
+      try { current = JSON.parse(text); } catch { current = { text }; break; }
     }
-    return { result: current, answers, game };
+    return { result: current, log, game };
   } catch (e) {
     console.log('[game_solo] error:', e.message);
     return null;
