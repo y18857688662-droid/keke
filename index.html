@@ -395,7 +395,30 @@ body {
 .gif-sticker-cell:active { transform:scale(.93); }
 .gif-sticker-cell img { width:100%; aspect-ratio:1; object-fit:contain; image-rendering:pixelated; }
 .gif-sticker-label { font-size:10px; color:var(--text-mid); text-align:center; margin-top:2px; line-height:1; }
-#gamePanel { max-height:60vh; }
+.game-full-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:var(--bg); z-index:999; display:none; flex-direction:column; }
+.game-full-overlay.show { display:flex; }
+.game-full-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--bg); }
+.game-full-back { background:none; border:none; font-size:14px; color:var(--accent); cursor:pointer; padding:4px 0; }
+.game-full-title { font-size:15px; font-weight:600; color:var(--text); }
+.game-full-body { flex:1; overflow-y:auto; padding:16px; -webkit-overflow-scrolling:touch; }
+.game-full-body .game-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.game-full-body .game-card { background:var(--input-bg); border-radius:14px; padding:14px 10px; cursor:pointer; text-align:center; transition:transform .15s; }
+.game-full-body .game-card:active { transform:scale(.95); }
+.game-full-body .game-icon { font-size:28px; display:block; margin-bottom:6px; }
+.game-full-body .game-name { font-size:12px; color:var(--text); line-height:1.3; }
+.game-section-title { font-size:15px; font-weight:600; margin:16px 0 10px; color:var(--text); }
+.game-section-title:first-child { margin-top:0; }
+.game-guide-card { background:var(--input-bg); border-radius:14px; padding:16px; margin-bottom:16px; }
+.game-guide-title { font-size:16px; font-weight:600; color:var(--text); margin-bottom:8px; }
+.game-guide-desc { font-size:13px; color:var(--text-mid); line-height:1.6; margin-bottom:14px; }
+.game-guide-meta { font-size:11px; color:var(--text-mid); margin-bottom:12px; }
+.game-start-btn { display:block; width:100%; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px; font-size:15px; font-weight:500; cursor:pointer; }
+.game-start-btn:active { opacity:.8; }
+.game-history-section { margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
+.game-history-card { background:var(--input-bg); border-radius:12px; padding:12px; margin-bottom:8px; }
+.game-history-card .gh-who { font-size:12px; font-weight:500; color:var(--accent); }
+.game-history-card .gh-result { font-size:12px; color:var(--text); margin-top:4px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+.game-history-card .gh-time { font-size:10px; color:var(--text-mid); margin-top:4px; }
 .game-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
 .game-card { background:var(--input-bg); border-radius:12px; padding:10px 8px; cursor:pointer; text-align:center; transition:transform .15s,background .15s; }
 .game-card:active { transform:scale(.95); }
@@ -637,6 +660,7 @@ body {
       <div class="nav-item" onclick="openMemPanel()"><div class="icon">🧠</div><span>记忆库</span></div>
       <div class="nav-item" onclick="goPage('/thoughts')"><div class="icon">💭</div><span>顾晏的碎碎念</span></div>
       <div class="nav-item" onclick="goPage('/garden')"><div class="icon">🌿</div><span>小院子</span></div>
+      <div class="nav-item" onclick="openGameFull()"><div class="icon">🎮</div><span>游戏</span></div>
       <div class="nav-item" onclick="goPage('/period')"><div class="icon">🌙</div><span>经期</span></div>
       <div class="nav-item" onclick="goPage('/bookmarks')"><div class="icon">📑</div><span>顾晏的收藏</span></div>
       <div class="nav-item" onclick="goPage('/movie')"><div class="icon">🎬</div><span>一起看</span></div>
@@ -696,6 +720,14 @@ body {
         <div id="fpList"><div class="fp-empty">还没有足迹…</div></div>
       </div>
     </div>
+    <div class="game-full-overlay" id="gameFullOverlay">
+      <div class="game-full-header">
+        <button class="game-full-back" onclick="closeGameFull()">← 返回</button>
+        <span class="game-full-title">🎮 游戏</span>
+        <span></span>
+      </div>
+      <div class="game-full-body" id="gameFullBody"></div>
+    </div>
     <div class="emo-overlay" id="emoPanel" onclick="if(event.target===this)toggleEmotions()">
       <div class="emo-inner">
         <div class="emo-title">💗 顾晏的情绪 <button class="fp-close" onclick="toggleEmotions()">&times;</button></div>
@@ -706,9 +738,6 @@ body {
     <div class="input-area" style="position:relative">
       <div class="sticker-panel" id="stickerPanel">
         <div class="stk-body" id="stkContent"></div>
-      </div>
-      <div class="sticker-panel" id="gamePanel">
-        <div class="stk-body" id="gameContent" style="padding:12px"></div>
       </div>
       <div class="quote-bar" id="quoteBar"><div class="quote-preview" id="quotePreview"></div><button class="quote-close" onclick="clearQuote()">&times;</button></div>
       <div class="attach-menu" id="attachMenu">
@@ -732,7 +761,6 @@ body {
           <button class="tb-btn" onclick="toggleAttach()" aria-label="附件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
           <button class="tb-btn" onclick="insertNL()" aria-label="换行" style="font-size:16px;font-family:var(--font)">⏎</button>
           <button class="tb-btn" onclick="toggleStickers()" aria-label="表情" style="font-size:17px">🦀</button>
-          <button class="tb-btn" onclick="toggleGames()" aria-label="游戏" style="font-size:16px">🎮</button>
           <div class="model-tag">Opus 4.6</div>
           <div class="tb-spacer"></div>
           <button class="tb-btn" id="micRecBtn" onclick="toggleRecord()" aria-label="麦克风"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v1a7 7 0 01-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg></button>
@@ -760,6 +788,7 @@ body {
         <div class="dash-item" onclick="openMemPanel()"><span class="di-icon">🧠</span>记忆库</div>
         <div class="dash-item" onclick="goPage('/thoughts')"><span class="di-icon">💭</span>碎碎念</div>
         <div class="dash-item" onclick="goPage('/garden')"><span class="di-icon">🌿</span>小院子</div>
+        <div class="dash-item" onclick="openGameFull()"><span class="di-icon">🎮</span>游戏</div>
         <div class="dash-item" onclick="goPage('/period')"><span class="di-icon">🌙</span>经期</div>
         <div class="dash-item" onclick="goPage('/bookmarks')"><span class="di-icon">📑</span>收藏</div>
         <div class="dash-item" onclick="goPage('/music/player')"><span class="di-icon">🎵</span>音乐</div>
@@ -846,7 +875,6 @@ function goPage(url) {
 function toggleAttach() {
   document.getElementById('attachMenu').classList.toggle('show');
   document.getElementById('stickerPanel').classList.remove('show');
-  document.getElementById('gamePanel').classList.remove('show');
 }
 function setAvatar(input, imgId, svgId, who) {
   var file = input.files[0]; if (!file) return;
@@ -1490,17 +1518,22 @@ var CLAWD_GIFS = [
 var gameIcons = {mbti:'🧠',enneagram:'🔢',dnd:'⚔️',love:'💕',ecr:'🤝',humanity:'👤',sins_virtues:'😇',bdsmtest:'🔗',turtle_soup:'🐢',duel:'🎲',tarot:'🔮',ai_life:'🎭',detroit:'🤖',fishing:'🎣',bar:'🍷',forest:'🌲',moonlit:'🌙',eco:'🌿',ciyuwu:'📝',leek:'📈',delve:'⛏️',travel:'✈️',arcade:'🕹️',burger:'🍔',crucible_echoes:'⚗️',imitator_td:'🌻',memoria:'🔍',white_room:'🏠',market:'🛒',workkk:'💼',garden_cat:'🐱',camping_plaza:'⛺'};
 var gameState = {active:false,game:null,playerId:'yaoyao'};
 
-function toggleGames() {
-  var p = document.getElementById('gamePanel');
-  var isOpen = p.classList.contains('show');
-  document.getElementById('attachMenu').classList.remove('show');
-  document.getElementById('stickerPanel').classList.remove('show');
-  p.classList.toggle('show');
-  if (!isOpen && !gameState.active) loadGameList();
+function openGameFull() {
+  var sb = document.getElementById('sidebar');
+  if (sb.classList.contains('open')) toggleSidebar();
+  var ov = document.getElementById('gameFullOverlay');
+  ov.classList.add('show');
+  if (!gameState.active) loadGameListFull();
 }
 
-function loadGameList() {
-  var ct = document.getElementById('gameContent');
+function closeGameFull() {
+  document.getElementById('gameFullOverlay').classList.remove('show');
+  gameState.active = false;
+  gameState.game = null;
+}
+
+function loadGameListFull() {
+  var ct = document.getElementById('gameFullBody');
   ct.innerHTML = '<div class="game-loading">加载游戏列表...</div>';
   fetch('/game/list').then(function(r){return r.json()}).then(function(data) {
     if (!data.ok) { ct.innerHTML = '<div class="game-loading">加载失败</div>'; return; }
@@ -1517,67 +1550,102 @@ function loadGameList() {
         var parts = items[j].split('·');
         if (parts.length >= 2) {
           var id = parts[0].trim();
-          var desc = parts.slice(1, -1).join('·').trim();
-          if (section === 'test') tests.push({id:id,desc:desc});
-          else games.push({id:id,desc:desc});
+          var desc = parts.slice(1).join('·').trim();
+          var shortName = desc.split('，')[0] || id;
+          if (section === 'test') tests.push({id:id,desc:desc,name:shortName});
+          else games.push({id:id,desc:desc,name:shortName});
         }
       }
     }
-    var html = '<div style="font-size:14px;font-weight:600;margin-bottom:8px;color:var(--text)">🎯 测试</div><div class="game-grid">';
+    var html = '<div class="game-section-title">🎯 测试</div><div class="game-grid">';
     for (var ti = 0; ti < tests.length; ti++) {
-      html += '<div class="game-card" onclick="startGame(\''+tests[ti].id+'\')" title="'+escHtml(tests[ti].desc)+'"><span class="game-icon">'+(gameIcons[tests[ti].id]||'🎮')+'</span><span class="game-name">'+escHtml(tests[ti].desc.split('，')[0] || tests[ti].id)+'</span></div>';
+      html += '<div class="game-card" onclick="startGameFull(\''+tests[ti].id+'\',\''+escHtml(tests[ti].name)+'\')" title="'+escHtml(tests[ti].desc)+'"><span class="game-icon">'+(gameIcons[tests[ti].id]||'🎮')+'</span><span class="game-name">'+escHtml(tests[ti].name)+'</span></div>';
     }
-    html += '</div><div style="font-size:14px;font-weight:600;margin:12px 0 8px;color:var(--text)">🎮 小游戏</div><div class="game-grid">';
+    html += '</div><div class="game-section-title">🎮 小游戏</div><div class="game-grid">';
     for (var gi = 0; gi < games.length; gi++) {
-      html += '<div class="game-card" onclick="startGame(\''+games[gi].id+'\')" title="'+escHtml(games[gi].desc)+'"><span class="game-icon">'+(gameIcons[games[gi].id]||'🎮')+'</span><span class="game-name">'+escHtml(games[gi].desc.split('，')[0] || games[gi].id)+'</span></div>';
+      html += '<div class="game-card" onclick="startGameFull(\''+games[gi].id+'\',\''+escHtml(games[gi].name)+'\')" title="'+escHtml(games[gi].desc)+'"><span class="game-icon">'+(gameIcons[games[gi].id]||'🎮')+'</span><span class="game-name">'+escHtml(games[gi].name)+'</span></div>';
     }
     html += '</div>';
+    // 顾晏的游戏记录
+    html += '<div class="game-history-section" id="gameHistorySection"><div class="game-section-title">📋 顾晏玩过的</div><div id="gameHistoryList"><div class="game-loading" style="padding:12px">暂无记录</div></div></div>';
     ct.innerHTML = html;
+    loadGameHistory();
   }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div>'; });
 }
 
-function startGame(id) {
+function loadGameHistory() {
+  fetch('/game/history').then(function(r){return r.json()}).then(function(data) {
+    var list = document.getElementById('gameHistoryList');
+    if (!list) return;
+    if (!data.ok || !data.history || !data.history.length) { list.innerHTML = '<div class="game-loading" style="padding:12px">顾晏还没玩过游戏</div>'; return; }
+    var html = '';
+    for (var i = data.history.length - 1; i >= 0; i--) {
+      var h = data.history[i];
+      var icon = gameIcons[h.game] || '🎮';
+      html += '<div class="game-history-card"><div class="gh-who">' + icon + ' ' + escHtml(h.game.toUpperCase()) + '</div><div class="gh-result">' + escHtml((h.result || '').slice(0, 300)) + '</div><div class="gh-time">' + escHtml(h.time || '') + '</div></div>';
+    }
+    list.innerHTML = html;
+  }).catch(function(){});
+}
+
+function parseGuideForHuman(text) {
+  var cleaned = text.replace(/```[\s\S]*?```/g, '');
+  cleaned = cleaned.replace(/\{[^{}]*"game"[^{}]*\}/g, '');
+  cleaned = cleaned.replace(/\{[^{}]*"action"[^{}]*\}/g, '');
+  cleaned = cleaned.replace(/play\([^)]*\)/g, '');
+  cleaned = cleaned.replace(/get_guide\([^)]*\)/g, '');
+  var lines = cleaned.split('\n');
+  var result = [];
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i].trim();
+    if (!l) continue;
+    if (/^格式/.test(l)) continue;
+    if (/^防沉迷/.test(l)) continue;
+    if (/params|player_id|action|jsonrpc/.test(l)) continue;
+    if (/^\{/.test(l) || /^\}/.test(l)) continue;
+    result.push(l);
+  }
+  return result.join('\n') || '点击开始游戏即可开始！';
+}
+
+function startGameFull(id, name) {
   gameState.active = true;
   gameState.game = id;
-  var ct = document.getElementById('gameContent');
+  var ct = document.getElementById('gameFullBody');
   ct.innerHTML = '<div class="game-loading">加载中...</div>';
+  document.querySelector('.game-full-title').textContent = (gameIcons[id] || '🎮') + ' ' + (name || id);
   fetch('/game/guide', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:id})}).then(function(r){return r.json()}).then(function(data) {
     if (!data.ok) { ct.innerHTML = '<div class="game-loading">加载失败</div>'; return; }
     var guideText = data.text;
     try { var gp = JSON.parse(guideText); if (gp.guide) guideText = gp.guide; } catch {}
-    var html = '<button class="game-back" onclick="backToGameList()">← 返回</button>';
-    html += '<div class="game-text" style="font-size:12px;max-height:180px;overflow-y:auto">' + formatGameText(guideText) + '</div>';
-    html += '<div style="margin-top:12px;text-align:center">';
-    html += '<button class="game-card" style="display:inline-block;padding:10px 24px;font-size:14px" onclick="gameAction(\'start\')">🎮 开始游戏</button>';
+    var humanGuide = parseGuideForHuman(guideText);
+    var html = '<div class="game-guide-card">';
+    html += '<div class="game-guide-title">' + (gameIcons[id] || '🎮') + ' ' + escHtml(name || id) + '</div>';
+    html += '<div class="game-guide-desc">' + formatGameText(humanGuide) + '</div>';
+    html += '<button class="game-start-btn" onclick="gameActionFull(\'start\')">🎮 开始游戏</button>';
     html += '</div>';
     ct.innerHTML = html;
   }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div>'; });
 }
 
-function backToGameList() {
-  gameState.active = false;
-  gameState.game = null;
-  loadGameList();
-}
-
-function gameAction(action, extra) {
-  var ct = document.getElementById('gameContent');
-  ct.innerHTML = '<div class="game-loading">处理中...</div>';
+function gameActionFull(action, extra) {
+  var ct = document.getElementById('gameFullBody');
+  ct.innerHTML = '<div class="game-loading">加载中...</div>';
   var params = {player_id:gameState.playerId};
   if (extra) for (var k in extra) params[k] = extra[k];
   fetch('/game/play', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:gameState.game,action:action,params:params})}).then(function(r){return r.json()}).then(function(data) {
-    if (!data.ok) { ct.innerHTML = '<div class="game-loading">请求失败，点击返回重试</div><button class="game-back" onclick="backToGameList()">← 返回</button>'; return; }
-    renderGameResponse(data.text);
-  }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div><button class="game-back" onclick="backToGameList()">← 返回</button>'; });
+    if (!data.ok) { ct.innerHTML = '<div class="game-loading">请求失败</div><button class="game-start-btn" style="margin-top:12px" onclick="loadGameListFull()">返回列表</button>'; return; }
+    renderGameFullResponse(data.text);
+  }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div><button class="game-start-btn" style="margin-top:12px" onclick="loadGameListFull()">返回列表</button>'; });
 }
 
-function renderGameResponse(text) {
-  var ct = document.getElementById('gameContent');
-  var html = '<button class="game-back" onclick="backToGameList()">← 退出</button>';
+function renderGameFullResponse(text) {
+  var ct = document.getElementById('gameFullBody');
+  var html = '';
   var qMatch = text.match(/第(\d+)题.*?共(\d+)题/);
   if (qMatch) {
     var cur = parseInt(qMatch[1]), total = parseInt(qMatch[2]);
-    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden"><div style="height:100%;background:var(--accent);width:'+(cur/total*100)+'%;border-radius:2px;transition:width .3s"></div></div><span style="font-size:11px;color:var(--text-mid)">'+cur+'/'+total+'</span></div>';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;background:var(--accent);width:'+(cur/total*100)+'%;border-radius:3px;transition:width .3s"></div></div><span style="font-size:12px;color:var(--text-mid)">'+cur+'/'+total+'</span></div>';
   }
   var lines = text.split('\n');
   var questionText = '', optA = '', optB = '', info = [];
@@ -1594,21 +1662,21 @@ function renderGameResponse(text) {
     else info.push(l);
   }
   if (hasAB && questionText) {
-    html += '<div class="game-q"><div class="q-title">' + escHtml(questionText) + '</div>';
-    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:5})">完全 A：' + escHtml(optA) + '</button>';
-    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:4})">偏向 A</button>';
-    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:3})">略偏 A</button>';
-    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:2})">略偏 B</button>';
-    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:1})">偏向 B</button>';
-    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:0})">完全 B：' + escHtml(optB) + '</button>';
+    html += '<div class="game-guide-card" style="margin-bottom:0"><div class="game-guide-title" style="font-size:15px;margin-bottom:12px">' + escHtml(questionText) + '</div>';
+    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer;line-height:1.4" onclick="gameActionFull(\'mbti_answer\',{a_score:5})">完全 A：' + escHtml(optA) + '</button>';
+    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'mbti_answer\',{a_score:4})">偏向 A</button>';
+    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'mbti_answer\',{a_score:3})">略偏 A</button>';
+    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'mbti_answer\',{a_score:2})">略偏 B</button>';
+    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'mbti_answer\',{a_score:1})">偏向 B</button>';
+    html += '<button class="q-opt" style="display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'mbti_answer\',{a_score:0})">完全 B：' + escHtml(optB) + '</button>';
     html += '</div>';
   } else {
-    html += '<div class="game-text">' + formatGameText(text) + '</div>';
+    html += '<div class="game-guide-card"><div class="game-guide-desc">' + formatGameText(text) + '</div></div>';
   }
   if (info.length) {
     for (var ii = 0; ii < info.length; ii++) {
       if (info[ii] && !/^请用/.test(info[ii]) && !/^A\+B/.test(info[ii]))
-        html += '<div style="font-size:11px;color:var(--text-mid);margin-top:4px">' + escHtml(info[ii]) + '</div>';
+        html += '<div style="font-size:12px;color:var(--text-mid);margin-top:6px;padding:0 4px">' + escHtml(info[ii]) + '</div>';
     }
   }
   ct.innerHTML = html;
@@ -1751,7 +1819,6 @@ function toggleStickers() {
   var p = document.getElementById('stickerPanel');
   var isOpen = p.classList.contains('show');
   document.getElementById('attachMenu').classList.remove('show');
-  document.getElementById('gamePanel').classList.remove('show');
   p.classList.toggle('show');
   if (!isOpen) {
     var ct = document.getElementById('stkContent');

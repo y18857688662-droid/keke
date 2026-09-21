@@ -2076,6 +2076,7 @@ async function processMomentActions(text) {
           const gTime = now2.toISOString().slice(0, 19).replace('T', ' ');
           const resultText = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
           sseBroadcast({ type: 'game_result', game: gameName, player: 'gy', data: result.result, time: gTime });
+          addGameHistory('gy', gameName, resultText);
           addFootprint('game', '自己玩了' + gameName, (resultText || '').slice(0, 80));
         }
       } catch(e) { console.log('[game_solo] error:', e.message); }
@@ -5745,6 +5746,18 @@ const GAME_MCP_URL = 'https://toy.cedarstar.org/';
 // 聊天内游戏会话
 const chatGameSessions = {}; // { 'gy': {game, state}, 'yy': {game, state} }
 
+const GAME_HISTORY_FILE = path.join(__dirname, 'game-history.json');
+function readGameHistory() { try { return JSON.parse(fs.readFileSync(GAME_HISTORY_FILE, 'utf8')); } catch { return []; } }
+function writeGameHistory(h) { fs.writeFileSync(GAME_HISTORY_FILE, JSON.stringify(h)); }
+function addGameHistory(player, game, result) {
+  const now = new Date(Date.now() + 8 * 3600000);
+  const h = readGameHistory();
+  const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+  h.push({ player, game, result: resultStr.slice(0, 500), time: now.toISOString().slice(0, 19).replace('T', ' ') });
+  if (h.length > 50) h.splice(0, h.length - 50);
+  writeGameHistory(h);
+}
+
 async function mcpCall(endpoint, method, args) {
   const url = endpoint || GAME_MCP_URL;
   const resp = await fetch(url, {
@@ -5798,7 +5811,22 @@ app.post('/game/play', async (req, res) => {
         text = JSON.stringify(parsed.result);
       }
     } catch {}
+    try {
+      const pd = JSON.parse(text);
+      if (pd.result || pd.final_result) {
+        const rt = pd.result || pd.final_result;
+        addGameHistory(params?.player_id || 'yy', game, typeof rt === 'string' ? rt : JSON.stringify(rt));
+      }
+    } catch {}
     res.json({ ok: true, text, game, action });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// 游戏历史记录
+app.get('/game/history', (req, res) => {
+  try {
+    const h = readGameHistory();
+    res.json({ ok: true, history: h });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
@@ -5820,7 +5848,13 @@ app.post('/game/chat-answer', async (req, res) => {
     chatGameSessions[pid] = { game, state: gameData };
     const now = new Date(Date.now() + 8 * 3600000);
     const time = now.toISOString().slice(0, 19).replace('T', ' ');
-    sseBroadcast({ type: 'game_update', player: pid, game, data: gameData, time });
+    if (gameData.result || gameData.final_result) {
+      const resultText = gameData.result || gameData.final_result || text;
+      addGameHistory(pid, game, typeof resultText === 'string' ? resultText : JSON.stringify(resultText));
+      sseBroadcast({ type: 'game_result', player: pid, game, data: gameData, time });
+    } else {
+      sseBroadcast({ type: 'game_update', player: pid, game, data: gameData, time });
+    }
     res.json({ ok: true, data: gameData, game });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
