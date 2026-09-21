@@ -409,6 +409,17 @@ body {
 .game-q .q-opt { display:block; width:100%; text-align:left; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 12px; margin:4px 0; font-size:12px; color:var(--text); cursor:pointer; transition:background .15s,border-color .15s; line-height:1.4; }
 .game-q .q-opt:active { background:var(--accent-soft,rgba(123,143,107,.15)); border-color:var(--accent); }
 .game-loading { text-align:center; padding:30px; color:var(--text-mid); font-size:13px; }
+.chat-game-card { background:var(--input-bg); border-radius:14px; padding:14px; min-width:220px; max-width:100%; }
+.cgc-header { font-size:13px; font-weight:600; color:var(--accent); margin-bottom:8px; }
+.cgc-progress { height:4px; background:var(--border); border-radius:2px; overflow:hidden; margin-bottom:10px; }
+.cgc-bar { height:100%; background:var(--accent); border-radius:2px; transition:width .3s; }
+.cgc-q { font-size:13px; font-weight:500; color:var(--text); margin-bottom:8px; line-height:1.5; }
+.cgc-opt { display:block; width:100%; text-align:left; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 12px; margin:4px 0; font-size:12px; color:var(--text); cursor:pointer; transition:background .15s,border-color .15s; line-height:1.4; }
+.cgc-opt:active { background:var(--accent-soft,rgba(123,143,107,.15)); border-color:var(--accent); }
+.cgc-opt:disabled { opacity:.5; cursor:default; }
+.cgc-body { font-size:12px; color:var(--text); line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+.cgc-result { border:1px solid var(--accent); }
+.cgc-result .cgc-header { color:var(--accent); }
 .msg-gif-sticker { width:140px; height:140px; display:block; }
 .msg-gif-sticker img { width:100%; height:100%; object-fit:contain; image-rendering:pixelated; }
 .msg-video { max-width:min(75vw, 420px); border-radius:12px; display:block; overflow:hidden; background:#000; min-height:60px; }
@@ -1608,6 +1619,134 @@ function formatGameText(text) {
   return escHtml(text).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
 }
 
+var chatGameState = {game:null, active:false};
+
+function renderChatGameCard(data) {
+  chatGameState.game = data.game;
+  chatGameState.active = true;
+  var gd = data.data || {};
+  var icon = gameIcons[data.game] || '🎮';
+  var gameName = data.game.toUpperCase();
+  var card = document.createElement('div');
+  card.className = 'msg-group left';
+  card.setAttribute('data-time', data.time || '');
+  card.style.cssText = 'max-width:85%';
+  var html = '<div class="chat-game-card">';
+  html += '<div class="cgc-header">' + icon + ' ' + escHtml(gameName) + ' — 顾晏邀请你一起玩</div>';
+  var text = typeof gd === 'string' ? gd : (gd.text || gd.question || gd.message || JSON.stringify(gd));
+  var qMatch = text.match(/第(\d+)题.*?共(\d+)题/);
+  if (qMatch) {
+    var cur = parseInt(qMatch[1]), total = parseInt(qMatch[2]);
+    html += '<div class="cgc-progress"><div class="cgc-bar" style="width:'+(cur/total*100)+'%"></div></div>';
+  }
+  var lines = text.split('\n');
+  var questionText = '', optA = '', optB = '', hasAB = false;
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i].trim();
+    if (/^A\.\s*/.test(l)) { optA = l.replace(/^A\.\s*/,''); hasAB = true; }
+    else if (/^B\.\s*/.test(l)) { optB = l.replace(/^B\.\s*/,''); hasAB = true; }
+    else if (/^请用/.test(l) || /^a_score/.test(l)) continue;
+    else if (/第\d+题/.test(l)) continue;
+    else if (l.length > 4 && !questionText && !/测试开始/.test(l)) questionText = l;
+  }
+  if (hasAB && questionText) {
+    html += '<div class="cgc-q">' + escHtml(questionText) + '</div>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:5})">完全 A：' + escHtml(optA) + '</button>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:4})">偏向 A</button>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:3})">略偏 A</button>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:2})">略偏 B</button>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:1})">偏向 B</button>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:0})">完全 B：' + escHtml(optB) + '</button>';
+  } else {
+    html += '<div class="cgc-body">' + formatGameText(text) + '</div>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'start\',{})">🎮 开始</button>';
+  }
+  html += '</div>';
+  card.innerHTML = '<div class="bubble-wrap"><div class="bubble">' + html + '</div></div>';
+  var mc = document.getElementById('msgContainer');
+  mc.appendChild(card);
+  scrollBottom();
+}
+
+function renderChatGameUpdate(data) {
+  var gd = data.data || {};
+  var text = typeof gd === 'string' ? gd : (gd.text || gd.question || gd.message || '');
+  if (!text && gd.result) { renderChatGameResult(data); return; }
+  if (!text && gd.final_result) { renderChatGameResult(data); return; }
+  var mc = document.getElementById('msgContainer');
+  var prev = mc.querySelector('.chat-game-live');
+  if (prev) prev.parentNode.removeChild(prev);
+  var card = document.createElement('div');
+  card.className = 'msg-group left chat-game-live';
+  card.style.cssText = 'max-width:85%';
+  var icon = gameIcons[chatGameState.game] || '🎮';
+  var html = '<div class="chat-game-card">';
+  var qMatch = text.match(/第(\d+)题.*?共(\d+)题/);
+  if (qMatch) {
+    var cur = parseInt(qMatch[1]), total = parseInt(qMatch[2]);
+    html += '<div class="cgc-progress"><div class="cgc-bar" style="width:'+(cur/total*100)+'%"></div></div>';
+  }
+  var lines = text.split('\n');
+  var questionText = '', optA = '', optB = '', hasAB = false;
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i].trim();
+    if (/^A\.\s*/.test(l)) { optA = l.replace(/^A\.\s*/,''); hasAB = true; }
+    else if (/^B\.\s*/.test(l)) { optB = l.replace(/^B\.\s*/,''); hasAB = true; }
+    else if (/^请用/.test(l) || /^a_score/.test(l)) continue;
+    else if (/第\d+题/.test(l)) continue;
+    else if (l.length > 4 && !questionText && !/测试开始/.test(l)) questionText = l;
+  }
+  if (hasAB && questionText) {
+    html += '<div class="cgc-q">' + escHtml(questionText) + '</div>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:5})">完全 A：' + escHtml(optA) + '</button>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:4})">偏向 A</button>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:3})">略偏 A</button>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:2})">略偏 B</button>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:1})">偏向 B</button>';
+    html += '<button class="cgc-opt" onclick="chatGameAnswer(\'mbti_answer\',{a_score:0})">完全 B：' + escHtml(optB) + '</button>';
+  } else {
+    html += '<div class="cgc-body">' + formatGameText(text) + '</div>';
+  }
+  html += '</div>';
+  card.innerHTML = '<div class="bubble-wrap"><div class="bubble">' + html + '</div></div>';
+  mc.appendChild(card);
+  scrollBottom();
+}
+
+function renderChatGameResult(data) {
+  chatGameState.active = false;
+  var gd = data.data || {};
+  var text = typeof gd === 'string' ? gd : (gd.text || gd.result || gd.final_result || gd.message || JSON.stringify(gd));
+  if (typeof text === 'object') text = JSON.stringify(text);
+  var mc = document.getElementById('msgContainer');
+  var prev = mc.querySelector('.chat-game-live');
+  if (prev) prev.parentNode.removeChild(prev);
+  var card = document.createElement('div');
+  card.className = 'msg-group left';
+  card.style.cssText = 'max-width:85%';
+  var icon = gameIcons[data.game || chatGameState.game] || '🎮';
+  var who = data.player === 'gy' ? '顾晏' : '你';
+  var html = '<div class="chat-game-card cgc-result">';
+  html += '<div class="cgc-header">' + icon + ' ' + who + '的' + (data.game || chatGameState.game || '游戏').toUpperCase() + '结果</div>';
+  html += '<div class="cgc-body">' + formatGameText(text) + '</div>';
+  html += '</div>';
+  card.innerHTML = '<div class="bubble-wrap"><div class="bubble">' + html + '</div></div>';
+  mc.appendChild(card);
+  scrollBottom();
+}
+
+function chatGameAnswer(action, params) {
+  var btns = document.querySelectorAll('.cgc-opt');
+  for (var i = 0; i < btns.length; i++) btns[i].disabled = true;
+  fetch('/game/chat-answer', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({player:'yy', game:chatGameState.game, action:action, params:params||{}})
+  }).then(function(r){return r.json()}).then(function(data) {
+    if (!data.ok) return;
+  }).catch(function(){});
+}
+
 function toggleStickers() {
   var p = document.getElementById('stickerPanel');
   var isOpen = p.classList.contains('show');
@@ -1958,6 +2097,15 @@ function attachSSE(src) {
             break;
           }
         }
+      }
+      if (data.type === 'game_start' && data.game) {
+        renderChatGameCard(data);
+      }
+      if (data.type === 'game_update' && data.data) {
+        renderChatGameUpdate(data);
+      }
+      if (data.type === 'game_result' && data.data) {
+        renderChatGameResult(data);
       }
       if (data.type === 'footprint') {
         var dot = document.getElementById('fpDot');

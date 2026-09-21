@@ -365,7 +365,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
           if (m.comments && m.comments.length) s += '[评论:' + m.comments.slice(-2).map(c => (c.author === 'gy' ? '你' : '瑶瑶') + ':' + c.text.slice(0, 20)).join('；') + ']';
           return s;
         }).join('；');
-        liveCtx += ' 可用[moment_post:内容][moment_like:id][moment_comment:id:评论][think:碎碎念][email:邮件内容][sms:短信内容]';
+        liveCtx += ' 可用[moment_post:内容][moment_like:id][moment_comment:id:评论][think:碎碎念][email:邮件内容][sms:短信内容][game_invite:游戏名][game_solo:游戏名]';
       }
     } catch(e) {}
     try {
@@ -1568,7 +1568,13 @@ async function getChatSystem() {
       occasionCtx += '\n别硬插祝福，别写成贺卡，有共同经历就结合着说。';
     }
   } catch(e) {}
-  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx + occasionCtx;
+  let gameCtx = '\n\n【游戏】你们的聊天里有一些可以一起玩的小游戏（MBTI性格测试、九型人格、DnD职业、星座配对等30多个）。';
+  gameCtx += '\n想邀请瑶瑶一起玩某个游戏：[game_invite:游戏名]（比如 [game_invite:mbti]）';
+  gameCtx += '\n你自己想测一下：[game_solo:游戏名]';
+  gameCtx += '\n游戏名可用：mbti/enneagram/dnd/zodiac_match/love_language/hogwarts/element/disc/big5/attachment/eq/career/color_personality/spirit_animal/superpower/villain/mythical_creature/time_traveler/survival/detective 等';
+  gameCtx += '\n用法举例：聊天时自然地提到"要不我们做个MBTI测试看看？"然后用[game_invite:mbti]就行';
+  gameCtx += '\n不需要每次都玩，偶尔聊到相关话题时自然提起就好。游戏结果出来后可以评论讨论';
+  let base = CHAT_SYSTEM_BASE + timeCtx + footprintCtx + momentsCtx + diaryCtx + smsCtx + periodCtx + screenCtx + occasionCtx + gameCtx;
   if (memoryCache) {
     const sections = memoryCache.split(/\n*===\s*(.+?)\s*===\n*/);
     let corePart = '';
@@ -2045,6 +2051,37 @@ async function processMomentActions(text) {
     }
     cleaned = cleaned.replace(/\[digest:[^\]]+\]/g, '');
   }
+  const gameInviteMatch = cleaned.match(/\[game_invite:([^\]]+)\]/);
+  if (gameInviteMatch) {
+    const gameName = gameInviteMatch[1].trim().toLowerCase();
+    try {
+      const gameData = await startChatGame(gameName, 'gy');
+      if (gameData) {
+        const now2 = new Date(Date.now() + 8 * 3600000);
+        const gTime = now2.toISOString().slice(0, 19).replace('T', ' ');
+        sseBroadcast({ type: 'game_start', game: gameName, data: gameData, initiator: 'gy', time: gTime });
+        addFootprint('game', '邀请瑶瑶一起玩' + gameName);
+      }
+    } catch(e) { console.log('[game_invite] error:', e.message); }
+    cleaned = cleaned.replace(/\[game_invite:[^\]]+\]/g, '');
+  }
+  const gameSoloMatch = cleaned.match(/\[game_solo:([^\]]+)\]/);
+  if (gameSoloMatch) {
+    const gameName = gameSoloMatch[1].trim().toLowerCase();
+    (async () => {
+      try {
+        const result = await aiPlayGameSolo(gameName);
+        if (result && result.result) {
+          const now2 = new Date(Date.now() + 8 * 3600000);
+          const gTime = now2.toISOString().slice(0, 19).replace('T', ' ');
+          const resultText = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
+          sseBroadcast({ type: 'game_result', game: gameName, player: 'gy', data: result.result, time: gTime });
+          addFootprint('game', '自己玩了' + gameName, (resultText || '').slice(0, 80));
+        }
+      } catch(e) { console.log('[game_solo] error:', e.message); }
+    })();
+    cleaned = cleaned.replace(/\[game_solo:[^\]]+\]/g, '');
+  }
   return cleaned.replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -2227,7 +2264,7 @@ app.post('/chat/send', async (req, res) => {
             }
           } catch(e) {}
         }
-        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[check_weather\]\s*/g, '').replace(/\s*\[check_location\]\s*/g, '').trim();
+        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[check_weather\]\s*/g, '').replace(/\s*\[check_location\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').trim();
         for (const bm of cliBarkMsgs) {
           fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
         }
@@ -2407,7 +2444,7 @@ app.post('/chat/send', async (req, res) => {
         }
       } catch(e) {}
     }
-    const savedReplyApi = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[check_weather\]\s*/g, '').replace(/\s*\[check_location\]\s*/g, '').trim();
+    const savedReplyApi = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[check_weather\]\s*/g, '').replace(/\s*\[check_location\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').trim();
     const savedContentApi = apiThinking ? '<think>' + apiThinking + '</think>\n' + savedReplyApi : savedReplyApi;
     const apiSearchMatch = savedReplyApi.match(/\[search:(.+?)\]/);
     for (const bm of apiBarkMsgs2) {
@@ -2724,7 +2761,7 @@ app.post('/chat/upload-finalize', (req, res) => {
                 while ((_b = _be.exec(aiReply)) !== null) barkMsgs.push(_b[1]);
                 const videoUrlsOut = []; let _v; const _ve = /\[video:([^\]]+)\]/g;
                 while ((_v = _ve.exec(aiReply)) !== null) videoUrlsOut.push(_v[1].trim());
-                const savedReply = stripVoiceActions(aiReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').trim();
+                const savedReply = stripVoiceActions(aiReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').trim();
                 for (const bm of barkMsgs) {
                   fetch('https://api.day.app/' + (process.env.BARK_KEY || 'U9cbrTUrCJBUPVMSADNDHf') + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
                 }
@@ -3381,7 +3418,7 @@ app.post('/tg/webhook', async (req, res) => {
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
     const tgVideoUrls = []; let _tvr; const _tvre = /\[video:([^\]]+)\]/g;
     while ((_tvr = _tvre.exec(reply)) !== null) tgVideoUrls.push(_tvr[1].trim());
-    const savedReplyTg = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').trim();
+    const savedReplyTg = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').trim();
     const chat2 = readChat();
     const tgEntry = { role: 'assistant', content: savedReplyTg, time: replyTime, source: 'telegram' };
     if (tgVideoUrls.length) tgEntry.videoUrls = tgVideoUrls;
@@ -4397,7 +4434,7 @@ async function autoChat(reason) {
         }
       } catch(e) {}
     }
-    const savedMsg = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[check_weather\]\s*/g, '').replace(/\s*\[check_location\]\s*/g, '').trim();
+    const savedMsg = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[check_weather\]\s*/g, '').replace(/\s*\[check_location\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').trim();
     const chatEntry = { role: 'assistant', content: savedMsg, time, autonomous: true };
     if (autoChatAudio) chatEntry.audioUrl = autoChatAudio;
     if (acVideoUrls.length) chatEntry.videoUrls = acVideoUrls;
@@ -4485,7 +4522,7 @@ async function autoSearch() {
     msg = msg.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '');
     const searchMatch = msg.match(/\[search:(.+?)\]/);
     const topic = searchMatch ? searchMatch[1] : '有趣的事';
-    const savedSearch = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[moment_post:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').trim();
+    const savedSearch = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[moment_post:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').trim();
     const now = new Date(Date.now() + 8 * 3600000);
     const time = now.toISOString().slice(0, 19).replace('T', ' ');
     const chat = readChat();
@@ -5705,6 +5742,9 @@ app.get('/moments', (req, res) => {
 // ======== 游戏板块 (Cedar Toy MCP Proxy) ========
 const GAME_MCP_URL = 'https://toy.cedarstar.org/';
 
+// 聊天内游戏会话
+const chatGameSessions = {}; // { 'gy': {game, state}, 'yy': {game, state} }
+
 async function mcpCall(endpoint, method, args) {
   const url = endpoint || GAME_MCP_URL;
   const resp = await fetch(url, {
@@ -5761,6 +5801,91 @@ app.post('/game/play', async (req, res) => {
     res.json({ ok: true, text, game, action });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
+
+// 聊天内游戏 — 瑶瑶回答游戏问题
+app.post('/game/chat-answer', async (req, res) => {
+  try {
+    const { player, game, action, params } = req.body;
+    const pid = player || 'yy';
+    let text = await mcpCall(GAME_MCP_URL, 'play', { game, action, params: params || {} });
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.result && parsed.result.content) {
+        const t = parsed.result.content.find(c => c.type === 'text');
+        if (t) text = t.text;
+      }
+    } catch {}
+    let gameData = null;
+    try { gameData = JSON.parse(text); } catch { gameData = { text }; }
+    chatGameSessions[pid] = { game, state: gameData };
+    const now = new Date(Date.now() + 8 * 3600000);
+    const time = now.toISOString().slice(0, 19).replace('T', ' ');
+    sseBroadcast({ type: 'game_update', player: pid, game, data: gameData, time });
+    res.json({ ok: true, data: gameData, game });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// 顾晏邀请一起玩游戏 — 服务端启动游戏
+async function startChatGame(game, initiator) {
+  try {
+    let text = await mcpCall(GAME_MCP_URL, 'play', { game, action: 'start', params: { player_id: initiator || 'gy' } });
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.result && parsed.result.content) {
+        const t = parsed.result.content.find(c => c.type === 'text');
+        if (t) text = t.text;
+      }
+    } catch {}
+    let gameData = null;
+    try { gameData = JSON.parse(text); } catch { gameData = { text }; }
+    chatGameSessions[initiator || 'gy'] = { game, state: gameData };
+    return gameData;
+  } catch (e) {
+    console.log('[game_start] error:', e.message);
+    return null;
+  }
+}
+
+// 顾晏自己玩游戏 — AI自动回答所有问题
+async function aiPlayGameSolo(game) {
+  try {
+    const startData = await startChatGame(game, 'gy_solo');
+    if (!startData) return null;
+    let current = startData;
+    const answers = [];
+    let rounds = 0;
+    while (current && !current.result && !current.final_result && rounds < 30) {
+      rounds++;
+      const opts = current.options || current.choices;
+      if (!opts || !Array.isArray(opts) || opts.length === 0) break;
+      const pick = opts[Math.floor(Math.random() * opts.length)];
+      const answerParams = {};
+      if (current.game === 'mbti' || game === 'mbti') {
+        answerParams.a_score = pick.a_score !== undefined ? pick.a_score : Math.floor(Math.random() * 6);
+      } else if (pick.value !== undefined) {
+        answerParams.answer = pick.value;
+      } else if (pick.id !== undefined) {
+        answerParams.answer = pick.id;
+      } else {
+        answerParams.answer = typeof pick === 'string' ? pick : JSON.stringify(pick);
+      }
+      let text = await mcpCall(GAME_MCP_URL, 'play', { game, action: 'answer', params: answerParams });
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.result && parsed.result.content) {
+          const t = parsed.result.content.find(c => c.type === 'text');
+          if (t) text = t.text;
+        }
+      } catch {}
+      try { current = JSON.parse(text); } catch { break; }
+      answers.push({ question: rounds, answer: pick });
+    }
+    return { result: current, answers, game };
+  } catch (e) {
+    console.log('[game_solo] error:', e.message);
+    return null;
+  }
+}
 
 server.listen(PORT, async () => {
   console.log('顾晏服务运行中，端口 ' + PORT);
