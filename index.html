@@ -395,12 +395,12 @@ body {
 .gif-sticker-cell:active { transform:scale(.93); }
 .gif-sticker-cell img { width:100%; aspect-ratio:1; object-fit:contain; image-rendering:pixelated; }
 .gif-sticker-label { font-size:10px; color:var(--text-mid); text-align:center; margin-top:2px; line-height:1; }
-.game-full-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:var(--bg); z-index:999; display:none; flex-direction:column; }
+.game-full-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:#1a1a1a; z-index:999; display:none; flex-direction:column; }
 .game-full-overlay.show { display:flex; }
-.game-full-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--bg); }
-.game-full-back { background:none; border:none; font-size:14px; color:var(--accent); cursor:pointer; padding:4px 0; }
-.game-full-title { font-size:15px; font-weight:600; color:var(--text); }
-.game-full-body { flex:1; overflow-y:auto; padding:16px; -webkit-overflow-scrolling:touch; }
+.game-full-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-bottom:3px solid #333; background:#2D2D2D; }
+.game-full-back { background:none; border:none; font-size:13px; color:var(--accent); cursor:pointer; padding:4px 0; font-weight:600; }
+.game-full-title { font-size:14px; font-weight:700; color:rgba(255,255,255,0.85); letter-spacing:1px; }
+.game-full-body { flex:1; overflow-y:auto; padding:12px; -webkit-overflow-scrolling:touch; background:#1a1a1a; }
 .game-full-body .game-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
 .game-full-body .game-card { background:var(--input-bg); border-radius:14px; padding:14px 10px; cursor:pointer; text-align:center; transition:transform .15s; }
 .game-full-body .game-card:active { transform:scale(.95); }
@@ -414,6 +414,38 @@ body {
 .game-guide-meta { font-size:11px; color:var(--text-mid); margin-bottom:12px; }
 .game-start-btn { display:block; width:100%; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:12px; font-size:15px; font-weight:500; cursor:pointer; }
 .game-start-btn:active { opacity:.8; }
+.gs-screen { position:relative; background:#2D2D2D; border:3px solid #1A1A1A; box-shadow:0 0 16px rgba(0,0,0,0.2); color:rgba(255,255,255,0.85); padding:16px; margin-bottom:12px; overflow:hidden; border-radius:4px; }
+.gs-screen::before { content:""; position:absolute; inset:0; background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.15) 50%),linear-gradient(90deg,rgba(255,0,0,0.04),rgba(0,255,0,0.01),rgba(0,0,118,0.04)); background-size:100% 4px,3px 100%; z-index:1; pointer-events:none; }
+.gs-screen * { position:relative; z-index:2; }
+.gs-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+.gs-mission { color:var(--accent); font-size:14px; font-weight:700; letter-spacing:0.5px; }
+.gs-badge { background:var(--accent); color:#fff; font-size:9px; padding:2px 8px; font-weight:700; letter-spacing:1px; }
+.gs-body { font-size:13px; line-height:1.8; white-space:pre-wrap; word-break:break-word; color:rgba(255,255,255,0.8); }
+.gs-body b { color:var(--accent); }
+.gs-footer { margin-top:12px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; }
+.gs-icons { display:flex; gap:10px; color:rgba(255,255,255,0.3); font-size:14px; }
+.gs-icons .lit { color:var(--accent); opacity:1; }
+.gs-blink { font-size:9px; color:rgba(255,255,255,0.7); animation:gsblink 1.4s infinite; }
+@keyframes gsblink { 0%,100%{opacity:1} 50%{opacity:0} }
+.gs-console { display:flex; align-items:center; gap:10px; background:var(--accent); padding:8px 12px; border-radius:0 0 4px 4px; margin-top:-12px; margin-bottom:12px; }
+.gs-dot { width:12px; height:12px; border-radius:50%; border:2px solid rgba(255,255,255,0.4); flex-shrink:0; }
+.gs-dot.pink { background:rgba(255,255,255,0.6); }
+.gs-dot.alt { background:rgba(255,255,255,0.2); }
+.gs-slot { width:30px; height:8px; background:rgba(0,0,0,0.2); border-radius:2px; }
+.gs-cmd-area { margin-top:10px; }
+.gs-cmd-input { display:flex; gap:8px; margin-bottom:8px; }
+.gs-cmd-input input { flex:1; padding:8px 12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:4px; color:#fff; font-size:13px; outline:none; }
+.gs-cmd-input input::placeholder { color:rgba(255,255,255,0.35); }
+.gs-cmd-input button { padding:8px 16px; background:var(--accent); color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer; font-weight:600; letter-spacing:0.5px; }
+.gs-cmd-btns { display:flex; flex-wrap:wrap; gap:6px; }
+.gs-cmd-btn { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:6px 12px; font-size:11px; color:rgba(255,255,255,0.7); cursor:pointer; transition:background .15s; }
+.gs-cmd-btn:active { background:rgba(255,255,255,0.18); }
+.gs-action-btn { display:block; width:100%; text-align:left; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:4px; padding:10px 14px; margin:5px 0; font-size:13px; color:rgba(255,255,255,0.8); cursor:pointer; transition:background .15s; }
+.gs-action-btn:active { background:rgba(255,255,255,0.15); }
+.gs-progress { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.gs-progress-bar { flex:1; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden; }
+.gs-progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .3s; }
+.gs-progress-text { font-size:11px; color:rgba(255,255,255,0.5); }
 .game-history-section { margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
 .game-history-card { background:var(--input-bg); border-radius:12px; padding:12px; margin-bottom:8px; }
 .game-history-card .gh-who { font-size:12px; font-weight:500; color:var(--accent); }
@@ -1608,35 +1640,38 @@ function parseGuideForHuman(text) {
   return result.join('\n') || '点击开始游戏即可开始！';
 }
 
+var gameBadges = {fishing:'FISH',leek:'LEEK',moonlit:'MOON',delve:'MINE',travel:'TRIP',arcade:'PLAY',burger:'FOOD',market:'MART',memoria:'FIND',crucible_echoes:'BREW',imitator_td:'GROW',white_room:'HOME',workkk:'WORK',mbti:'MBTI',enneagram:'ENNE',dnd:'DND',love:'LOVE',ecr:'ECR',humanity:'SOUL',sins_virtues:'SINS',bdsmtest:'TEST',turtle_soup:'SOUP',duel:'DUEL',tarot:'STAR',ai_life:'LIFE',detroit:'DET',bar:'BAR',forest:'TALE',eco:'ECO',ciyuwu:'WORD',garden_cat:'CAT',camping_plaza:'CAMP'};
+
 function startGameFull(id, name) {
   gameState.active = true;
   gameState.game = id;
   var ct = document.getElementById('gameFullBody');
-  ct.innerHTML = '<div class="game-loading">加载中...</div>';
-  document.querySelector('.game-full-title').textContent = (gameIcons[id] || '🎮') + ' ' + (name || id);
+  ct.innerHTML = '<div class="game-loading" style="color:rgba(255,255,255,0.5)">加载中...</div>';
+  document.querySelector('.game-full-title').textContent = (gameBadges[id] || 'GAME') + ' · ' + (name || id).toUpperCase();
   fetch('/game/guide', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:id})}).then(function(r){return r.json()}).then(function(data) {
-    if (!data.ok) { ct.innerHTML = '<div class="game-loading">加载失败</div>'; return; }
+    if (!data.ok) { ct.innerHTML = '<div class="game-loading" style="color:rgba(255,255,255,0.5)">加载失败</div>'; return; }
     var guideText = data.text;
     try { var gp = JSON.parse(guideText); if (gp.guide) guideText = gp.guide; } catch {}
     var humanGuide = parseGuideForHuman(guideText);
-    var html = '<div class="game-guide-card">';
-    html += '<div class="game-guide-title">' + (gameIcons[id] || '🎮') + ' ' + escHtml(name || id) + '</div>';
-    html += '<div class="game-guide-desc">' + formatGameText(humanGuide) + '</div>';
-    html += '<button class="game-start-btn" onclick="gameActionFull(\'start\')">🎮 开始游戏</button>';
+    var html = '<div class="gs-screen">';
+    html += '<div class="gs-head"><div class="gs-mission">MISSION: ' + escHtml((name || id).toUpperCase()) + '</div><div class="gs-badge">' + (gameBadges[id] || 'GAME') + '</div></div>';
+    html += '<div class="gs-body">' + formatGameText(humanGuide) + '</div>';
+    html += '<div class="gs-footer"><div class="gs-icons"><span class="lit">' + (gameIcons[id] || '🎮') + '</span><span>◌</span><span>□</span></div><div class="gs-blink">PRESS START_</div></div>';
     html += '</div>';
+    html += '<div class="gs-console"><div class="gs-dot pink"></div><div class="gs-dot alt"></div><div class="gs-slot"></div><button class="gs-cmd-btn" style="margin-left:auto;background:var(--accent);color:#fff;border-color:var(--accent);padding:8px 20px;font-weight:700;letter-spacing:1px" onclick="gameActionFull(\'start\')">ENTER →</button></div>';
     ct.innerHTML = html;
-  }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div>'; });
+  }).catch(function(){ ct.innerHTML = '<div class="game-loading" style="color:rgba(255,255,255,0.5)">网络错误</div>'; });
 }
 
 function gameActionFull(action, extra) {
   var ct = document.getElementById('gameFullBody');
-  ct.innerHTML = '<div class="game-loading">加载中...</div>';
+  ct.innerHTML = '<div class="gs-screen" style="text-align:center;padding:40px 16px"><div class="gs-blink" style="font-size:13px">LOADING...</div></div>';
   var params = {player_id:gameState.playerId};
   if (extra) for (var k in extra) params[k] = extra[k];
   fetch('/game/play', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:gameState.game,action:action,params:params})}).then(function(r){return r.json()}).then(function(data) {
-    if (!data.ok) { ct.innerHTML = '<div class="game-loading">请求失败</div><button class="game-start-btn" style="margin-top:12px" onclick="loadGameListFull()">返回列表</button>'; return; }
+    if (!data.ok) { ct.innerHTML = '<div class="gs-screen" style="text-align:center;padding:30px 16px"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px">REQUEST FAILED</div><button class="gs-cmd-btn" style="padding:10px 20px" onclick="loadGameListFull()">← BACK</button></div>'; return; }
     renderGameFullResponse(data.text, data.gameData);
-  }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div><button class="game-start-btn" style="margin-top:12px" onclick="loadGameListFull()">返回列表</button>'; });
+  }).catch(function(){ ct.innerHTML = '<div class="gs-screen" style="text-align:center;padding:30px 16px"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px">NETWORK ERROR</div><button class="gs-cmd-btn" style="padding:10px 20px" onclick="loadGameListFull()">← BACK</button></div>'; });
 }
 
 var CMD_GAMES = ['fishing','leek','moonlit','delve','travel','arcade','imitator_td','white_room','burger','market','crucible_echoes','memoria'];
@@ -1646,11 +1681,10 @@ function renderGameFullResponse(text, gameData) {
   var html = '';
   var gd = gameData || null;
   if (!gd) { try { gd = JSON.parse(text); if (gd.text) text = gd.text; } catch {} }
+  var game = gameState.game;
+  var badge = gameBadges[game] || 'GAME';
+  var icon = gameIcons[game] || '🎮';
   var qMatch = text.match(/第(\d+)题.*?共(\d+)题/);
-  if (qMatch) {
-    var cur = parseInt(qMatch[1]), total = parseInt(qMatch[2]);
-    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;background:var(--accent);width:'+(cur/total*100)+'%;border-radius:3px;transition:width .3s"></div></div><span style="font-size:12px;color:var(--text-mid)">'+cur+'/'+total+'</span></div>';
-  }
   var lines = text.split('\n');
   var questionText = '', optA = '', optB = '', info = [];
   var hasAB = false;
@@ -1665,72 +1699,79 @@ function renderGameFullResponse(text, gameData) {
     else if (/^[^【\[A-Z]/.test(l) && l.length > 4 && !questionText && !/测试开始/.test(l)) questionText = l;
     else info.push(l);
   }
-  var optStyle = 'display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:6px 0;font-size:13px;color:var(--text);cursor:pointer;line-height:1.4';
+  html += '<div class="gs-screen">';
+  html += '<div class="gs-head"><div class="gs-mission">' + badge + '</div><div class="gs-badge">' + icon + '</div></div>';
+  if (qMatch) {
+    var cur = parseInt(qMatch[1]), total = parseInt(qMatch[2]);
+    html += '<div class="gs-progress"><div class="gs-progress-bar"><div class="gs-progress-fill" style="width:'+(cur/total*100)+'%"></div></div><div class="gs-progress-text">'+cur+'/'+total+'</div></div>';
+  }
   if (hasAB && questionText) {
-    html += '<div class="game-guide-card" style="margin-bottom:0"><div class="game-guide-title" style="font-size:15px;margin-bottom:12px">' + escHtml(questionText) + '</div>';
-    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:5})">完全 A：' + escHtml(optA) + '</button>';
-    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:4})">偏向 A</button>';
-    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:3})">略偏 A</button>';
-    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:2})">略偏 B</button>';
-    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:1})">偏向 B</button>';
-    html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:0})">完全 B：' + escHtml(optB) + '</button>';
-    html += '</div>';
-  } else if (CMD_GAMES.indexOf(gameState.game) >= 0) {
-    html += '<div class="game-guide-card"><div class="game-guide-desc">' + formatGameText(text) + '</div>';
-    html += '<div style="margin-top:12px"><div style="display:flex;gap:6px;margin-bottom:8px"><input id="gameCmdInput" type="text" placeholder="输入指令..." style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\'){gameSendCmd()}"><button onclick="gameSendCmd()" style="padding:10px 16px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:13px;cursor:pointer">发送</button></div>';
-    var cmdBtns = getCmdButtons(gameState.game, gd);
+    html += '<div class="gs-body" style="margin-bottom:12px">' + escHtml(questionText) + '</div>';
+    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:5})">A ▸ ' + escHtml(optA) + '</button>';
+    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:4})">偏向 A</button>';
+    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:3})">略偏 A</button>';
+    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:2})">略偏 B</button>';
+    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:1})">偏向 B</button>';
+    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:0})">B ▸ ' + escHtml(optB) + '</button>';
+  } else {
+    var displayText = text.replace(/```[\s\S]*?```/g, '').replace(/\{[^{}]*"action"[^{}]*\}/g, '');
+    html += '<div class="gs-body">' + formatGameText(displayText) + '</div>';
+  }
+  if (info.length) {
+    for (var ii = 0; ii < info.length; ii++) {
+      if (info[ii] && !/^请用/.test(info[ii]) && !/^A\+B/.test(info[ii]))
+        html += '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px">' + escHtml(info[ii]) + '</div>';
+    }
+  }
+  html += '<div class="gs-footer"><div class="gs-icons"><span class="lit">' + icon + '</span><span>◌</span><span>□</span></div><div class="gs-blink">READY_</div></div>';
+  html += '</div>';
+  if (CMD_GAMES.indexOf(game) >= 0) {
+    html += '<div class="gs-console" style="flex-direction:column;align-items:stretch;gap:8px;border-radius:4px;margin-top:6px">';
+    html += '<div class="gs-cmd-input"><input id="gameCmdInput" type="text" placeholder="> 输入指令..." onkeydown="if(event.key===\'Enter\'){gameSendCmd()}"><button onclick="gameSendCmd()">SEND</button></div>';
+    var cmdBtns = getCmdButtons(game, gd);
     if (cmdBtns.length) {
-      html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      html += '<div class="gs-cmd-btns">';
       for (var ci = 0; ci < cmdBtns.length; ci++) {
-        html += '<button style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'cmd\',{command:\''+escHtml(cmdBtns[ci])+'\'})">'+escHtml(cmdBtns[ci])+'</button>';
+        html += '<button class="gs-cmd-btn" onclick="gameActionFull(\'cmd\',{command:\''+escHtml(cmdBtns[ci])+'\'})">'+escHtml(cmdBtns[ci])+'</button>';
       }
       html += '</div>';
     }
-    html += '</div></div>';
-  } else if (gameState.game === 'workkk') {
-    html += '<div class="game-guide-card"><div class="game-guide-desc">' + formatGameText(text) + '</div>';
-    html += '<div style="margin-top:12px"><div style="display:flex;gap:6px;margin-bottom:8px"><input id="gameCmdInput" type="text" placeholder="想法..." style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\'){gameSendWorkkk(this.value)}"></div>';
-    var wBtns = [['get_status','📊 状态'],['write_code','💻 写代码'],['debug','🐛 调试'],['slack_off','😴 摸鱼'],['buy_coffee','☕ 买咖啡'],['attend_meeting','📋 开会'],['check_messages','📬 查消息']];
-    html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    html += '</div>';
+  } else if (game === 'workkk') {
+    html += '<div class="gs-console" style="flex-direction:column;align-items:stretch;gap:8px;border-radius:4px;margin-top:6px">';
+    html += '<div class="gs-cmd-input"><input id="gameCmdInput" type="text" placeholder="> 想法..." onkeydown="if(event.key===\'Enter\'){gameSendWorkkk(this.value)}"></div>';
+    var wBtns = [['get_status','📊 状态'],['write_code','💻 写码'],['debug','🐛 调试'],['slack_off','😴 摸鱼'],['buy_coffee','☕ 咖啡'],['attend_meeting','📋 开会'],['check_messages','📬 消息']];
+    html += '<div class="gs-cmd-btns">';
     for (var wi = 0; wi < wBtns.length; wi++) {
-      html += '<button style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--text);cursor:pointer" onclick="gameSendWorkkk(document.getElementById(\'gameCmdInput\')?.value||\'\',\''+wBtns[wi][0]+'\')">'+wBtns[wi][1]+'</button>';
+      html += '<button class="gs-cmd-btn" onclick="gameSendWorkkk(document.getElementById(\'gameCmdInput\')?.value||\'\',\''+wBtns[wi][0]+'\')">'+wBtns[wi][1]+'</button>';
     }
-    html += '</div></div></div>';
+    html += '</div></div>';
   } else {
-    var displayText = text.replace(/```[\s\S]*?```/g, '').replace(/\{[^{}]*"action"[^{}]*\}/g, '');
-    html += '<div class="game-guide-card"><div class="game-guide-desc">' + formatGameText(displayText) + '</div>';
     var actions = [];
     if (gd && gd.actions && Array.isArray(gd.actions)) actions = gd.actions;
     else if (gd && gd.options && Array.isArray(gd.options)) actions = gd.options;
     else if (gd && gd.choices && Array.isArray(gd.choices)) actions = gd.choices;
     if (actions.length > 0) {
-      html += '<div style="margin-top:10px">';
+      html += '<div style="margin-top:6px">';
       for (var ai = 0; ai < actions.length; ai++) {
         var act = actions[ai];
         var actName = typeof act === 'string' ? act : (act.action || act.label || act.value || act.id || act.name || JSON.stringify(act));
         var actLabel = typeof act === 'string' ? act : (act.label || act.name || act.action || act.value || actName);
         var actParams = (typeof act === 'object' && act.params) ? JSON.stringify(act.params).replace(/'/g,"\\'") : '{}';
-        html += '<button style="'+optStyle+'" onclick="gameActionFull(\''+escHtml(String(actName))+'\','+escHtml(actParams)+')">'+escHtml(String(actLabel))+'</button>';
+        html += '<button class="gs-action-btn" onclick="gameActionFull(\''+escHtml(String(actName))+'\','+escHtml(actParams)+')">'+escHtml(String(actLabel))+'</button>';
       }
       html += '</div>';
     } else {
       var actMatches = text.match(/【([^】]+)】/g);
       if (actMatches && actMatches.length) {
-        html += '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">';
+        html += '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">';
         for (var ami = 0; ami < actMatches.length; ami++) {
           var actText = actMatches[ami].replace(/[【】]/g, '');
           if (actText.length > 20) continue;
-          html += '<button style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);cursor:pointer" onclick="gameActionFull(\''+escHtml(actText)+'\')">'+escHtml(actText)+'</button>';
+          html += '<button class="gs-cmd-btn" onclick="gameActionFull(\''+escHtml(actText)+'\')">'+escHtml(actText)+'</button>';
         }
         html += '</div>';
       }
-    }
-    html += '</div>';
-  }
-  if (info.length) {
-    for (var ii = 0; ii < info.length; ii++) {
-      if (info[ii] && !/^请用/.test(info[ii]) && !/^A\+B/.test(info[ii]))
-        html += '<div style="font-size:12px;color:var(--text-mid);margin-top:6px;padding:0 4px">' + escHtml(info[ii]) + '</div>';
     }
   }
   ct.innerHTML = html;
