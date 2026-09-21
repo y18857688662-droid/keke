@@ -1925,7 +1925,7 @@ function renderGameFullResponse(text, gameData) {
   var ct = document.getElementById('gameFullBody');
   var html = '';
   var gd = gameData || null;
-  if (!gd) { try { gd = JSON.parse(text); if (gd.text) text = gd.text; } catch {} }
+  if (!gd) { try { gd = JSON.parse(text); if (gd.text) text = gd.text; else if (gd.message) text = gd.message; } catch {} }
   var game = gameState.game;
   var badge = gameBadges[game] || 'GAME';
   var icon = gameIcons[game] || '🎮';
@@ -2143,20 +2143,25 @@ function renderEco(text, gd) {
 }
 
 function renderGardenCat(text, gd) {
-  var clean = stripJson(text);
   var state = null;
-  try { var m = text.match(/\{[\s\S]*"player_id"[\s\S]*\}/); if (m) state = JSON.parse(m[0]); } catch {}
-  if (!state && gd) { try { state = typeof gd === 'object' ? gd : JSON.parse(gd); } catch {} }
+  if (gd && typeof gd === 'object') state = gd;
+  if (!state) { try { state = JSON.parse(text); } catch {} }
   if (state && state.state) state = state.state;
   var hunger = 50, thirst = 50, mood = 50, bond = 0, money = 0, weather = '', daypart = '', event = '';
   var items = [], seeds = [];
   if (state) {
-    if (state.cat_summary) {
+    if (state.cat_summary && typeof state.cat_summary === 'object') {
       var cs = state.cat_summary;
-      var hm = cs.match(/饱食度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (hm) hunger = parseInt(hm[1]);
-      var tm = cs.match(/口渴度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (tm) thirst = parseInt(tm[1]);
-      var mm = cs.match(/心情[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (mm) mood = parseInt(mm[1]);
-      var bm = cs.match(/亲密度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (bm) bond = parseInt(bm[1]);
+      hunger = Math.round(cs.hunger != null ? cs.hunger : 50);
+      thirst = Math.round(cs.thirst != null ? cs.thirst : 50);
+      mood = Math.round(cs.mood != null ? cs.mood : 50);
+      bond = Math.round(cs.affection != null ? cs.affection : (cs.bond != null ? cs.bond : 0));
+    } else if (state.cat_summary && typeof state.cat_summary === 'string') {
+      var csStr = state.cat_summary;
+      var hm = csStr.match(/饱食度[^]*?(\d+)/); if (hm) hunger = parseInt(hm[1]);
+      var tm = csStr.match(/口渴度[^]*?(\d+)/); if (tm) thirst = parseInt(tm[1]);
+      var mm = csStr.match(/心情[^]*?(\d+)/); if (mm) mood = parseInt(mm[1]);
+      var bm = csStr.match(/亲密度[^]*?(\d+)/); if (bm) bond = parseInt(bm[1]);
     }
     money = state.money || 0;
     weather = (state.weather_emoji || '') + ' ' + (state.weather_name || state.weather || '');
@@ -2164,20 +2169,21 @@ function renderGardenCat(text, gd) {
     event = state.latest_event || '';
     if (state.inventory_counts) {
       var inv = state.inventory_counts;
-      for (var k in inv) { if (inv[k] > 0) items.push(k + ' x' + inv[k]); }
+      if (inv.seed_total > 0) items.push('种子 x' + inv.seed_total);
+      if (inv.flower_total > 0) items.push('鲜花 x' + inv.flower_total);
+      if (inv.cat_food_servings > 0) items.push('猫粮 x' + inv.cat_food_servings);
+      if (inv.water_servings > 0) items.push('水 x' + inv.water_servings);
     }
     if (state.pots_summary) {
       var ps = state.pots_summary;
-      for (var pk in ps) seeds.push(pk);
+      if (ps.growing_pots > 0) seeds.push('生长中 x' + ps.growing_pots);
+      if (ps.ready_pots > 0) seeds.push('可收获 x' + ps.ready_pots);
+      if (ps.empty_slots > 0) seeds.push('空花盆 x' + ps.empty_slots);
     }
   }
-  if (!state) {
-    var hm2 = clean.match(/饱食度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (hm2) hunger = parseInt(hm2[1]);
-    var tm2 = clean.match(/口渴度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (tm2) thirst = parseInt(tm2[1]);
-    var mm2 = clean.match(/心情[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (mm2) mood = parseInt(mm2[1]);
-    var bm2 = clean.match(/亲密度[：:\s]*[█▓░🟩🟥■□\s]*(\d+)/); if (bm2) bond = parseInt(bm2[1]);
-    var em = clean.match(/(?:事件|最新)[：:\s]*(.+)/); if (em) event = em[1];
-  }
+  var clean = stripJson(text);
+  if (!clean && state && state.message) clean = state.message;
+  if (!clean) clean = text;
   var displayLines = clean.replace(/[🟩🟥🟧🟨⬜⬛■□█▓░]+/g, '').split('\n');
   var bodyLines = [];
   for (var i = 0; i < displayLines.length; i++) {
