@@ -395,12 +395,12 @@ body {
 .gif-sticker-cell:active { transform:scale(.93); }
 .gif-sticker-cell img { width:100%; aspect-ratio:1; object-fit:contain; image-rendering:pixelated; }
 .gif-sticker-label { font-size:10px; color:var(--text-mid); text-align:center; margin-top:2px; line-height:1; }
-.game-full-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:#1a1a1a; z-index:999; display:none; flex-direction:column; }
+.game-full-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:var(--bg); z-index:999; display:none; flex-direction:column; }
 .game-full-overlay.show { display:flex; }
-.game-full-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-bottom:3px solid #333; background:#2D2D2D; }
+.game-full-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-bottom:2px solid var(--border); background:var(--surface); }
 .game-full-back { background:none; border:none; font-size:13px; color:var(--accent); cursor:pointer; padding:4px 0; font-weight:600; }
-.game-full-title { font-size:14px; font-weight:700; color:rgba(255,255,255,0.85); letter-spacing:1px; }
-.game-full-body { flex:1; overflow-y:auto; padding:12px; -webkit-overflow-scrolling:touch; background:#1a1a1a; }
+.game-full-title { font-size:14px; font-weight:700; color:var(--text); letter-spacing:1px; }
+.game-full-body { flex:1; overflow-y:auto; padding:12px; -webkit-overflow-scrolling:touch; background:var(--bg); }
 .game-full-body .game-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
 .game-full-body .game-card { background:var(--input-bg); border-radius:14px; padding:14px 10px; cursor:pointer; text-align:center; transition:transform .15s; }
 .game-full-body .game-card:active { transform:scale(.95); }
@@ -1648,10 +1648,9 @@ function resetGameOverlayTheme() {
   var overlay = document.getElementById('gameFullOverlay');
   var hdr = document.querySelector('.game-full-header');
   var titleEl = document.querySelector('.game-full-title');
-  overlay.style.background = '#1a1a1a';
-  document.getElementById('gameFullBody').style.background = '#1a1a1a';
-  hdr.style.background = '#2D2D2D'; hdr.style.borderColor = '#333';
-  titleEl.style.color = 'rgba(255,255,255,0.85)';
+  overlay.style.background = ''; document.getElementById('gameFullBody').style.background = '';
+  hdr.style.background = ''; hdr.style.borderColor = '';
+  titleEl.style.color = '';
 }
 function loadGameListFull() {
   resetGameOverlayTheme();
@@ -1758,11 +1757,11 @@ function startGameFull(id, name) {
     overlay.style.background = '#1a1a1a'; ct.style.background = '#1a1a1a';
     hdr.style.background = '#2D2D2D'; hdr.style.borderColor = '#333';
     titleEl.style.color = 'rgba(255,255,255,0.85)';
-    ct.innerHTML = '<div class="game-loading" style="color:rgba(255,255,255,0.5)">加载中...</div>';
+    ct.innerHTML = '<div style="text-align:center;padding:40px;color:rgba(255,255,255,0.5)">加载中...</div>';
   }
   titleEl.textContent = (gameBadges[id] || 'GAME') + ' · ' + (name || id).toUpperCase();
   fetch('/game/guide', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:id})}).then(function(r){return r.json()}).then(function(data) {
-    if (!data.ok) { ct.innerHTML = '<div class="game-loading" style="color:rgba(255,255,255,0.5)">加载失败</div>'; return; }
+    if (!data.ok) { ct.innerHTML = '<div style="text-align:center;padding:40px;color:rgba(255,255,255,0.5)">加载失败</div>'; return; }
     var guideText = data.text;
     try { var gp = JSON.parse(guideText); if (gp.guide) guideText = gp.guide; } catch {}
     var humanGuide = parseGuideForHuman(guideText);
