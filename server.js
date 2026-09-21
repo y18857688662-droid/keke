@@ -5702,6 +5702,66 @@ app.get('/moments', (req, res) => {
   res.sendFile(path.join(__dirname, 'moments.html'));
 });
 
+// ======== 游戏板块 (Cedar Toy MCP Proxy) ========
+const GAME_MCP_URL = 'https://toy.cedarstar.org/';
+
+async function mcpCall(endpoint, method, args) {
+  const url = endpoint || GAME_MCP_URL;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: method, arguments: args || {} } })
+  });
+  const data = await resp.json();
+  if (data.result && data.result.content) {
+    const txt = data.result.content.find(c => c.type === 'text');
+    if (txt) {
+      try {
+        const inner = JSON.parse(txt.text);
+        if (inner.result && inner.result.content) {
+          const t2 = inner.result.content.find(c => c.type === 'text');
+          if (t2) return t2.text;
+        }
+        if (typeof inner === 'object' && inner.guide) return inner.guide;
+      } catch {}
+      return txt.text;
+    }
+    return JSON.stringify(data.result.content);
+  }
+  return JSON.stringify(data);
+}
+
+app.get('/game/list', async (req, res) => {
+  try {
+    const text = await mcpCall(GAME_MCP_URL, 'list_games', {});
+    res.json({ ok: true, text });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.post('/game/guide', async (req, res) => {
+  try {
+    const text = await mcpCall(GAME_MCP_URL, 'get_guide', { game: req.body.game });
+    res.json({ ok: true, text });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+app.post('/game/play', async (req, res) => {
+  try {
+    const { game, action, params } = req.body;
+    let text = await mcpCall(GAME_MCP_URL, 'play', { game, action, params: params || {} });
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.result && parsed.result.content) {
+        const t = parsed.result.content.find(c => c.type === 'text');
+        if (t) text = t.text;
+      } else if (parsed.jsonrpc && parsed.result) {
+        text = JSON.stringify(parsed.result);
+      }
+    } catch {}
+    res.json({ ok: true, text, game, action });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
 server.listen(PORT, async () => {
   console.log('顾晏服务运行中，端口 ' + PORT);
   buildMissYouPlan();

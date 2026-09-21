@@ -395,6 +395,20 @@ body {
 .gif-sticker-cell:active { transform:scale(.93); }
 .gif-sticker-cell img { width:100%; aspect-ratio:1; object-fit:contain; image-rendering:pixelated; }
 .gif-sticker-label { font-size:10px; color:var(--text-mid); text-align:center; margin-top:2px; line-height:1; }
+#gamePanel { max-height:60vh; }
+.game-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.game-card { background:var(--input-bg); border-radius:12px; padding:10px 8px; cursor:pointer; text-align:center; transition:transform .15s,background .15s; }
+.game-card:active { transform:scale(.95); }
+.game-card .game-icon { font-size:24px; display:block; margin-bottom:4px; }
+.game-card .game-name { font-size:11px; color:var(--text); line-height:1.3; }
+.game-back { display:inline-flex; align-items:center; gap:4px; font-size:13px; color:var(--accent); cursor:pointer; margin-bottom:8px; border:none; background:none; padding:4px 0; }
+.game-text { font-size:13px; color:var(--text); line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+.game-text b, .game-text strong { color:var(--accent); }
+.game-q { background:var(--input-bg); border-radius:12px; padding:12px; margin:8px 0; }
+.game-q .q-title { font-size:13px; font-weight:600; color:var(--text); margin-bottom:8px; line-height:1.5; }
+.game-q .q-opt { display:block; width:100%; text-align:left; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 12px; margin:4px 0; font-size:12px; color:var(--text); cursor:pointer; transition:background .15s,border-color .15s; line-height:1.4; }
+.game-q .q-opt:active { background:var(--accent-soft,rgba(123,143,107,.15)); border-color:var(--accent); }
+.game-loading { text-align:center; padding:30px; color:var(--text-mid); font-size:13px; }
 .msg-gif-sticker { width:140px; height:140px; display:block; }
 .msg-gif-sticker img { width:100%; height:100%; object-fit:contain; image-rendering:pixelated; }
 .msg-video { max-width:min(75vw, 420px); border-radius:12px; display:block; overflow:hidden; background:#000; min-height:60px; }
@@ -682,6 +696,9 @@ body {
       <div class="sticker-panel" id="stickerPanel">
         <div class="stk-body" id="stkContent"></div>
       </div>
+      <div class="sticker-panel" id="gamePanel">
+        <div class="stk-body" id="gameContent" style="padding:12px"></div>
+      </div>
       <div class="quote-bar" id="quoteBar"><div class="quote-preview" id="quotePreview"></div><button class="quote-close" onclick="clearQuote()">&times;</button></div>
       <div class="attach-menu" id="attachMenu">
         <button class="attach-item" onclick="document.getElementById('photoInput').click();toggleAttach()"><span class="ai">📷</span>发照片</button>
@@ -704,6 +721,7 @@ body {
           <button class="tb-btn" onclick="toggleAttach()" aria-label="附件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
           <button class="tb-btn" onclick="insertNL()" aria-label="换行" style="font-size:16px;font-family:var(--font)">⏎</button>
           <button class="tb-btn" onclick="toggleStickers()" aria-label="表情" style="font-size:17px">🦀</button>
+          <button class="tb-btn" onclick="toggleGames()" aria-label="游戏" style="font-size:16px">🎮</button>
           <div class="model-tag">Opus 4.6</div>
           <div class="tb-spacer"></div>
           <button class="tb-btn" id="micRecBtn" onclick="toggleRecord()" aria-label="麦克风"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v1a7 7 0 01-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg></button>
@@ -817,6 +835,7 @@ function goPage(url) {
 function toggleAttach() {
   document.getElementById('attachMenu').classList.toggle('show');
   document.getElementById('stickerPanel').classList.remove('show');
+  document.getElementById('gamePanel').classList.remove('show');
 }
 function setAvatar(input, imgId, svgId, who) {
   var file = input.files[0]; if (!file) return;
@@ -1457,10 +1476,143 @@ var CLAWD_GIFS = [
   {id:'lurk',name:'偷看'},
   {id:'magnifier',name:'放大镜'}
 ];
+var gameIcons = {mbti:'🧠',enneagram:'🔢',dnd:'⚔️',love:'💕',ecr:'🤝',humanity:'👤',sins_virtues:'😇',bdsmtest:'🔗',turtle_soup:'🐢',duel:'🎲',tarot:'🔮',ai_life:'🎭',detroit:'🤖',fishing:'🎣',bar:'🍷',forest:'🌲',moonlit:'🌙',eco:'🌿',ciyuwu:'📝',leek:'📈',delve:'⛏️',travel:'✈️',arcade:'🕹️',burger:'🍔',crucible_echoes:'⚗️',imitator_td:'🌻',memoria:'🔍',white_room:'🏠',market:'🛒',workkk:'💼',garden_cat:'🐱',camping_plaza:'⛺'};
+var gameState = {active:false,game:null,playerId:'yaoyao'};
+
+function toggleGames() {
+  var p = document.getElementById('gamePanel');
+  var isOpen = p.classList.contains('show');
+  document.getElementById('attachMenu').classList.remove('show');
+  document.getElementById('stickerPanel').classList.remove('show');
+  p.classList.toggle('show');
+  if (!isOpen && !gameState.active) loadGameList();
+}
+
+function loadGameList() {
+  var ct = document.getElementById('gameContent');
+  ct.innerHTML = '<div class="game-loading">加载游戏列表...</div>';
+  fetch('/game/list').then(function(r){return r.json()}).then(function(data) {
+    if (!data.ok) { ct.innerHTML = '<div class="game-loading">加载失败</div>'; return; }
+    var lines = data.text.split('\n');
+    var tests = [], games = [];
+    var section = '';
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i].trim();
+      if (l.indexOf('测试:') === 0 || l.indexOf('测试: ') === 0) { section = 'test'; l = l.replace(/^测试:\s*/, ''); }
+      if (l.indexOf('小游戏:') === 0 || l.indexOf('小游戏: ') === 0) { section = 'game'; l = l.replace(/^小游戏:\s*/, ''); }
+      if (!l || !section) continue;
+      var items = l.split(' | ');
+      for (var j = 0; j < items.length; j++) {
+        var parts = items[j].split('·');
+        if (parts.length >= 2) {
+          var id = parts[0].trim();
+          var desc = parts.slice(1, -1).join('·').trim();
+          if (section === 'test') tests.push({id:id,desc:desc});
+          else games.push({id:id,desc:desc});
+        }
+      }
+    }
+    var html = '<div style="font-size:14px;font-weight:600;margin-bottom:8px;color:var(--text)">🎯 测试</div><div class="game-grid">';
+    for (var ti = 0; ti < tests.length; ti++) {
+      html += '<div class="game-card" onclick="startGame(\''+tests[ti].id+'\')" title="'+escHtml(tests[ti].desc)+'"><span class="game-icon">'+(gameIcons[tests[ti].id]||'🎮')+'</span><span class="game-name">'+escHtml(tests[ti].desc.split('，')[0] || tests[ti].id)+'</span></div>';
+    }
+    html += '</div><div style="font-size:14px;font-weight:600;margin:12px 0 8px;color:var(--text)">🎮 小游戏</div><div class="game-grid">';
+    for (var gi = 0; gi < games.length; gi++) {
+      html += '<div class="game-card" onclick="startGame(\''+games[gi].id+'\')" title="'+escHtml(games[gi].desc)+'"><span class="game-icon">'+(gameIcons[games[gi].id]||'🎮')+'</span><span class="game-name">'+escHtml(games[gi].desc.split('，')[0] || games[gi].id)+'</span></div>';
+    }
+    html += '</div>';
+    ct.innerHTML = html;
+  }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div>'; });
+}
+
+function startGame(id) {
+  gameState.active = true;
+  gameState.game = id;
+  var ct = document.getElementById('gameContent');
+  ct.innerHTML = '<div class="game-loading">加载中...</div>';
+  fetch('/game/guide', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:id})}).then(function(r){return r.json()}).then(function(data) {
+    if (!data.ok) { ct.innerHTML = '<div class="game-loading">加载失败</div>'; return; }
+    var guideText = data.text;
+    try { var gp = JSON.parse(guideText); if (gp.guide) guideText = gp.guide; } catch {}
+    var html = '<button class="game-back" onclick="backToGameList()">← 返回</button>';
+    html += '<div class="game-text" style="font-size:12px;max-height:180px;overflow-y:auto">' + formatGameText(guideText) + '</div>';
+    html += '<div style="margin-top:12px;text-align:center">';
+    html += '<button class="game-card" style="display:inline-block;padding:10px 24px;font-size:14px" onclick="gameAction(\'start\')">🎮 开始游戏</button>';
+    html += '</div>';
+    ct.innerHTML = html;
+  }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div>'; });
+}
+
+function backToGameList() {
+  gameState.active = false;
+  gameState.game = null;
+  loadGameList();
+}
+
+function gameAction(action, extra) {
+  var ct = document.getElementById('gameContent');
+  ct.innerHTML = '<div class="game-loading">处理中...</div>';
+  var params = {player_id:gameState.playerId};
+  if (extra) for (var k in extra) params[k] = extra[k];
+  fetch('/game/play', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:gameState.game,action:action,params:params})}).then(function(r){return r.json()}).then(function(data) {
+    if (!data.ok) { ct.innerHTML = '<div class="game-loading">请求失败，点击返回重试</div><button class="game-back" onclick="backToGameList()">← 返回</button>'; return; }
+    renderGameResponse(data.text);
+  }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div><button class="game-back" onclick="backToGameList()">← 返回</button>'; });
+}
+
+function renderGameResponse(text) {
+  var ct = document.getElementById('gameContent');
+  var html = '<button class="game-back" onclick="backToGameList()">← 退出</button>';
+  var qMatch = text.match(/第(\d+)题.*?共(\d+)题/);
+  if (qMatch) {
+    var cur = parseInt(qMatch[1]), total = parseInt(qMatch[2]);
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden"><div style="height:100%;background:var(--accent);width:'+(cur/total*100)+'%;border-radius:2px;transition:width .3s"></div></div><span style="font-size:11px;color:var(--text-mid)">'+cur+'/'+total+'</span></div>';
+  }
+  var lines = text.split('\n');
+  var questionText = '', optA = '', optB = '', info = [];
+  var hasAB = false;
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i].trim();
+    if (!l) continue;
+    if (/^A\.\s*/.test(l)) { optA = l.replace(/^A\.\s*/,''); hasAB = true; }
+    else if (/^B\.\s*/.test(l)) { optB = l.replace(/^B\.\s*/,''); hasAB = true; }
+    else if (/^请用\s*mbti_answer/.test(l) || /^a_score/.test(l)) continue;
+    else if (/第\d+题/.test(l) && !questionText) continue;
+    else if (hasAB) info.push(l);
+    else if (/^[^【\[A-Z]/.test(l) && l.length > 4 && !questionText && !/MBTI测试开始/.test(l)) questionText = l;
+    else info.push(l);
+  }
+  if (hasAB && questionText) {
+    html += '<div class="game-q"><div class="q-title">' + escHtml(questionText) + '</div>';
+    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:5})">完全 A：' + escHtml(optA) + '</button>';
+    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:4})">偏向 A</button>';
+    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:3})">略偏 A</button>';
+    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:2})">略偏 B</button>';
+    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:1})">偏向 B</button>';
+    html += '<button class="q-opt" onclick="gameAction(\'mbti_answer\',{a_score:0})">完全 B：' + escHtml(optB) + '</button>';
+    html += '</div>';
+  } else {
+    html += '<div class="game-text">' + formatGameText(text) + '</div>';
+  }
+  if (info.length) {
+    for (var ii = 0; ii < info.length; ii++) {
+      if (info[ii] && !/^请用/.test(info[ii]) && !/^A\+B/.test(info[ii]))
+        html += '<div style="font-size:11px;color:var(--text-mid);margin-top:4px">' + escHtml(info[ii]) + '</div>';
+    }
+  }
+  ct.innerHTML = html;
+  ct.scrollTop = 0;
+}
+
+function formatGameText(text) {
+  return escHtml(text).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+}
+
 function toggleStickers() {
   var p = document.getElementById('stickerPanel');
   var isOpen = p.classList.contains('show');
   document.getElementById('attachMenu').classList.remove('show');
+  document.getElementById('gamePanel').classList.remove('show');
   p.classList.toggle('show');
   if (!isOpen) {
     var ct = document.getElementById('stkContent');
