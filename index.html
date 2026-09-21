@@ -1635,22 +1635,22 @@ function gameActionFull(action, extra) {
   if (extra) for (var k in extra) params[k] = extra[k];
   fetch('/game/play', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:gameState.game,action:action,params:params})}).then(function(r){return r.json()}).then(function(data) {
     if (!data.ok) { ct.innerHTML = '<div class="game-loading">请求失败</div><button class="game-start-btn" style="margin-top:12px" onclick="loadGameListFull()">返回列表</button>'; return; }
-    renderGameFullResponse(data.text);
+    renderGameFullResponse(data.text, data.gameData);
   }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div><button class="game-start-btn" style="margin-top:12px" onclick="loadGameListFull()">返回列表</button>'; });
 }
 
-function renderGameFullResponse(text) {
+var CMD_GAMES = ['fishing','leek','moonlit','delve','travel','arcade','imitator_td','white_room','burger','market','crucible_echoes','memoria'];
+
+function renderGameFullResponse(text, gameData) {
   var ct = document.getElementById('gameFullBody');
   var html = '';
-  // try parse JSON for structured game data
-  var gd = null;
-  try { gd = JSON.parse(text); } catch {}
+  var gd = gameData || null;
+  if (!gd) { try { gd = JSON.parse(text); if (gd.text) text = gd.text; } catch {} }
   var qMatch = text.match(/第(\d+)题.*?共(\d+)题/);
   if (qMatch) {
     var cur = parseInt(qMatch[1]), total = parseInt(qMatch[2]);
     html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;background:var(--accent);width:'+(cur/total*100)+'%;border-radius:3px;transition:width .3s"></div></div><span style="font-size:12px;color:var(--text-mid)">'+cur+'/'+total+'</span></div>';
   }
-  // detect A/B test format
   var lines = text.split('\n');
   var questionText = '', optA = '', optB = '', info = [];
   var hasAB = false;
@@ -1675,19 +1675,34 @@ function renderGameFullResponse(text) {
     html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:1})">偏向 B</button>';
     html += '<button style="'+optStyle+'" onclick="gameActionFull(\'mbti_answer\',{a_score:0})">完全 B：' + escHtml(optB) + '</button>';
     html += '</div>';
+  } else if (CMD_GAMES.indexOf(gameState.game) >= 0) {
+    html += '<div class="game-guide-card"><div class="game-guide-desc">' + formatGameText(text) + '</div>';
+    html += '<div style="margin-top:12px"><div style="display:flex;gap:6px;margin-bottom:8px"><input id="gameCmdInput" type="text" placeholder="输入指令..." style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\'){gameSendCmd()}"><button onclick="gameSendCmd()" style="padding:10px 16px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:13px;cursor:pointer">发送</button></div>';
+    var cmdBtns = getCmdButtons(gameState.game, gd);
+    if (cmdBtns.length) {
+      html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      for (var ci = 0; ci < cmdBtns.length; ci++) {
+        html += '<button style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--text);cursor:pointer" onclick="gameActionFull(\'cmd\',{command:\''+escHtml(cmdBtns[ci])+'\'})">'+escHtml(cmdBtns[ci])+'</button>';
+      }
+      html += '</div>';
+    }
+    html += '</div></div>';
+  } else if (gameState.game === 'workkk') {
+    html += '<div class="game-guide-card"><div class="game-guide-desc">' + formatGameText(text) + '</div>';
+    html += '<div style="margin-top:12px"><div style="display:flex;gap:6px;margin-bottom:8px"><input id="gameCmdInput" type="text" placeholder="想法..." style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\'){gameSendWorkkk(this.value)}"></div>';
+    var wBtns = [['get_status','📊 状态'],['write_code','💻 写代码'],['debug','🐛 调试'],['slack_off','😴 摸鱼'],['buy_coffee','☕ 买咖啡'],['attend_meeting','📋 开会'],['check_messages','📬 查消息']];
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    for (var wi = 0; wi < wBtns.length; wi++) {
+      html += '<button style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--text);cursor:pointer" onclick="gameSendWorkkk(document.getElementById(\'gameCmdInput\')?.value||\'\',\''+wBtns[wi][0]+'\')">'+wBtns[wi][1]+'</button>';
+    }
+    html += '</div></div></div>';
   } else {
-    // show game content
     var displayText = text.replace(/```[\s\S]*?```/g, '').replace(/\{[^{}]*"action"[^{}]*\}/g, '');
     html += '<div class="game-guide-card"><div class="game-guide-desc">' + formatGameText(displayText) + '</div>';
-    // detect action buttons from JSON data or 【action】 markers
     var actions = [];
-    if (gd && gd.actions && Array.isArray(gd.actions)) {
-      actions = gd.actions;
-    } else if (gd && gd.options && Array.isArray(gd.options)) {
-      actions = gd.options;
-    } else if (gd && gd.choices && Array.isArray(gd.choices)) {
-      actions = gd.choices;
-    }
+    if (gd && gd.actions && Array.isArray(gd.actions)) actions = gd.actions;
+    else if (gd && gd.options && Array.isArray(gd.options)) actions = gd.options;
+    else if (gd && gd.choices && Array.isArray(gd.choices)) actions = gd.choices;
     if (actions.length > 0) {
       html += '<div style="margin-top:10px">';
       for (var ai = 0; ai < actions.length; ai++) {
@@ -1699,7 +1714,6 @@ function renderGameFullResponse(text) {
       }
       html += '</div>';
     } else {
-      // detect 【action】 markers in text
       var actMatches = text.match(/【([^】]+)】/g);
       if (actMatches && actMatches.length) {
         html += '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">';
@@ -1721,6 +1735,35 @@ function renderGameFullResponse(text) {
   }
   ct.innerHTML = html;
   ct.scrollTop = 0;
+}
+
+function getCmdButtons(game, gd) {
+  if (gd && gd.commands && Array.isArray(gd.commands)) return gd.commands;
+  if (gd && gd.available_commands && Array.isArray(gd.available_commands)) return gd.available_commands;
+  var defaults = {
+    fishing: ['cast','status','shop','inventory','help'],
+    leek: ['status','buy','sell','market','help'],
+    moonlit: ['look','inventory','help'],
+    delve: ['look','inventory','status','help'],
+    travel: ['look','status','inventory','help'],
+    arcade: ['status','help'],
+    burger: ['status','menu','help'],
+    market: ['status','portfolio','help'],
+    memoria: ['look','status','help'],
+    crucible_echoes: ['look','status','help']
+  };
+  return defaults[game] || ['status','help'];
+}
+
+function gameSendCmd() {
+  var input = document.getElementById('gameCmdInput');
+  if (!input || !input.value.trim()) return;
+  gameActionFull('cmd', {command: input.value.trim()});
+}
+
+function gameSendWorkkk(thought, action) {
+  action = action || 'write_code';
+  gameActionFull('work_action', {action: action, thought: thought || ''});
 }
 
 function formatGameText(text) {

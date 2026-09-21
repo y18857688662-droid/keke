@@ -5850,14 +5850,19 @@ app.post('/game/play', async (req, res) => {
         text = JSON.stringify(parsed.result);
       }
     } catch {}
+    let gameData = null;
     try {
       const pd = JSON.parse(text);
       if (pd.result || pd.final_result) {
         const rt = pd.result || pd.final_result;
         addGameHistory(params?.player_id || 'yy', game, typeof rt === 'string' ? rt : JSON.stringify(rt));
       }
+      if (pd.text) {
+        gameData = pd;
+        text = pd.text;
+      }
     } catch {}
-    res.json({ ok: true, text, game, action });
+    res.json({ ok: true, text, game, action, gameData });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
