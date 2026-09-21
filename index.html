@@ -1942,7 +1942,7 @@ function renderGameFullResponse(text, gameData) {
     if (!l) continue;
     if (/^A\.\s*/.test(l)) { optA = l.replace(/^A\.\s*/,''); hasAB = true; }
     else if (/^B\.\s*/.test(l)) { optB = l.replace(/^B\.\s*/,''); hasAB = true; }
-    else if (/^请用\s*mbti_answer/.test(l) || /^a_score/.test(l)) continue;
+    else if (/^请用\s*\w*_?answer/.test(l) || /^a_score/.test(l) || /传入\s*score/.test(l)) continue;
     else if (/第\d+题/.test(l) && !questionText) continue;
     else if (hasAB) info.push(l);
     else if (/^[^【\[A-Z]/.test(l) && l.length > 4 && !questionText && !/测试开始/.test(l)) questionText = l;
@@ -2000,6 +2000,8 @@ function renderGameFullResponse(text, gameData) {
     var cur = parseInt(qMatch[1]), total = parseInt(qMatch[2]);
     html += '<div class="gt-progress"><div class="gt-progress-bar" style="background:'+t.border+'"><div class="gt-progress-fill" style="width:'+(cur/total*100)+'%;background:'+t.accent+'"></div></div><div class="gt-progress-text" style="color:'+t.accent+'">'+cur+'/'+total+'</div></div>';
   }
+  var scoreMatch = text.match(/请用\s*(\w+_?answer)\s*传入\s*score/);
+  var scoreAction = scoreMatch ? scoreMatch[1] : null;
   if (hasAB && questionText) {
     html += '<div class="gt-question" style="color:'+t.text+'">'+escHtml(questionText)+'</div>';
     html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+'" onclick="gameActionFull(\'mbti_answer\',{a_score:5})">A ▸ '+escHtml(optA)+'</button>';
@@ -2008,14 +2010,22 @@ function renderGameFullResponse(text, gameData) {
     html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+'" onclick="gameActionFull(\'mbti_answer\',{a_score:2})">略偏 B</button>';
     html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+'" onclick="gameActionFull(\'mbti_answer\',{a_score:1})">偏向 B</button>';
     html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+'" onclick="gameActionFull(\'mbti_answer\',{a_score:0})">B ▸ '+escHtml(optB)+'</button>';
+  } else if (scoreAction && questionText) {
+    html += '<div class="gt-question" style="color:'+t.text+'">'+escHtml(questionText)+'</div>';
+    var scoreLabels = [{s:7,l:'完全同意'},{s:6,l:'同意'},{s:5,l:'较同意'},{s:4,l:'中立'},{s:3,l:'较不同意'},{s:2,l:'不同意'},{s:1,l:'完全不同意'}];
+    html += '<div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">';
+    for (var si = 0; si < scoreLabels.length; si++) {
+      var sc = scoreLabels[si];
+      html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+';display:flex;justify-content:space-between;align-items:center" onclick="gameActionFull(\''+escHtml(scoreAction)+'\',{score:'+sc.s+'})">';
+      html += '<span>'+sc.l+'</span><span style="font-weight:700;color:'+t.accent+'">'+sc.s+'</span></button>';
+    }
+    html += '</div>';
   } else {
-    var displayText = stripJson(text);
-    html += '<div class="gt-body" style="color:'+t.text+'">'+formatGameText(displayText)+'</div>';
-  }
-  if (info.length) {
-    for (var ii = 0; ii < info.length; ii++) {
-      if (info[ii] && !/^请用/.test(info[ii]) && !/^A\+B/.test(info[ii]))
-        html += '<div style="font-size:11px;color:'+t.accent+';opacity:.6;margin-top:4px">'+escHtml(info[ii])+'</div>';
+    var displayText = cleanGameDisplay(text, gd);
+    if (displayText) {
+      html += '<div class="gt-body" style="color:'+t.text+'">'+formatGameText(displayText)+'</div>';
+    } else {
+      html += renderGameDataCards(gd, t, game);
     }
   }
   html += '<div class="gt-footer" style="border-color:'+t.border+'"><div style="color:'+t.accent+'">● '+(t.name||game)+'</div><div style="font-size:10px;color:'+t.border+'">CEDAR TOY</div></div>';
@@ -2266,6 +2276,89 @@ function stripJson(text) {
     if (depth === 0) result += text[i];
   }
   return result.replace(/```[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+function cleanGameDisplay(text, gd) {
+  var s = stripJson(text);
+  s = s.replace(/\[[\s\S]*?\]/g, '');
+  var lines = s.split('\n');
+  var clean = [];
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i].trim();
+    if (!l) continue;
+    if (/^请用\s*\w/.test(l)) continue;
+    if (/传入\s*(score|answer)/.test(l)) continue;
+    if (/player_id|jsonrpc|"action"|"params"|"game"/.test(l)) continue;
+    if (/^\s*"[a-zA-Z_]+":\s*/.test(l)) continue;
+    if (/^\s*[\[\]{}],?\s*$/.test(l)) continue;
+    clean.push(l);
+  }
+  return clean.join('\n').trim();
+}
+function renderGameDataCards(gd, t, game) {
+  if (!gd || typeof gd !== 'object') return '<div class="gt-body" style="color:'+t.text+'">点击按钮开始游戏</div>';
+  var html = '';
+  var textFields = ['message','text','description','display_text','content','narrative','story','summary','intro'];
+  for (var fi = 0; fi < textFields.length; fi++) {
+    if (gd[textFields[fi]] && typeof gd[textFields[fi]] === 'string') {
+      html += '<div class="gt-body" style="color:'+t.text+'">'+formatGameText(gd[textFields[fi]])+'</div>';
+      break;
+    }
+  }
+  var keys = Object.keys(gd);
+  var stats = [];
+  var items = null;
+  for (var ki = 0; ki < keys.length; ki++) {
+    var k = keys[ki], v = gd[k];
+    if (textFields.indexOf(k) >= 0) continue;
+    if (k === 'actions' || k === 'options' || k === 'choices' || k === 'result' || k === 'final_result') continue;
+    if (typeof v === 'number') stats.push({k:k,v:v});
+    else if (typeof v === 'string' && v.length < 50) stats.push({k:k,v:v});
+    else if (typeof v === 'boolean') stats.push({k:k,v:v?'是':'否'});
+    else if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') items = {key:k, list:v};
+    else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      var sub = Object.keys(v);
+      for (var si = 0; si < sub.length; si++) {
+        var sv = v[sub[si]];
+        if (typeof sv === 'number' || typeof sv === 'boolean') stats.push({k:sub[si],v:typeof sv==='boolean'?(sv?'是':'否'):sv});
+        else if (typeof sv === 'string' && sv.length < 50) stats.push({k:sub[si],v:sv});
+        else if (Array.isArray(sv) && sv.length > 0 && typeof sv[0] === 'object' && !items) items = {key:sub[si], list:sv};
+      }
+    }
+  }
+  if (stats.length > 0) {
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0">';
+    for (var sti = 0; sti < stats.length && sti < 12; sti++) {
+      html += '<div style="background:'+t.tag+';border:1px solid '+t.border+';border-radius:10px;padding:8px 12px;min-width:80px;text-align:center">';
+      html += '<div style="font-size:10px;color:'+t.accent+';margin-bottom:2px">'+escHtml(String(stats[sti].k))+'</div>';
+      html += '<div style="font-size:15px;font-weight:700;color:'+t.text+'">'+escHtml(String(stats[sti].v))+'</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  if (items && items.list.length > 0) {
+    html += '<div style="margin-top:8px">';
+    for (var ii = 0; ii < items.list.length && ii < 10; ii++) {
+      var item = items.list[ii];
+      var iName = item.name || item.title || item.id || '';
+      var iDesc = item.blurb || item.description || item.desc || '';
+      var iExtra = [];
+      if (item.price !== undefined) iExtra.push('💰 '+item.price);
+      if (item.country) iExtra.push('📍 '+item.country);
+      if (item.tier !== undefined) iExtra.push('⭐ '+item.tier);
+      if (item.level !== undefined) iExtra.push('Lv.'+item.level);
+      html += '<div style="background:'+t.tag+';border:1px solid '+t.border+';border-radius:10px;padding:12px;margin-bottom:6px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+      html += '<div style="font-weight:600;color:'+t.text+'">'+escHtml(String(iName))+'</div>';
+      if (iExtra.length) html += '<div style="font-size:11px;color:'+t.accent+'">'+escHtml(iExtra.join(' · '))+'</div>';
+      html += '</div>';
+      if (iDesc) html += '<div style="font-size:12px;color:'+t.text+';opacity:.7;margin-top:4px;line-height:1.5">'+escHtml(String(iDesc))+'</div>';
+      if (item.id) html += '<button class="gt-cmd-btn" style="margin-top:6px;background:'+t.accent+';color:#fff;border:none;padding:6px 16px" onclick="gameActionFull(\'cmd\',{command:\'go '+escHtml(String(item.id))+'\'})">前往</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  if (!html) html = '<div class="gt-body" style="color:'+t.text+'">游戏已加载，请使用下方按钮操作</div>';
+  return html;
 }
 function formatGameText(text) {
   return escHtml(text).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\\n/g,'\n').replace(/\n/g,'<br>');

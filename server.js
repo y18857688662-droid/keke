@@ -5883,6 +5883,11 @@ app.post('/game/play', async (req, res) => {
       if (pd.text) {
         gameData = pd;
         text = pd.text;
+      } else if (pd.message) {
+        gameData = pd;
+        text = pd.message;
+      } else {
+        gameData = pd;
       }
     } catch {}
     res.json({ ok: true, text, game, action, gameData });
