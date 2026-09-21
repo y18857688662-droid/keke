@@ -557,6 +557,27 @@ body {
 .gc-cmd-btns { display:flex; flex-wrap:wrap; gap:6px; }
 .gc-cmd-btn { background:#E8F5E2; border:1.5px solid #C5E4BC; border-radius:16px; padding:5px 12px; font-size:11px; color:#4A7A3A; font-weight:600; cursor:pointer; transition:background .15s; }
 .gc-cmd-btn:active { background:#D4EDCA; }
+.gt-page { border-radius:12px; padding:12px; }
+.gt-card { border-radius:14px; padding:14px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:8px; }
+.gt-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.gt-title { font-size:15px; font-weight:700; }
+.gt-badge { font-size:10px; padding:3px 10px; border-radius:12px; font-weight:600; border:1px solid; }
+.gt-progress { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.gt-progress-bar { flex:1; height:6px; border-radius:3px; overflow:hidden; }
+.gt-progress-fill { height:100%; border-radius:3px; transition:width .3s; }
+.gt-progress-text { font-size:11px; font-weight:600; }
+.gt-question { font-size:14px; font-weight:500; line-height:1.6; margin-bottom:12px; }
+.gt-body { font-size:13px; line-height:1.8; white-space:pre-wrap; word-break:break-word; }
+.gt-body b { font-weight:600; }
+.gt-footer { margin-top:12px; padding-top:8px; border-top:1px solid; display:flex; justify-content:space-between; align-items:center; font-size:10px; }
+.gt-opt-btn { display:block; width:100%; text-align:left; border:1.5px solid; border-radius:10px; padding:10px 14px; margin:5px 0; font-size:13px; cursor:pointer; transition:opacity .15s; }
+.gt-opt-btn:active { opacity:.7; }
+.gt-cmd-input { display:flex; gap:8px; margin-bottom:8px; }
+.gt-cmd-input input { flex:1; padding:8px 12px; background:#fff; border:1.5px solid; border-radius:20px; font-size:13px; outline:none; }
+.gt-cmd-input button { padding:8px 16px; color:#fff; border:none; border-radius:20px; font-size:12px; cursor:pointer; font-weight:600; }
+.gt-cmd-btns { display:flex; flex-wrap:wrap; gap:6px; }
+.gt-cmd-btn { border:1.5px solid; border-radius:16px; padding:5px 12px; font-size:11px; font-weight:600; cursor:pointer; transition:opacity .15s; }
+.gt-cmd-btn:active { opacity:.7; }
 .game-history-section { margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
 .game-history-card { background:var(--input-bg); border-radius:12px; padding:12px; margin-bottom:8px; }
 .game-history-card .gh-who { font-size:12px; font-weight:500; color:var(--accent); }
@@ -1789,6 +1810,12 @@ function startGameFull(id, name) {
     hdr.style.background = '#D4EDCA'; hdr.style.borderColor = '#7BB56A';
     titleEl.style.color = '#3A5A2E';
     ct.innerHTML = '<div style="text-align:center;padding:40px;color:#3A5A2E">加载中...</div>';
+  } else if (gameThemes[id]) {
+    var th = gameThemes[id];
+    overlay.style.background = th.bg; ct.style.background = th.bg;
+    hdr.style.background = th.card; hdr.style.borderColor = th.border;
+    titleEl.style.color = th.text;
+    ct.innerHTML = '<div style="text-align:center;padding:40px;color:'+th.accent+'">加载中...</div>';
   } else {
     overlay.style.background = ''; ct.style.background = '';
     hdr.style.background = ''; hdr.style.borderColor = '';
@@ -1818,12 +1845,15 @@ function startGameFull(id, name) {
       html += '<div class="gc-footer"><div>● READY</div><div>CEDAR TOY</div></div></div>';
       html += '<div style="text-align:center;margin-top:10px"><button class="gc-cmd-btn" style="background:#7BB56A;color:#fff;padding:10px 28px;font-size:13px;border-color:#7BB56A" onclick="gameActionFull(\'start\')">ENTER →</button></div></div>';
     } else {
-    html += '<div class="gs-screen">';
-    html += '<div class="gs-head"><div class="gs-mission">MISSION: ' + escHtml((name || id).toUpperCase()) + '</div><div class="gs-badge">' + (gameBadges[id] || 'GAME') + '</div></div>';
-    html += '<div class="gs-body">' + formatGameText(humanGuide) + '</div>';
-    html += '<div class="gs-footer"><div class="gs-icons"><span class="lit">' + (gameIcons[id] || '🎮') + '</span><span>◌</span><span>□</span></div><div class="gs-blink">PRESS START_</div></div>';
+    var gt = gameThemes[id] || {bg:'var(--bg)',card:'var(--surface)',accent:'var(--accent)',text:'var(--text)',border:'var(--border)',tag:'var(--input-bg,#f0f0f0)',name:id};
+    html += '<div class="gt-page" style="background:'+gt.bg+'">';
+    html += '<div class="gt-card" style="background:'+gt.card+'">';
+    html += '<div class="gt-hdr"><div class="gt-title" style="color:'+gt.text+'">'+(gameIcons[id]||'🎮')+' '+(gt.name||(name||id).toUpperCase())+'</div><div class="gt-badge" style="background:'+gt.tag+';color:'+gt.accent+';border-color:'+gt.border+'">'+(gameBadges[id]||'GAME')+'</div></div>';
+    html += '<div class="gt-body" style="color:'+gt.text+'">' + formatGameText(humanGuide) + '</div>';
+    html += '<div class="gt-footer" style="border-color:'+gt.border+'"><div style="color:'+gt.accent+'">● READY</div><div style="font-size:10px;color:'+gt.border+'">CEDAR TOY</div></div>';
     html += '</div>';
-    html += '<div class="gs-console"><div class="gs-dot pink"></div><div class="gs-dot alt"></div><div class="gs-slot"></div><button class="gs-cmd-btn" style="margin-left:auto;background:var(--accent);color:#fff;border-color:var(--accent);padding:8px 20px;font-weight:700;letter-spacing:1px" onclick="gameActionFull(\'start\')">ENTER →</button></div>';
+    html += '<div style="text-align:center;margin-top:10px"><button class="gt-cmd-btn" style="background:'+gt.accent+';color:#fff;padding:10px 28px;font-size:13px;border:none" onclick="gameActionFull(\'start\')">ENTER →</button></div>';
+    html += '</div>';
     }
     ct.innerHTML = html;
   }).catch(function(){ ct.innerHTML = '<div class="game-loading">网络错误</div>'; });
@@ -1842,6 +1872,10 @@ function gameActionFull(action, extra) {
   } else if (g === 'garden_cat') {
     loadHtml = '<div class="gc-page" style="text-align:center;padding:40px 16px"><div style="color:#3A5A2E;font-size:13px">加载中...</div></div>';
     errBtn = function(msg){ return '<div class="gc-page" style="text-align:center;padding:30px 16px"><div style="color:#3A5A2E;margin-bottom:12px">'+msg+'</div><button class="gc-cmd-btn" style="padding:10px 20px" onclick="loadGameListFull()">← 返回</button></div>'; };
+  } else if (gameThemes[g]) {
+    var th = gameThemes[g];
+    loadHtml = '<div class="gt-page" style="background:'+th.bg+';text-align:center;padding:40px 16px"><div style="color:'+th.accent+';font-size:13px">加载中...</div></div>';
+    errBtn = function(msg){ return '<div class="gt-page" style="background:'+th.bg+';text-align:center;padding:30px 16px"><div style="color:'+th.text+';margin-bottom:12px">'+msg+'</div><button class="gt-cmd-btn" style="background:'+th.accent+';color:#fff;padding:10px 20px;border:none" onclick="loadGameListFull()">← 返回</button></div>'; };
   } else {
     loadHtml = '<div class="game-loading">加载中...</div>';
     errBtn = function(msg){ return '<div style="text-align:center;padding:30px 16px"><div style="color:var(--text-mid);margin-bottom:12px">'+msg+'</div><button style="padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;cursor:pointer" onclick="loadGameListFull()">← 返回</button></div>'; };
@@ -1855,7 +1889,37 @@ function gameActionFull(action, extra) {
   }).catch(function(){ ct.innerHTML = errBtn('NETWORK ERROR'); });
 }
 
-var CMD_GAMES = ['fishing','leek','moonlit','delve','travel','arcade','imitator_td','white_room','burger','market','crucible_echoes','memoria'];
+var CMD_GAMES = ['fishing','leek','moonlit','delve','travel','arcade','imitator_td','white_room','burger','market','crucible_echoes','memoria','bar','forest','ciyuwu','tarot','ai_life','detroit','turtle_soup','camping_plaza','crucible_echoes'];
+var gameThemes = {
+  fishing:   {bg:'#EEF6FB',card:'#fff',accent:'#2980B9',text:'#1A4A6E',border:'#B3D9F2',tag:'#E1F0FA',name:'钓鱼'},
+  leek:      {bg:'#EEFAF0',card:'#fff',accent:'#27AE60',text:'#1A4A2E',border:'#B8E6C8',tag:'#E0F5E4',name:'韭菜'},
+  market:    {bg:'#EEF3FA',card:'#fff',accent:'#2C6FAC',text:'#1A3A5E',border:'#B3CCE6',tag:'#E0EBF5',name:'商店'},
+  bar:       {bg:'#FDF5E6',card:'#fff',accent:'#C77D3A',text:'#5A3E1E',border:'#EDDCBB',tag:'#FFF3E0',name:'酒吧'},
+  burger:    {bg:'#FFF5EB',card:'#fff',accent:'#E67E22',text:'#5A3A18',border:'#F5D5B0',tag:'#FFF0E0',name:'汉堡'},
+  moonlit:   {bg:'#F3F0F8',card:'#fff',accent:'#7D6AA5',text:'#3E3458',border:'#D5CCE6',tag:'#EDE8F5',name:'月下'},
+  delve:     {bg:'#F2EDE4',card:'#fff',accent:'#8B7355',text:'#4A3C28',border:'#D6C8AD',tag:'#EDE4D4',name:'矿洞'},
+  travel:    {bg:'#EDF6FC',card:'#fff',accent:'#4A90A4',text:'#1A4A5E',border:'#B3D9EA',tag:'#E0F0F8',name:'旅行'},
+  arcade:    {bg:'#F5F0F7',card:'#fff',accent:'#9B59B6',text:'#4A2E5E',border:'#D5B8E6',tag:'#EDE0F5',name:'街机'},
+  imitator_td:{bg:'#FBF8EE',card:'#fff',accent:'#D4A017',text:'#5A4A18',border:'#EDD99C',tag:'#FBF3D5',name:'向日葵'},
+  white_room:{bg:'#F5F5F2',card:'#fff',accent:'#7A8A7E',text:'#3A3E3A',border:'#D0D5D0',tag:'#E8EBE8',name:'白房间'},
+  memoria:   {bg:'#F8F5F0',card:'#fff',accent:'#A0785A',text:'#4A3828',border:'#DDD0C0',tag:'#F0E8DD',name:'记忆'},
+  crucible_echoes:{bg:'#F8F2E8',card:'#fff',accent:'#B8860B',text:'#5A4518',border:'#E6D5A8',tag:'#F5EDDA',name:'炼金'},
+  forest:    {bg:'#EFF5ED',card:'#fff',accent:'#4A8A4E',text:'#2A4A2E',border:'#B8D8BC',tag:'#E0F0E2',name:'森林'},
+  tarot:     {bg:'#F5F0FA',card:'#fff',accent:'#8E44AD',text:'#3E2458',border:'#D0B8E6',tag:'#EDE0F8',name:'塔罗'},
+  ciyuwu:    {bg:'#FBF8F0',card:'#fff',accent:'#6A5A4A',text:'#3A3028',border:'#D8CDB8',tag:'#F0E8DA',name:'词语屋'},
+  ai_life:   {bg:'#F0F3F8',card:'#fff',accent:'#5A7AA0',text:'#2A3A50',border:'#B8CCE0',tag:'#E0E8F2',name:'AI人生'},
+  detroit:   {bg:'#EDF0F5',card:'#fff',accent:'#3A7CB8',text:'#1A3050',border:'#A8C8E6',tag:'#DCE8F5',name:'底特律'},
+  turtle_soup:{bg:'#FBF5EE',card:'#fff',accent:'#8B6A45',text:'#4A3A25',border:'#DDD0B8',tag:'#F0E8D8',name:'海龟汤'},
+  camping_plaza:{bg:'#F5F2EA',card:'#fff',accent:'#7A8B55',text:'#3A4228',border:'#C8D4A8',tag:'#E8EDD8',name:'露营'},
+  mbti:      {bg:'#F0F5FA',card:'#fff',accent:'#4A80B0',text:'#1A3A5A',border:'#B0CCE6',tag:'#DEE8F5',name:'MBTI'},
+  enneagram: {bg:'#FAF0F5',card:'#fff',accent:'#A05A7A',text:'#5A2A3E',border:'#E6B8CC',tag:'#F5DEE8',name:'九型'},
+  dnd:       {bg:'#F5F0E8',card:'#fff',accent:'#8B4513',text:'#4A2810',border:'#D4B896',tag:'#EDE0D0',name:'DND'},
+  love:      {bg:'#FDF0F5',card:'#fff',accent:'#D4556A',text:'#5A2030',border:'#F0B8C8',tag:'#FDE0E8',name:'恋爱'},
+  ecr:       {bg:'#F0F5F0',card:'#fff',accent:'#5A8A6A',text:'#2A4A3A',border:'#B8D8C0',tag:'#E0F0E4',name:'依恋'},
+  humanity:  {bg:'#F5F2F0',card:'#fff',accent:'#7A6A5A',text:'#3A3028',border:'#D0C4B8',tag:'#E8E0D8',name:'人性'},
+  sins_virtues:{bg:'#F8F0F0',card:'#fff',accent:'#AA4444',text:'#4A1818',border:'#E6B0B0',tag:'#F5D8D8',name:'罪与德'},
+  bdsmtest:  {bg:'#F2F0F5',card:'#fff',accent:'#6A5A8A',text:'#2A2040',border:'#C8B8D8',tag:'#E0D8F0',name:'性格'},
+};
 
 function renderGameFullResponse(text, gameData) {
   var ct = document.getElementById('gameFullBody');
@@ -1924,40 +1988,42 @@ function renderGameFullResponse(text, gameData) {
     }
     html += '</div>';
   } else {
-  html += '<div class="gs-screen">';
-  html += '<div class="gs-head"><div class="gs-mission">' + badge + '</div><div class="gs-badge">' + icon + '</div></div>';
+  var t = gameThemes[game] || {bg:'var(--bg)',card:'var(--surface)',accent:'var(--accent)',text:'var(--text)',border:'var(--border)',tag:'var(--input-bg,#f0f0f0)',name:game};
+  html += '<div class="gt-page" style="background:'+t.bg+'">';
+  html += '<div class="gt-card" style="background:'+t.card+'">';
+  html += '<div class="gt-hdr"><div class="gt-title" style="color:'+t.text+'">'+icon+' '+(t.name||badge)+'</div><div class="gt-badge" style="background:'+t.tag+';color:'+t.accent+';border-color:'+t.border+'">'+badge+'</div></div>';
   if (qMatch) {
     var cur = parseInt(qMatch[1]), total = parseInt(qMatch[2]);
-    html += '<div class="gs-progress"><div class="gs-progress-bar"><div class="gs-progress-fill" style="width:'+(cur/total*100)+'%"></div></div><div class="gs-progress-text">'+cur+'/'+total+'</div></div>';
+    html += '<div class="gt-progress"><div class="gt-progress-bar" style="background:'+t.border+'"><div class="gt-progress-fill" style="width:'+(cur/total*100)+'%;background:'+t.accent+'"></div></div><div class="gt-progress-text" style="color:'+t.accent+'">'+cur+'/'+total+'</div></div>';
   }
   if (hasAB && questionText) {
-    html += '<div class="gs-body" style="margin-bottom:12px">' + escHtml(questionText) + '</div>';
-    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:5})">A ▸ ' + escHtml(optA) + '</button>';
-    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:4})">偏向 A</button>';
-    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:3})">略偏 A</button>';
-    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:2})">略偏 B</button>';
-    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:1})">偏向 B</button>';
-    html += '<button class="gs-action-btn" onclick="gameActionFull(\'mbti_answer\',{a_score:0})">B ▸ ' + escHtml(optB) + '</button>';
+    html += '<div class="gt-question" style="color:'+t.text+'">'+escHtml(questionText)+'</div>';
+    html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+'" onclick="gameActionFull(\'mbti_answer\',{a_score:5})">A ▸ '+escHtml(optA)+'</button>';
+    html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+'" onclick="gameActionFull(\'mbti_answer\',{a_score:4})">偏向 A</button>';
+    html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+'" onclick="gameActionFull(\'mbti_answer\',{a_score:3})">略偏 A</button>';
+    html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+'" onclick="gameActionFull(\'mbti_answer\',{a_score:2})">略偏 B</button>';
+    html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+'" onclick="gameActionFull(\'mbti_answer\',{a_score:1})">偏向 B</button>';
+    html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+'" onclick="gameActionFull(\'mbti_answer\',{a_score:0})">B ▸ '+escHtml(optB)+'</button>';
   } else {
     var displayText = stripJson(text);
-    html += '<div class="gs-body">' + formatGameText(displayText) + '</div>';
+    html += '<div class="gt-body" style="color:'+t.text+'">'+formatGameText(displayText)+'</div>';
   }
   if (info.length) {
     for (var ii = 0; ii < info.length; ii++) {
       if (info[ii] && !/^请用/.test(info[ii]) && !/^A\+B/.test(info[ii]))
-        html += '<div style="font-size:11px;color:var(--text-mid,#999);margin-top:4px">' + escHtml(info[ii]) + '</div>';
+        html += '<div style="font-size:11px;color:'+t.accent+';opacity:.6;margin-top:4px">'+escHtml(info[ii])+'</div>';
     }
   }
-  html += '<div class="gs-footer"><div class="gs-icons"><span class="lit">' + icon + '</span><span>◌</span><span>□</span></div><div class="gs-blink">READY_</div></div>';
+  html += '<div class="gt-footer" style="border-color:'+t.border+'"><div style="color:'+t.accent+'">● '+(t.name||game)+'</div><div style="font-size:10px;color:'+t.border+'">CEDAR TOY</div></div>';
   html += '</div>';
   if (CMD_GAMES.indexOf(game) >= 0) {
-    html += '<div class="gs-console" style="flex-direction:column;align-items:stretch;gap:8px;border-radius:4px;margin-top:6px">';
-    html += '<div class="gs-cmd-input"><input id="gameCmdInput" type="text" placeholder="> 输入指令..." onkeydown="if(event.key===\'Enter\'){gameSendCmd()}"><button onclick="gameSendCmd()">SEND</button></div>';
+    html += '<div style="margin-top:8px;background:'+t.bg+';border-radius:14px;padding:10px">';
+    html += '<div class="gt-cmd-input"><input id="gameCmdInput" type="text" placeholder="'+icon+' 输入指令..." style="border-color:'+t.border+';color:'+t.text+'" onkeydown="if(event.key===\'Enter\'){gameSendCmd()}"><button style="background:'+t.accent+'" onclick="gameSendCmd()">SEND</button></div>';
     var cmdBtns = getCmdButtons(game, gd);
     if (cmdBtns.length) {
-      html += '<div class="gs-cmd-btns">';
+      html += '<div class="gt-cmd-btns">';
       for (var ci = 0; ci < cmdBtns.length; ci++) {
-        html += '<button class="gs-cmd-btn" onclick="gameActionFull(\'cmd\',{command:\''+escHtml(cmdBtns[ci])+'\'})">'+escHtml(cmdBtns[ci])+'</button>';
+        html += '<button class="gt-cmd-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.accent+'" onclick="gameActionFull(\'cmd\',{command:\''+escHtml(cmdBtns[ci])+'\'})">'+escHtml(cmdBtns[ci])+'</button>';
       }
       html += '</div>';
     }
@@ -1974,7 +2040,7 @@ function renderGameFullResponse(text, gameData) {
         var actName = typeof act === 'string' ? act : (act.action || act.label || act.value || act.id || act.name || JSON.stringify(act));
         var actLabel = typeof act === 'string' ? act : (act.label || act.name || act.action || act.value || actName);
         var actParams = (typeof act === 'object' && act.params) ? JSON.stringify(act.params).replace(/'/g,"\\'") : '{}';
-        html += '<button class="gs-action-btn" onclick="gameActionFull(\''+escHtml(String(actName))+'\','+escHtml(actParams)+')">'+escHtml(String(actLabel))+'</button>';
+        html += '<button class="gt-opt-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.text+'" onclick="gameActionFull(\''+escHtml(String(actName))+'\','+escHtml(actParams)+')">'+escHtml(String(actLabel))+'</button>';
       }
       html += '</div>';
     } else {
@@ -1984,12 +2050,13 @@ function renderGameFullResponse(text, gameData) {
         for (var ami = 0; ami < actMatches.length; ami++) {
           var actText = actMatches[ami].replace(/[【】]/g, '');
           if (actText.length > 20) continue;
-          html += '<button class="gs-cmd-btn" onclick="gameActionFull(\''+escHtml(actText)+'\')">'+escHtml(actText)+'</button>';
+          html += '<button class="gt-cmd-btn" style="background:'+t.tag+';border-color:'+t.border+';color:'+t.accent+'" onclick="gameActionFull(\''+escHtml(actText)+'\')">'+escHtml(actText)+'</button>';
         }
         html += '</div>';
       }
     }
   }
+  html += '</div>';
   }
   ct.innerHTML = html;
   ct.scrollTop = 0;
