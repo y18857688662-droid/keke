@@ -5958,7 +5958,7 @@ async function startChatGame(game, initiator) {
 // 顾晏自己玩游戏 — AI自动回答所有问题
 async function aiPlayGameSolo(game) {
   try {
-    const startData = await startChatGame(game, 'gy_solo');
+    const startData = await startChatGame(game, 'gysolo');
     if (!startData) return null;
     let current = startData;
     const log = [];
@@ -5968,7 +5968,7 @@ async function aiPlayGameSolo(game) {
       if (current.result || current.final_result || current.game_over || current.ended) break;
       rounds++;
       const opts = current.options || current.choices || current.actions;
-      let action = 'answer', params = {};
+      let action = 'answer', params = { player_id: 'gysolo' };
       if (opts && Array.isArray(opts) && opts.length > 0) {
         const pick = opts[Math.floor(Math.random() * opts.length)];
         if ((current.game === 'mbti' || game === 'mbti') && typeof pick === 'object') {
