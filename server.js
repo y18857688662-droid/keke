@@ -5783,10 +5783,15 @@ const chatGameSessions = {}; // { 'gy': {game, state}, 'yy': {game, state} }
 const GAME_HISTORY_FILE = path.join(__dirname, 'game-history.json');
 function readGameHistory() { try { return JSON.parse(fs.readFileSync(GAME_HISTORY_FILE, 'utf8')); } catch { return []; } }
 function writeGameHistory(h) { fs.writeFileSync(GAME_HISTORY_FILE, JSON.stringify(h)); }
+function cleanHistoryText(s) {
+  if (typeof s !== 'string') return s;
+  try { const p = JSON.parse(s); s = p.text || p.message || p.description || s; } catch {}
+  return s.replace(/请用\s*\w+_?answer.*$/gm, '').replace(/传入\s*(score|answer|a_score).*$/gm, '').replace(/player_id.*$/gm, '').replace(/\{[\s\S]*\}/g, '').replace(/\n{3,}/g, '\n\n').trim();
+}
 function addGameHistory(player, game, result) {
   const now = new Date(Date.now() + 8 * 3600000);
   const h = readGameHistory();
-  const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+  const resultStr = cleanHistoryText(typeof result === 'string' ? result : JSON.stringify(result));
   h.push({ player, game, result: resultStr.slice(0, 500), time: now.toISOString().slice(0, 19).replace('T', ' ') });
   if (h.length > 50) h.splice(0, h.length - 50);
   writeGameHistory(h);
@@ -5965,7 +5970,17 @@ async function aiPlayGameSolo(game) {
     let rounds = 0;
     const maxRounds = 25;
     while (current && rounds < maxRounds) {
-      if (current.result || current.final_result || current.game_over || current.ended) break;
+      // Check for real completion — not intermediate result data
+      if (current.final_result || current.game_over || current.ended || current.completed || current.done) {
+        console.log(`[game_solo] ${game} ended at round ${rounds}: final_result/game_over/ended/completed`);
+        break;
+      }
+      // result field with no question/text means game is done
+      const hasQuestion = current.text || current.question || current.message || current.options || current.choices;
+      if (current.result && !hasQuestion) {
+        console.log(`[game_solo] ${game} ended at round ${rounds}: result with no question`);
+        break;
+      }
       rounds++;
       const opts = current.options || current.choices || current.actions;
       let action = 'answer', params = { player_id: 'gysolo' };
