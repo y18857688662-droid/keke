@@ -6002,8 +6002,26 @@ async function aiPlayGameSolo(game) {
             action = hint;
             log.push({ round: rounds, action: hint });
           } else {
-            log.push({ round: rounds, note: 'no actions found, ending' });
-            break;
+            const cmdFallbacks = {
+              fishing:['cast','status'], leek:['buy','sell','status'], travel:['explore','status'],
+              burger:['cook','serve','status'], market:['buy','status'], bar:['look','talk','mix'],
+              delve:['mine','look','status'], moonlit:['look','talk'], arcade:['play','status'],
+              imitator_td:['plant','start_wave'], white_room:['look','touch','open'],
+              forest:['look','choose'], ciyuwu:['play'], tarot:['draw'],
+              ai_life:['work','rest','social'], detroit:['look','choose'],
+              turtle_soup:['guess'], camping_plaza:['look','build','status'],
+              crucible_echoes:['look','brew'], memoria:['look','flip'],
+              eco:['observe','feed'], garden_cat:['status','feed','pet']
+            };
+            const cmds = cmdFallbacks[game];
+            if (cmds && cmds.length) {
+              action = 'cmd';
+              params.command = cmds[Math.floor(Math.random() * cmds.length)];
+              log.push({ round: rounds, action: 'cmd', command: params.command });
+            } else {
+              log.push({ round: rounds, note: 'no actions found, ending' });
+              break;
+            }
           }
         }
       }

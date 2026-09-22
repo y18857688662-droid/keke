@@ -2244,19 +2244,29 @@ function getCmdButtons(game, gd) {
   var defaults = {
     fishing: ['cast','status','shop','inventory','help'],
     leek: ['status','buy','sell','market','help'],
-    moonlit: ['look','inventory','help'],
-    delve: ['look','inventory','status','help'],
-    travel: ['look','status','inventory','help'],
-    arcade: ['status','help'],
-    burger: ['status','menu','help'],
-    market: ['status','portfolio','help'],
-    memoria: ['look','status','help'],
-    crucible_echoes: ['look','status','help'],
+    moonlit: ['look','talk','inventory','use','help'],
+    delve: ['look','mine','inventory','status','help'],
+    travel: ['explore','status','destinations','inventory','help'],
+    arcade: ['play','list','status','help'],
+    imitator_td: ['plant','status','shop','start_wave','help'],
+    white_room: ['look','touch','open','status','help'],
+    burger: ['status','menu','cook','serve','shop','help'],
+    market: ['status','portfolio','buy','sell','help'],
+    memoria: ['look','flip','status','help'],
+    crucible_echoes: ['look','brew','inventory','status','help'],
+    bar: ['look','talk','mix','menu','status','help'],
+    forest: ['look','choose','inventory','status','help'],
+    ciyuwu: ['play','hint','status','help'],
+    tarot: ['draw','spread','status','help'],
+    ai_life: ['status','work','rest','social','help'],
+    detroit: ['look','choose','status','save','help'],
+    turtle_soup: ['guess','hint','answer','help'],
+    camping_plaza: ['look','build','status','shop','help'],
     duel: ['rooms','create','join','status','help'],
     eco: ['observe','feed','status','codex','help'],
     garden_cat: ['status','feed','water','pet','garden','shop','help']
   };
-  return defaults[game] || ['status','help'];
+  return defaults[game] || ['status','look','help'];
 }
 
 function gameSendCmd() {
