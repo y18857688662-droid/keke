@@ -1759,7 +1759,10 @@ function loadGameHistory() {
     for (var i = data.history.length - 1; i >= 0; i--) {
       var h = data.history[i];
       var icon = gameIcons[h.game] || '🎮';
-      html += '<div class="game-history-card"><div class="gh-who">' + icon + ' ' + escHtml(h.game.toUpperCase()) + '</div><div class="gh-result">' + escHtml((h.result || '').slice(0, 300)) + '</div><div class="gh-time">' + escHtml(h.time || '') + '</div></div>';
+      var rText = h.result || '';
+      try { var rp = JSON.parse(rText); rText = rp.text || rp.message || rp.result || rText; if (typeof rText === 'object') rText = rText.text || rText.message || JSON.stringify(rText); } catch {}
+      rText = String(rText).slice(0, 300);
+      html += '<div class="game-history-card"><div class="gh-who">' + icon + ' ' + escHtml(h.game.toUpperCase()) + '</div><div class="gh-result">' + escHtml(rText) + '</div><div class="gh-time">' + escHtml(h.time || '') + '</div></div>';
     }
     list.innerHTML = html;
   }).catch(function(){});
