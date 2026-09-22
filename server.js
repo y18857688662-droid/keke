@@ -5987,14 +5987,24 @@ async function aiPlayGameSolo(game) {
         log.push({ round: rounds, action, pick: typeof pick === 'string' ? pick : (pick.label || pick.action || pick.value || '') });
       } else {
         const textStr = typeof current === 'string' ? current : (current.text || current.message || JSON.stringify(current));
-        const actionHints = textStr.match(/【([^】]+)】/g);
-        if (actionHints && actionHints.length) {
-          const hint = actionHints[Math.floor(Math.random() * actionHints.length)].replace(/[【】]/g, '');
-          action = hint;
-          log.push({ round: rounds, action: hint });
+        if (game === 'mbti' || textStr.match(/请用\s*mbti_answer/)) {
+          action = 'mbti_answer';
+          params.a_score = Math.floor(Math.random() * 6);
+          log.push({ round: rounds, action, a_score: params.a_score });
+        } else if (textStr.match(/请用\s*(\w+_?answer)\s*传入\s*score/)) {
+          action = textStr.match(/请用\s*(\w+_?answer)/)[1];
+          params.score = Math.floor(Math.random() * 7) + 1;
+          log.push({ round: rounds, action, score: params.score });
         } else {
-          log.push({ round: rounds, note: 'no actions found, ending' });
-          break;
+          const actionHints = textStr.match(/【([^】]+)】/g);
+          if (actionHints && actionHints.length) {
+            const hint = actionHints[Math.floor(Math.random() * actionHints.length)].replace(/[【】]/g, '');
+            action = hint;
+            log.push({ round: rounds, action: hint });
+          } else {
+            log.push({ round: rounds, note: 'no actions found, ending' });
+            break;
+          }
         }
       }
       let text = await mcpCall(GAME_MCP_URL, 'play', { game, action, params });
