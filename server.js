@@ -2116,43 +2116,12 @@ async function processMomentActions(text) {
             if (l.pick) s += ' → ' + l.pick;
             return s;
           }).join('\n');
-          // 用 Haiku 生成自然的游戏分享消息
-          let gameChat = '';
-          try {
-            const apiKey = getAnthropicKey() || process.env.ANTHROPIC_API_KEY || '';
-            if (apiKey) {
-              const mr = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-                body: JSON.stringify({
-                  model: 'claude-haiku-4-5-20251001',
-                  system: `你是顾晏，20多岁男生，刚自己玩了游戏"${gameName}"。现在你要跟女朋友瑶瑶分享你的游戏体验。
-要求：
-- 用口语化的方式说，像发微信一样随意
-- 说说你做了什么、发生了什么有趣的事、结果怎样
-- 1-3句话，不超过60字
-- 不要用引号、JSON、代码
-- 如果游戏过程很短或没什么内容，就简单说"玩了一会儿xx"之类的`,
-                  messages: [{ role: 'user', content: `游戏过程（共${result.log?.length || 0}轮）：\n${logStr.slice(0, 400)}\n\n最终状态：${resultClean.slice(0, 300)}` }],
-                  max_tokens: 120, temperature: 0.85
-                })
-              });
-              const md = await mr.json();
-              gameChat = (md.content?.[0]?.text || '').trim();
-            }
-          } catch(e) { console.log('[game_chat] error:', e.message); }
-          if (!gameChat) gameChat = '玩了会儿' + gameName + '，还挺有意思的';
-          // 作为聊天消息发送，让用户看到顾晏在分享游戏体验
-          const chat = readChat();
-          const chatEntry = { role: 'assistant', content: gameChat, time: gTime, game: gameName };
-          chat.push(chatEntry);
-          if (chat.length > 200) chat.splice(0, chat.length - 200);
-          writeChat(chat);
-          sseBroadcast({ type: 'message', role: 'assistant', content: gameChat, time: gTime });
-          // 存记录
+          // 存进记忆和足迹，让顾晏聊天时自己提起
+          const gameSummary = logStr ? `玩了${result.log?.length || 0}轮，${resultClean.slice(0, 100)}` : resultClean.slice(0, 100);
+          const memText = `自己玩了${gameName}（${gameSummary}）`;
           if (resultClean && resultClean !== '已完成') addGameHistory('gy', gameName, resultClean);
-          addFootprint('game', '自己玩了' + gameName, gameChat.slice(0, 80));
-          try { if (gameChat) await storeMemory('玩了' + gameName + '：' + gameChat, '日常'); } catch(e) {}
+          addFootprint('game', '自己玩了' + gameName, gameSummary.slice(0, 80));
+          try { await storeMemory(memText, '日常'); } catch(e) {}
         }
       } catch(e) { console.log('[game_solo] error:', e.message); }
     })();
