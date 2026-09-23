@@ -5806,9 +5806,15 @@ const GAME_HISTORY_FILE = path.join(__dirname, 'game-history.json');
 function readGameHistory() { try { return JSON.parse(fs.readFileSync(GAME_HISTORY_FILE, 'utf8')); } catch { return []; } }
 function writeGameHistory(h) { fs.writeFileSync(GAME_HISTORY_FILE, JSON.stringify(h)); }
 function cleanHistoryText(s) {
-  if (typeof s !== 'string') return s;
-  try { const p = JSON.parse(s); s = p.text || p.message || p.description || s; } catch {}
-  return s.replace(/请用\s*\w+_?answer.*$/gm, '').replace(/传入\s*(score|answer|a_score).*$/gm, '').replace(/player_id.*$/gm, '').replace(/\{[\s\S]*\}/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  if (typeof s !== 'string') return String(s || '');
+  try { const p = JSON.parse(s); s = p.text || p.message || p.description || (typeof p.result === 'string' ? p.result : '') || s; if (typeof s === 'object') s = s.text || s.message || JSON.stringify(s); } catch {}
+  s = String(s);
+  s = s.replace(/请用\s*\w+_?answer.*$/gm, '').replace(/传入\s*(score|answer|a_score).*$/gm, '');
+  s = s.replace(/player_id.*$/gm, '').replace(/"[a-zA-Z_]+":\s*"?[^"\n]*"?,?/g, '');
+  s = s.replace(/\{[^{}]*\}/g, '').replace(/\[[^\[\]]*\]/g, '');
+  s = s.replace(/jsonrpc|"action"|"params"|"game"/g, '');
+  s = s.replace(/\n{2,}/g, '\n').trim();
+  return s || '已完成';
 }
 function addGameHistory(player, game, result) {
   const now = new Date(Date.now() + 8 * 3600000);
@@ -5925,7 +5931,8 @@ app.post('/game/play', async (req, res) => {
 app.get('/game/history', (req, res) => {
   try {
     const h = readGameHistory();
-    res.json({ ok: true, history: h });
+    const cleaned = h.map(item => ({ ...item, result: cleanHistoryText(item.result) }));
+    res.json({ ok: true, history: cleaned });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 

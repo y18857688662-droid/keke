@@ -1760,8 +1760,14 @@ function loadGameHistory() {
       var h = data.history[i];
       var icon = gameIcons[h.game] || '🎮';
       var rText = h.result || '';
-      try { var rp = JSON.parse(rText); rText = rp.text || rp.message || rp.result || rText; if (typeof rText === 'object') rText = rText.text || rText.message || JSON.stringify(rText); } catch {}
-      rText = String(rText).slice(0, 300);
+      try { var rp = JSON.parse(rText); rText = rp.text || rp.message || rp.description || rp.result || rText; if (typeof rText === 'object') rText = rText.text || rText.message || JSON.stringify(rText); } catch {}
+      rText = String(rText);
+      rText = rText.replace(/\{[\s\S]*?\}/g, '').replace(/\[[\s\S]*?\]/g, '');
+      rText = rText.replace(/请用\s*\w+.*$/gm, '').replace(/传入\s*(score|answer|a_score).*$/gm, '');
+      rText = rText.replace(/"[a-zA-Z_]+":/g, '').replace(/player_id.*$/gm, '');
+      rText = rText.replace(/jsonrpc|"action"|"params"|"game"/g, '');
+      rText = rText.replace(/\n{2,}/g, '\n').trim().slice(0, 200);
+      if (!rText) rText = '已完成';
       html += '<div class="game-history-card"><div class="gh-who">' + icon + ' ' + escHtml(h.game.toUpperCase()) + '</div><div class="gh-result">' + escHtml(rText) + '</div><div class="gh-time">' + escHtml(h.time || '') + '</div></div>';
     }
     list.innerHTML = html;
