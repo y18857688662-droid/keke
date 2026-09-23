@@ -2112,6 +2112,26 @@ async function processMomentActions(text) {
           sseBroadcast({ type: 'game_result', game: gameName, player: 'gy', data: result.result, time: gTime });
           addGameHistory('gy', gameName, resultText);
           addFootprint('game', '自己玩了' + gameName, (resultText || '').slice(0, 80));
+          // 用 Haiku 把游戏结果总结成一段自然的记忆存进记忆库
+          try {
+            const apiKey = getAnthropicKey() || process.env.ANTHROPIC_API_KEY || '';
+            if (apiKey) {
+              const logStr = (result.log || []).map(l => `第${l.round}轮: ${l.action || l.command || l.note || ''}`).join(', ');
+              const mr = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+                body: JSON.stringify({
+                  model: 'claude-haiku-4-5-20251001',
+                  system: '你是顾晏，一个男生。你刚自己玩了一个游戏。用第一人称写一句话总结你的游戏体验和结果，像跟女朋友分享一样自然随意，30字以内。不要用引号。',
+                  messages: [{ role: 'user', content: `游戏：${gameName}\n结果：${resultText.slice(0, 300)}\n过程：${logStr.slice(0, 200)}` }],
+                  max_tokens: 60, temperature: 0.8
+                })
+              });
+              const md = await mr.json();
+              const memText = (md.content?.[0]?.text || '').trim();
+              if (memText) await storeMemory('玩了' + gameName + '：' + memText, '日常');
+            }
+          } catch(e) { console.log('[game_memory] error:', e.message); }
         }
       } catch(e) { console.log('[game_solo] error:', e.message); }
     })();
