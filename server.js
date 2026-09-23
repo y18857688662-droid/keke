@@ -5838,6 +5838,9 @@ function cleanHistoryText(s) {
   s = s.replace(/jsonrpc|"action"|"params"|"game"/g, '');
   s = s.replace(/cmd\([^)]*\)?/g, '');
   s = s.replace(/（种子\s*\d+）/g, '');
+  s = s.replace(/已重开新局[^。\n]*。?\s*/g, '');
+  s = s.replace(/调\s*(看规则|开钓)[^。\n]*。?\s*/g, '');
+  s = s.replace(/看规则[，。]?\s*/g, '').replace(/开钓[。]?\s*/g, '');
   s = s.replace(/【cedartoy】/g, '');
   s = s.replace(/[{}"\\]/g, '');
   s = s.replace(/\n{2,}/g, '\n').trim();
@@ -5960,10 +5963,14 @@ app.get('/game/history', (req, res) => {
     const h = readGameHistory();
     const cleaned = h.map(item => ({ ...item, result: cleanHistoryText(item.result) }))
       .filter(item => {
-        const r = item.result || '';
-        if (r === '已完成' || r === '。' || !r.trim()) return false;
-        if (/^未知\s*\w+\s*action$/i.test(r)) return false;
-        if (/参数错误/.test(r)) return false;
+        const r = (item.result || '').replace(/[，。、\s]/g, '').trim();
+        if (!r || r === '已完成') return false;
+        if (/^未知\s*\w+\s*action$/i.test(item.result)) return false;
+        if (/参数错误/.test(item.result)) return false;
+        if (/^已重开新局/.test(item.result)) return false;
+        if (/^(调|看规则|开钓)\s*[，。]?\s*$/.test(item.result)) return false;
+        const meaningful = (item.result || '').replace(/[，。、\s调看规则开钓]/g, '').trim();
+        if (meaningful.length < 4) return false;
         return true;
       });
     res.json({ ok: true, history: cleaned });
