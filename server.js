@@ -4040,17 +4040,14 @@ function writeFootprints(fp) { fs.writeFileSync(FOOTPRINTS_FILE, JSON.stringify(
 function cleanFootprintDetail(d) {
   if (!d) return '';
   d = String(d);
-  // 去掉 JSON 碎片（包括截断的）
-  d = d.replace(/^\s*\{.*$/s, '');
-  d = d.replace(/^\s*\[.*$/s, '');
+  d = d.replace(/^\s*\{.*$/s, '').replace(/^\s*\[.*$/s, '');
   d = d.replace(/"[a-zA-Z_]+"[,:]/g, '');
-  d = d.replace(/cmd\([^)]*\)?/g, '');
-  d = d.replace(/（种子\s*\d+）/g, '');
-  d = d.replace(/已重开新局\s*。?\s*/g, '');
-  d = d.replace(/【cedartoy】/g, '');
-  d = d.replace(/guest:\w+/g, '');
-  d = d.replace(/[{}"\\]/g, '');
-  d = d.replace(/\s{2,}/g, ' ').trim();
+  d = d.replace(/cmd\([^)]*\)?/g, '').replace(/（种子\s*\d+）/g, '');
+  d = d.replace(/已重开新局[^。]*。?\s*/g, '');
+  d = d.replace(/检测到已有存档[^。]*。?/g, '').replace(/此操作将永久覆盖[^。]*。?/g, '');
+  d = d.replace(/确认重开请在参数中加\s*confirm\s*=\s*true/g, '');
+  d = d.replace(/【cedartoy】/g, '').replace(/guest:\w+/g, '');
+  d = d.replace(/[{}"\\]/g, '').replace(/\s{2,}/g, ' ').trim();
   return d || '';
 }
 function addFootprint(type, summary, detail) {
@@ -5841,6 +5838,8 @@ function cleanHistoryText(s) {
   s = s.replace(/已重开新局[^。\n]*。?\s*/g, '');
   s = s.replace(/调\s*(看规则|开钓)[^。\n]*。?\s*/g, '');
   s = s.replace(/看规则[，。]?\s*/g, '').replace(/开钓[。]?\s*/g, '');
+  s = s.replace(/检测到已有存档[^。]*。?/g, '').replace(/此操作将永久覆盖[^。]*。?/g, '');
+  s = s.replace(/确认重开请在参数中加\s*confirm\s*=\s*true/g, '');
   s = s.replace(/【cedartoy】/g, '');
   s = s.replace(/[{}"\\]/g, '');
   s = s.replace(/\n{2,}/g, '\n').trim();
@@ -5904,11 +5903,11 @@ const GAME_START_MAP = {
   humanity: { action: 'humanity_start', params: { mode: 'full' } },
   sins_virtues: { action: 'sins_virtues_start', params: { mode: 'full' } },
   bdsmtest: { action: 'bdsmtest_start', params: { mode: 'normal' } },
-  fishing: { action: 'new' }, leek: { action: 'new' }, moonlit: { action: 'new' },
-  delve: { action: 'new' }, travel: { action: 'new' }, arcade: { action: 'new' },
-  imitator_td: { action: 'new' }, white_room: { action: 'new' },
-  burger: { action: 'new' }, market: { action: 'new' },
-  crucible_echoes: { action: 'new' }, memoria: { action: 'new', params: { level: 1 } },
+  fishing: { action: 'new', params: { confirm: true } }, leek: { action: 'new', params: { confirm: true } }, moonlit: { action: 'new', params: { confirm: true } },
+  delve: { action: 'new', params: { confirm: true } }, travel: { action: 'new', params: { confirm: true } }, arcade: { action: 'new', params: { confirm: true } },
+  imitator_td: { action: 'new', params: { confirm: true } }, white_room: { action: 'new', params: { confirm: true } },
+  burger: { action: 'new', params: { confirm: true } }, market: { action: 'new', params: { confirm: true } },
+  crucible_echoes: { action: 'new', params: { confirm: true } }, memoria: { action: 'new', params: { level: 1, confirm: true } },
   workkk: { action: 'work_action', params: { action: 'get_status', thought: '看看今天的工作' } },
   bar: { action: 'version' }, ai_life: { action: 'start_game' },
   detroit: { action: 'list_saves' }, forest: { action: 'lines' },
@@ -5968,6 +5967,8 @@ app.get('/game/history', (req, res) => {
         if (/^未知\s*\w+\s*action$/i.test(item.result)) return false;
         if (/参数错误/.test(item.result)) return false;
         if (/^已重开新局/.test(item.result)) return false;
+        if (/检测到已有存档/.test(item.result)) return false;
+        if (/confirm\s*=\s*true/.test(item.result)) return false;
         if (/^(调|看规则|开钓)\s*[，。]?\s*$/.test(item.result)) return false;
         const meaningful = (item.result || '').replace(/[，。、\s调看规则开钓]/g, '').trim();
         if (meaningful.length < 4) return false;
