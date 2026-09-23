@@ -2105,35 +2105,54 @@ async function processMomentActions(text) {
     (async () => {
       try {
         const result = await aiPlayGameSolo(gameName);
-        if (result && result.result) {
+        if (result) {
           const now2 = new Date(Date.now() + 8 * 3600000);
           const gTime = now2.toISOString().slice(0, 19).replace('T', ' ');
-          const resultRaw = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
+          const resultRaw = result.result ? (typeof result.result === 'string' ? result.result : JSON.stringify(result.result)) : '';
           const resultClean = cleanHistoryText(resultRaw);
-          sseBroadcast({ type: 'game_result', game: gameName, player: 'gy', data: result.result, time: gTime });
-          addGameHistory('gy', gameName, resultRaw);
-          // 用 Haiku 总结游戏体验 → footprint + 记忆库
-          let gameSummary = '';
+          const logStr = (result.log || []).map(l => {
+            let s = `第${l.round}轮: ${l.action || ''}`;
+            if (l.command) s += ' ' + l.command;
+            if (l.pick) s += ' → ' + l.pick;
+            return s;
+          }).join('\n');
+          // 用 Haiku 生成自然的游戏分享消息
+          let gameChat = '';
           try {
             const apiKey = getAnthropicKey() || process.env.ANTHROPIC_API_KEY || '';
             if (apiKey) {
-              const logStr = (result.log || []).map(l => `第${l.round}轮: ${l.action || l.command || l.note || ''}`).join(', ');
               const mr = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
                 body: JSON.stringify({
                   model: 'claude-haiku-4-5-20251001',
-                  system: '你是顾晏，一个男生。你刚自己玩了一个游戏。用第一人称写一句话总结你的游戏体验和结果，像跟女朋友分享一样自然随意，30字以内。不要用引号，不要JSON，不要代码。',
-                  messages: [{ role: 'user', content: `游戏：${gameName}\n结果：${resultClean.slice(0, 300)}\n过程：${logStr.slice(0, 200)}\n共${result.log?.length || 0}轮` }],
-                  max_tokens: 60, temperature: 0.8
+                  system: `你是顾晏，20多岁男生，刚自己玩了游戏"${gameName}"。现在你要跟女朋友瑶瑶分享你的游戏体验。
+要求：
+- 用口语化的方式说，像发微信一样随意
+- 说说你做了什么、发生了什么有趣的事、结果怎样
+- 1-3句话，不超过60字
+- 不要用引号、JSON、代码
+- 如果游戏过程很短或没什么内容，就简单说"玩了一会儿xx"之类的`,
+                  messages: [{ role: 'user', content: `游戏过程（共${result.log?.length || 0}轮）：\n${logStr.slice(0, 400)}\n\n最终状态：${resultClean.slice(0, 300)}` }],
+                  max_tokens: 120, temperature: 0.85
                 })
               });
               const md = await mr.json();
-              gameSummary = (md.content?.[0]?.text || '').trim();
-              if (gameSummary) await storeMemory('玩了' + gameName + '：' + gameSummary, '日常');
+              gameChat = (md.content?.[0]?.text || '').trim();
             }
-          } catch(e) { console.log('[game_memory] error:', e.message); }
-          addFootprint('game', '自己玩了' + gameName, gameSummary || resultClean.slice(0, 80));
+          } catch(e) { console.log('[game_chat] error:', e.message); }
+          if (!gameChat) gameChat = '玩了会儿' + gameName + '，还挺有意思的';
+          // 作为聊天消息发送，让用户看到顾晏在分享游戏体验
+          const chat = readChat();
+          const chatEntry = { role: 'assistant', content: gameChat, time: gTime, game: gameName };
+          chat.push(chatEntry);
+          if (chat.length > 200) chat.splice(0, chat.length - 200);
+          writeChat(chat);
+          sseBroadcast({ type: 'message', role: 'assistant', content: gameChat, time: gTime });
+          // 存记录
+          if (resultClean && resultClean !== '已完成') addGameHistory('gy', gameName, resultClean);
+          addFootprint('game', '自己玩了' + gameName, gameChat.slice(0, 80));
+          try { if (gameChat) await storeMemory('玩了' + gameName + '：' + gameChat, '日常'); } catch(e) {}
         }
       } catch(e) { console.log('[game_solo] error:', e.message); }
     })();
