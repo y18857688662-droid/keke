@@ -353,7 +353,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
     try {
       const fp = readFootprints().slice(-5);
       if (fp.length) {
-        liveCtx += '\n你最近做过：' + fp.map(f => f.summary + (f.detail ? '（' + f.detail.slice(0, 60) + '）' : '')).join('；');
+        liveCtx += '\n你最近做过：' + fp.map(f => { let d = f.detail || ''; if (f.type === 'game' && d) { try { const p = JSON.parse(d); d = p.text || p.message || d; } catch {} d = d.replace(/\{[\s\S]*?\}/g, '').replace(/"[a-zA-Z_]+":/g, '').replace(/cmd\([^)]*\)/g, '').replace(/（种子\s*\d+）/g, '').replace(/已重开新局\s*。?\s*/g, '').trim(); } return f.summary + (d ? '（' + d.slice(0, 60) + '）' : ''); }).join('；');
       }
     } catch(e) {}
     try {
@@ -4165,7 +4165,16 @@ function updateChatFreq() {
 app.get('/footprints/list', (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 200);
   const fp = readFootprints();
-  res.json({ footprints: fp.slice(-limit).reverse() });
+  const cleaned = fp.map(f => {
+    if (f.type === 'game' && f.detail) {
+      let d = f.detail;
+      try { const p = JSON.parse(d); d = p.text || p.message || d; } catch {}
+      d = String(d).replace(/\{[\s\S]*?\}/g, '').replace(/"[a-zA-Z_]+":/g, '').replace(/cmd\([^)]*\)/g, '').replace(/（种子\s*\d+）/g, '').replace(/已重开新局\s*。?\s*/g, '').trim();
+      return { ...f, detail: d || '已完成' };
+    }
+    return f;
+  });
+  res.json({ footprints: cleaned.slice(-limit).reverse() });
 });
 
 app.post('/footprints/cleanup', (req, res) => {
@@ -5813,6 +5822,12 @@ function cleanHistoryText(s) {
   s = s.replace(/player_id.*$/gm, '').replace(/"[a-zA-Z_]+":\s*"?[^"\n]*"?,?/g, '');
   s = s.replace(/\{[^{}]*\}/g, '').replace(/\[[^\[\]]*\]/g, '');
   s = s.replace(/jsonrpc|"action"|"params"|"game"/g, '');
+  // 清除 MCP 指令文本
+  s = s.replace(/调\s*cmd\([^)]*\)[^。\n]*/g, '');
+  s = s.replace(/cmd\(['"][^'"]*['"]\)/g, '');
+  s = s.replace(/（种子\s*\d+）/g, '');
+  s = s.replace(/已重开新局\s*。?\s*/g, '');
+  s = s.replace(/【cedartoy】/g, '');
   s = s.replace(/\n{2,}/g, '\n').trim();
   return s || '已完成';
 }
