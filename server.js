@@ -5960,7 +5960,45 @@ async function startChatGame(game, initiator) {
   }
 }
 
-// 顾晏自己玩游戏 — AI自动回答所有问题
+// 用 AI 理解 MCP 回复并决定下一步动作
+async function aiDecideGameAction(game, mcpResponse) {
+  const apiKey = getAnthropicKey() || process.env.ANTHROPIC_API_KEY || '';
+  if (!apiKey) return null;
+  const responseStr = typeof mcpResponse === 'string' ? mcpResponse : JSON.stringify(mcpResponse);
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        system: `你是游戏玩家AI。你在玩MCP游戏"${game}"。根据游戏返回的JSON，决定下一步操作。
+
+规则：
+1. 如果游戏已结束（有final_result/game_over/ended/completed字段，或者有最终结果且没有新问题），回复 {"done":true}
+2. 如果游戏还在继续，回复 {"action":"动作名","params":{"参数名":"值"}} — params里必须包含 player_id:"gysolo"
+3. 仔细阅读游戏指令，比如"请用 mbti_answer 传入 a_score"就表示 action 是 mbti_answer，params 里要有 a_score
+4. 如果有选项(options/choices)，从中随机选一个
+5. 如果是问卷/测试题，随机给出合理的答案
+6. 对于命令类游戏(fishing/travel等)，用合适的游戏命令如 cast/explore/status 等
+
+只回复JSON，不要其他文字。`,
+        messages: [{ role: 'user', content: `游戏"${game}"返回了：\n${responseStr}` }],
+        max_tokens: 200,
+        temperature: 0.7
+      })
+    });
+    const data = await r.json();
+    const txt = (data.content?.[0]?.text || '').trim();
+    const jsonMatch = txt.match(/\{[\s\S]*\}/);
+    if (jsonMatch) return JSON.parse(jsonMatch[0]);
+    return null;
+  } catch (e) {
+    console.log('[ai_decide] error:', e.message);
+    return null;
+  }
+}
+
+// 顾晏自己玩游戏 — AI理解MCP回复并自动玩
 async function aiPlayGameSolo(game) {
   try {
     const startData = await startChatGame(game, 'gysolo');
@@ -5970,76 +6008,17 @@ async function aiPlayGameSolo(game) {
     let rounds = 0;
     const maxRounds = 25;
     while (current && rounds < maxRounds) {
-      // Check for real completion — not intermediate result data
-      if (current.final_result || current.game_over || current.ended || current.completed || current.done) {
-        console.log(`[game_solo] ${game} ended at round ${rounds}: final_result/game_over/ended/completed`);
-        break;
-      }
-      // result field with no question/text means game is done
-      const hasQuestion = current.text || current.question || current.message || current.options || current.choices;
-      if (current.result && !hasQuestion) {
-        console.log(`[game_solo] ${game} ended at round ${rounds}: result with no question`);
-        break;
-      }
       rounds++;
-      const opts = current.options || current.choices || current.actions;
-      let action = 'answer', params = { player_id: 'gysolo' };
-      if (opts && Array.isArray(opts) && opts.length > 0) {
-        const pick = opts[Math.floor(Math.random() * opts.length)];
-        if ((current.game === 'mbti' || game === 'mbti') && typeof pick === 'object') {
-          action = 'mbti_answer';
-          params.a_score = pick.a_score !== undefined ? pick.a_score : Math.floor(Math.random() * 6);
-        } else if (typeof pick === 'string') {
-          action = pick;
-        } else if (pick.action) {
-          action = pick.action;
-          if (pick.params) Object.assign(params, pick.params);
-        } else if (pick.value !== undefined) {
-          params.answer = pick.value;
-        } else if (pick.id !== undefined) {
-          params.answer = pick.id;
-        }
-        log.push({ round: rounds, action, pick: typeof pick === 'string' ? pick : (pick.label || pick.action || pick.value || '') });
-      } else {
-        const textStr = typeof current === 'string' ? current : (current.text || current.message || JSON.stringify(current));
-        if (game === 'mbti' || textStr.match(/请用\s*mbti_answer/)) {
-          action = 'mbti_answer';
-          params.a_score = Math.floor(Math.random() * 6);
-          log.push({ round: rounds, action, a_score: params.a_score });
-        } else if (textStr.match(/请用\s*(\w+_?answer)\s*传入\s*score/)) {
-          action = textStr.match(/请用\s*(\w+_?answer)/)[1];
-          params.score = Math.floor(Math.random() * 7) + 1;
-          log.push({ round: rounds, action, score: params.score });
-        } else {
-          const actionHints = textStr.match(/【([^】]+)】/g);
-          if (actionHints && actionHints.length) {
-            const hint = actionHints[Math.floor(Math.random() * actionHints.length)].replace(/[【】]/g, '');
-            action = hint;
-            log.push({ round: rounds, action: hint });
-          } else {
-            const cmdFallbacks = {
-              fishing:['cast','status'], leek:['buy','sell','status'], travel:['explore','status'],
-              burger:['cook','serve','status'], market:['buy','status'], bar:['look','talk','mix'],
-              delve:['mine','look','status'], moonlit:['look','talk'], arcade:['play','status'],
-              imitator_td:['plant','start_wave'], white_room:['look','touch','open'],
-              forest:['look','choose'], ciyuwu:['play'], tarot:['draw'],
-              ai_life:['work','rest','social'], detroit:['look','choose'],
-              turtle_soup:['guess'], camping_plaza:['look','build','status'],
-              crucible_echoes:['look','brew'], memoria:['look','flip'],
-              eco:['observe','feed'], garden_cat:['status','feed','pet']
-            };
-            const cmds = cmdFallbacks[game];
-            if (cmds && cmds.length) {
-              action = 'cmd';
-              params.command = cmds[Math.floor(Math.random() * cmds.length)];
-              log.push({ round: rounds, action: 'cmd', command: params.command });
-            } else {
-              log.push({ round: rounds, note: 'no actions found, ending' });
-              break;
-            }
-          }
-        }
+      const decision = await aiDecideGameAction(game, current);
+      if (!decision || decision.done) {
+        console.log(`[game_solo] ${game} ended at round ${rounds}: AI says done`);
+        break;
       }
+      const action = decision.action || 'answer';
+      const params = { player_id: 'gysolo', ...(decision.params || {}) };
+      if (!params.player_id) params.player_id = 'gysolo';
+      log.push({ round: rounds, action, params: { ...params, player_id: undefined } });
+      console.log(`[game_solo] ${game} round ${rounds}: action=${action} params=${JSON.stringify(params)}`);
       let text = await mcpCall(GAME_MCP_URL, 'play', { game, action, params });
       try {
         const parsed = JSON.parse(text);
