@@ -353,7 +353,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
     try {
       const fp = readFootprints().slice(-5);
       if (fp.length) {
-        liveCtx += '\n你最近做过：' + fp.map(f => { let d = f.detail || ''; if (f.type === 'game' && d) { try { const p = JSON.parse(d); d = p.text || p.message || d; } catch {} d = d.replace(/\{[\s\S]*?\}/g, '').replace(/"[a-zA-Z_]+":/g, '').replace(/cmd\([^)]*\)/g, '').replace(/（种子\s*\d+）/g, '').replace(/已重开新局\s*。?\s*/g, '').trim(); } return f.summary + (d ? '（' + d.slice(0, 60) + '）' : ''); }).join('；');
+        liveCtx += '\n你最近做过：' + fp.map(f => { const d = f.type === 'game' ? cleanFootprintDetail(f.detail) : (f.detail || ''); return f.summary + (d ? '（' + d.slice(0, 60) + '）' : ''); }).join('；');
       }
     } catch(e) {}
     try {
@@ -4037,6 +4037,22 @@ function writeAutoState(s) { fs.writeFileSync(AUTO_STATE_FILE, JSON.stringify(s)
 function readFootprints() { try { return JSON.parse(fs.readFileSync(FOOTPRINTS_FILE, 'utf8')); } catch { return []; } }
 function writeFootprints(fp) { fs.writeFileSync(FOOTPRINTS_FILE, JSON.stringify(fp.slice(-200))); }
 
+function cleanFootprintDetail(d) {
+  if (!d) return '';
+  d = String(d);
+  // 去掉 JSON 碎片（包括截断的）
+  d = d.replace(/^\s*\{.*$/s, '');
+  d = d.replace(/^\s*\[.*$/s, '');
+  d = d.replace(/"[a-zA-Z_]+"[,:]/g, '');
+  d = d.replace(/cmd\([^)]*\)?/g, '');
+  d = d.replace(/（种子\s*\d+）/g, '');
+  d = d.replace(/已重开新局\s*。?\s*/g, '');
+  d = d.replace(/【cedartoy】/g, '');
+  d = d.replace(/guest:\w+/g, '');
+  d = d.replace(/[{}"\\]/g, '');
+  d = d.replace(/\s{2,}/g, ' ').trim();
+  return d || '';
+}
 function addFootprint(type, summary, detail) {
   const now = new Date(Date.now() + 8 * 3600000);
   const fp = readFootprints();
@@ -4167,10 +4183,7 @@ app.get('/footprints/list', (req, res) => {
   const fp = readFootprints();
   const cleaned = fp.map(f => {
     if (f.type === 'game' && f.detail) {
-      let d = f.detail;
-      try { const p = JSON.parse(d); d = p.text || p.message || d; } catch {}
-      d = String(d).replace(/\{[\s\S]*?\}/g, '').replace(/"[a-zA-Z_]+":/g, '').replace(/cmd\([^)]*\)/g, '').replace(/（种子\s*\d+）/g, '').replace(/已重开新局\s*。?\s*/g, '').trim();
-      return { ...f, detail: d || '已完成' };
+      return { ...f, detail: cleanFootprintDetail(f.detail) };
     }
     return f;
   });
@@ -5819,15 +5832,14 @@ function cleanHistoryText(s) {
   try { const p = JSON.parse(s); s = p.text || p.message || p.description || (typeof p.result === 'string' ? p.result : '') || s; if (typeof s === 'object') s = s.text || s.message || JSON.stringify(s); } catch {}
   s = String(s);
   s = s.replace(/请用\s*\w+_?answer.*$/gm, '').replace(/传入\s*(score|answer|a_score).*$/gm, '');
-  s = s.replace(/player_id.*$/gm, '').replace(/"[a-zA-Z_]+":\s*"?[^"\n]*"?,?/g, '');
+  s = s.replace(/player_id.*$/gm, '');
   s = s.replace(/\{[^{}]*\}/g, '').replace(/\[[^\[\]]*\]/g, '');
+  s = s.replace(/"[a-zA-Z_]+":\s*"?[^"\n]*"?,?/g, '');
   s = s.replace(/jsonrpc|"action"|"params"|"game"/g, '');
-  // 清除 MCP 指令文本
-  s = s.replace(/调\s*cmd\([^)]*\)[^。\n]*/g, '');
-  s = s.replace(/cmd\(['"][^'"]*['"]\)/g, '');
+  s = s.replace(/cmd\([^)]*\)?/g, '');
   s = s.replace(/（种子\s*\d+）/g, '');
-  s = s.replace(/已重开新局\s*。?\s*/g, '');
   s = s.replace(/【cedartoy】/g, '');
+  s = s.replace(/[{}"\\]/g, '');
   s = s.replace(/\n{2,}/g, '\n').trim();
   return s || '已完成';
 }
@@ -5946,7 +5958,14 @@ app.post('/game/play', async (req, res) => {
 app.get('/game/history', (req, res) => {
   try {
     const h = readGameHistory();
-    const cleaned = h.map(item => ({ ...item, result: cleanHistoryText(item.result) }));
+    const cleaned = h.map(item => ({ ...item, result: cleanHistoryText(item.result) }))
+      .filter(item => {
+        const r = item.result || '';
+        if (r === '已完成' || r === '。' || !r.trim()) return false;
+        if (/^未知\s*\w+\s*action$/i.test(r)) return false;
+        if (/参数错误/.test(r)) return false;
+        return true;
+      });
     res.json({ ok: true, history: cleaned });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
