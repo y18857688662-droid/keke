@@ -2287,7 +2287,8 @@ app.post('/chat/send', async (req, res) => {
       const sysPrompt = await getChatSystem();
       sseBroadcast({ type: 'memory', action: sysPrompt.includes('记忆') ? 'read_ok' : 'read_none' });
       console.log('[cli] calling claude CLI for reply...');
-      const cliResult = await claudeCliReply(sysPrompt, chat.slice(-10));
+      const chatNow = readChat();
+      const cliResult = await claudeCliReply(sysPrompt, chatNow.slice(-10));
       let cliReply = cliResult?.text || cliResult;
       if (typeof cliReply === 'string') cliReply = cliReply.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '').replace(/。(?=\s*\*)/g, '');
       const cliThinking = cliResult?.thinking || '';
@@ -2422,7 +2423,8 @@ app.post('/chat/send', async (req, res) => {
         if (cliHeartbeat) { clearInterval(cliHeartbeat); cliHeartbeat = null; }
         cliMsgCount = 0;
         const sysPrompt2 = await getChatSystem();
-        const cliReply2 = await claudeCliReply(sysPrompt2, chat.slice(-10));
+        const chatRetry = readChat();
+        const cliReply2 = await claudeCliReply(sysPrompt2, chatRetry.slice(-10));
         if (cliReply2) {
           const replyTime2 = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
           const savedReply2 = stripVoiceActions(cliReply2);
@@ -2439,7 +2441,8 @@ app.post('/chat/send', async (req, res) => {
     return res.json({ ok: false, error: 'CLI不可用，请稍后再试', time });
   }
   try {
-    const recent = chat.slice(-20);
+    const chatApi = readChat();
+    const recent = chatApi.slice(-20);
     sseBroadcast({ type: 'memory', action: 'reading' });
     const sysPrompt = await getChatSystem();
     const memoryLoaded = sysPrompt.includes('记忆');
