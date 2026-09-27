@@ -2294,6 +2294,9 @@ app.post('/chat/send', async (req, res) => {
       const cliThinking = cliResult?.thinking || '';
       const cliUsage = cliResult?.usage;
       const cliWebSearchQuery = cliResult?.webSearchQuery || '';
+      if (!cliReply) {
+        await updateChat(c => { c.forEach(m => { if (m.pending) delete m.pending; }); });
+      }
       if (cliReply) {
         cliReply = await processMomentActions(cliReply);
         const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
@@ -2402,7 +2405,7 @@ app.post('/chat/send', async (req, res) => {
         res.json({ ok: true, reply: savedContent, time: replyTime, memoryLoaded: sysPrompt.includes('记忆'), source: 'cli-pro', usage: cliUsage, audioUrl: cliAudioUrl, searchQuery: cliEntry.searchQuery, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined, gifStickers: cliGifStickers.length ? cliGifStickers : undefined, videoUrls: cliVideoUrls.length ? cliVideoUrls : undefined });
         (async () => {
           try {
-            const last5 = chat2.slice(-6);
+            const last5 = readChat().slice(-6);
             const convo = last5.map(m => `${m.role}: ${m.content}`).join('\n');
             const shouldStore = convo.length > 40 && (/约定|记住|以后|生日|喜欢|讨厌|重要|答应|纪念|秘密|第一次|新梗|昵称|习惯/).test(convo);
             if (shouldStore) {
@@ -2438,6 +2441,7 @@ app.post('/chat/send', async (req, res) => {
         }
       } catch (e2) { console.log('[cli] retry also failed:', e2.message); }
     }
+    await updateChat(c => { c.forEach(m => { if (m.pending) delete m.pending; }); });
     return res.json({ ok: false, error: 'CLI不可用，请稍后再试', time });
   }
   try {
@@ -3050,9 +3054,8 @@ app.post('/chat/tts', async (req, res) => {
         res.set({ 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
         return res.send(buf);
       }
-      console.error('MiniMax TTS resp:', JSON.stringify(d).slice(0, 300));
-      if (!res.headersSent) return res.status(500).json({ error: 'minimax_detail', detail: JSON.stringify(d).slice(0, 500) });
-    } catch (e) { console.error('MiniMax TTS catch:', e.message); if (!res.headersSent) return res.status(500).json({ error: 'minimax_catch', detail: e.message }); }
+      console.error('MiniMax TTS no audio:', JSON.stringify(d).slice(0, 200));
+    } catch (e) { console.error('MiniMax TTS error:', e.message); }
   }
   const elKey = process.env.ELEVENLABS_KEY || cfg.elevenlabs_key || '';
   const elVoice = process.env.ELEVENLABS_VOICE || cfg.elevenlabs_voice || 'F5jFuB8I58iHHNYwQLaN';
