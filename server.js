@@ -2212,31 +2212,19 @@ app.post('/chat/send', async (req, res) => {
   trackUserMessage();
   const now = new Date(Date.now() + 8 * 3600000);
   const time = req.body.time || now.toISOString().slice(0, 19).replace('T', ' ');
-  const chat = readChat();
+  let userEntry = null;
+  let audioPath = '', audioUrl = '';
   if (audio) {
     const audioId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     const audioFile = audioId + '.webm';
-    const audioPath = path.join(UPLOADS_DIR, audioFile);
+    audioPath = path.join(UPLOADS_DIR, audioFile);
     try {
       const b64 = audio.includes(',') ? audio.split(',')[1] : audio;
       fs.writeFileSync(audioPath, Buffer.from(b64, 'base64'));
     } catch(e) { console.log('[chat] audio save error:', e.message); }
-    const audioUrl = '/uploads/' + audioFile;
-    let audioContent = msg || '[语音]';
-    const audioEntry = { role: 'user', content: audioContent, audioUrl, time, pending: true };
-    if (quote) audioEntry.quote = quote;
-    chat.push(audioEntry);
-    const whisperKey = readApiConfig().whisper_key || readApiConfig().openai_key || '';
-    if (whisperKey && fs.existsSync(audioPath)) {
-      transcribeAudio(audioPath, whisperKey).then(text => {
-        if (text) {
-          updateChat(c => {
-            const idx = c.findIndex(m => m.audioUrl === audioUrl);
-            if (idx !== -1) { c[idx].content = '[语音] ' + text; console.log('[whisper] transcribed:', text); }
-          });
-        }
-      }).catch(e => console.log('[whisper] error:', e.message));
-    }
+    audioUrl = '/uploads/' + audioFile;
+    userEntry = { role: 'user', content: msg || '[语音]', audioUrl, time, pending: true };
+    if (quote) userEntry.quote = quote;
   } else if (req.body.images && req.body.images.length > 0) {
     const images = req.body.images;
     const imageUrls = [];
@@ -2253,9 +2241,8 @@ app.post('/chat/send', async (req, res) => {
       imageDataArr.push(img);
     }
     console.log('[chat] received', images.length, 'images');
-    const imgEntry = { role: 'user', content: '[图片]', images: imageDataArr, imageUrls, time, pending: true };
-    if (quote) imgEntry.quote = quote;
-    chat.push(imgEntry);
+    userEntry = { role: 'user', content: '[图片]', images: imageDataArr, imageUrls, time, pending: true };
+    if (quote) userEntry.quote = quote;
   } else if (image) {
     const imgId = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     const ext = image.includes('image/png') ? '.png' : '.jpg';
@@ -2264,17 +2251,29 @@ app.post('/chat/send', async (req, res) => {
       const b64 = image.includes(',') ? image.split(',')[1] : image;
       fs.writeFileSync(path.join(UPLOADS_DIR, imgFile), Buffer.from(b64, 'base64'));
     } catch(e) { console.log('[chat] image save error:', e.message); }
-    const imageUrl = '/uploads/' + imgFile;
-    const imgEntry = { role: 'user', content: '[图片]', image, imageUrl, time, pending: true };
-    if (quote) imgEntry.quote = quote;
-    chat.push(imgEntry);
+    userEntry = { role: 'user', content: '[图片]', image, imageUrl: '/uploads/' + imgFile, time, pending: true };
+    if (quote) userEntry.quote = quote;
   } else {
-    const textEntry = { role: 'user', content: msg, time, pending: true };
-    if (quote) textEntry.quote = quote;
-    chat.push(textEntry);
+    userEntry = { role: 'user', content: msg, time, pending: true };
+    if (quote) userEntry.quote = quote;
   }
-  if (chat.length > 200) chat.splice(0, chat.length - 200);
-  writeChat(chat);
+  await updateChat(chat => {
+    chat.push(userEntry);
+    if (chat.length > 200) chat.splice(0, chat.length - 200);
+  });
+  if (audio && audioUrl) {
+    const whisperKey = readApiConfig().whisper_key || readApiConfig().openai_key || '';
+    if (whisperKey && fs.existsSync(audioPath)) {
+      transcribeAudio(audioPath, whisperKey).then(text => {
+        if (text) {
+          updateChat(c => {
+            const idx = c.findIndex(m => m.audioUrl === audioUrl);
+            if (idx !== -1) { c[idx].content = '[语音] ' + text; console.log('[whisper] transcribed:', text); }
+          });
+        }
+      }).catch(e => console.log('[whisper] error:', e.message));
+    }
+  }
   const proOn = isProMode();
   const directKey = proOn ? '' : (process.env.ANTHROPIC_API_KEY || '');
   const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
@@ -2727,7 +2726,7 @@ app.post('/chat/upload-chunk', express.raw({ type: 'application/octet-stream', l
   res.json({ ok: true });
 });
 
-app.post('/chat/upload-finalize', (req, res) => {
+app.post('/chat/upload-finalize', async (req, res) => {
   const { uploadId, filename, totalChunks } = req.body;
   if (!uploadId || !filename) return res.json({ ok: false, error: 'missing params' });
   const dir = path.join(CHUNK_DIR, uploadId);
@@ -2748,12 +2747,10 @@ app.post('/chat/upload-finalize', (req, res) => {
     const fileUrl = '/uploads/' + safeName;
     const now = new Date(Date.now() + 8 * 3600000);
     const time = req.body.time || now.toISOString().slice(0, 19).replace('T', ' ');
-    const chat = readChat();
     const fileExt = ext.toLowerCase();
     if (VIDEO_EXTS.has(fileExt)) {
       const entry = { role: 'user', content: '[视频]', filename, fileUrl, videoUrl: fileUrl, time, pending: true };
-      chat.push(entry);
-      writeChat(chat);
+      await updateChat(chat => { chat.push(entry); });
       sseBroadcast({ type: 'message', role: 'user', content: '[视频]', filename, videoUrl: fileUrl, time });
       res.json({ ok: true, fileUrl, isVideo: true });
       (async () => {
@@ -2837,8 +2834,7 @@ app.post('/chat/upload-finalize', (req, res) => {
         } catch (e) { console.log('[video] processing error:', e.message); }
       })();
     } else {
-      chat.push({ role: 'user', content: '[文件] ' + filename, filename: filename, fileUrl: fileUrl, time });
-      writeChat(chat);
+      await updateChat(ch => { ch.push({ role: 'user', content: '[文件] ' + filename, filename: filename, fileUrl: fileUrl, time }); });
       sseBroadcast({ type: 'message', role: 'user', content: '[文件] ' + filename, filename: filename, fileUrl: fileUrl, time });
       res.json({ ok: true, fileUrl });
     }
@@ -3378,16 +3374,16 @@ app.post('/tg/webhook', async (req, res) => {
       const description = await describeImage(imgUrl);
       const now = new Date(Date.now() + 8 * 3600000);
       const time = now.toISOString().slice(0, 19).replace('T', ' ');
-      const chat = readChat();
       let content;
       if (description) {
         content = caption ? `[图片：${description}] ${caption}` : `[图片：${description}]`;
       } else {
         content = caption ? `[图片] ${caption}` : '[图片]';
       }
-      chat.push({ role: 'user', content, time, source: 'telegram', pending: true, image: imgUrl });
-      if (chat.length > 200) chat.splice(0, chat.length - 200);
-      writeChat(chat);
+      await updateChat(chat => {
+        chat.push({ role: 'user', content, time, source: 'telegram', pending: true, image: imgUrl });
+        if (chat.length > 200) chat.splice(0, chat.length - 200);
+      });
       sseBroadcast({ type: 'message', role: 'user', content, time });
       console.log(`[tg] photo received, description: ${description || 'failed'}`);
       return;
@@ -3421,10 +3417,10 @@ app.post('/tg/webhook', async (req, res) => {
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(0, 19).replace('T', ' ');
   trackUserMessage();
-  const chat = readChat();
-  chat.push({ role: 'user', content: userText, time, source: 'telegram', pending: true });
-  if (chat.length > 200) chat.splice(0, chat.length - 200);
-  writeChat(chat);
+  await updateChat(chat => {
+    chat.push({ role: 'user', content: userText, time, source: 'telegram', pending: true });
+    if (chat.length > 200) chat.splice(0, chat.length - 200);
+  });
 
   const directKey = isProMode() ? '' : (process.env.ANTHROPIC_API_KEY || '');
   const chatApiKey = getAnthropicKey() || getApiKey() || directKey;
@@ -4514,8 +4510,10 @@ async function autoChat(reason) {
     if (autoChatAudio) chatEntry.audioUrl = autoChatAudio;
     if (acVideoUrls.length) chatEntry.videoUrls = acVideoUrls;
     if (acGifStickers.length) chatEntry.gifStickers = acGifStickers;
-    chat.push(chatEntry);
-    writeChat(chat);
+    await updateChat(ch => {
+      ch.push(chatEntry);
+      if (ch.length > 200) ch.splice(0, ch.length - 200);
+    });
     sseBroadcast({ type: 'message', role: 'assistant', content: savedMsg, time, autonomous: true, audioUrl: autoChatAudio || undefined, clawd: acClawdMatch2 ? acClawdMatch2[1] : undefined, gifStickers: acGifStickers.length ? acGifStickers : undefined, videoUrls: acVideoUrls.length ? acVideoUrls : undefined });
     addFootprint('chat', '主动找瑶瑶聊天');
     try {
@@ -4600,12 +4598,12 @@ async function autoSearch() {
     const savedSearch = stripVoiceActions(msg).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[moment_post:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').trim();
     const now = new Date(Date.now() + 8 * 3600000);
     const time = now.toISOString().slice(0, 19).replace('T', ' ');
-    const chat = readChat();
     const entry = { role: 'assistant', content: savedSearch, time, autonomous: true };
     entry.searchQuery = topic;
-    chat.push(entry);
-    if (chat.length > 200) chat.splice(0, chat.length - 200);
-    writeChat(chat);
+    await updateChat(chat => {
+      chat.push(entry);
+      if (chat.length > 200) chat.splice(0, chat.length - 200);
+    });
     sseBroadcast({ type: 'message', role: 'assistant', content: savedSearch, time, autonomous: true, searchQuery: entry.searchQuery });
     addFootprint('search', '搜了「' + topic + '」');
     try {
