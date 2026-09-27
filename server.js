@@ -3029,7 +3029,6 @@ app.post('/chat/tts', async (req, res) => {
   const rawText = (req.body.text || '').trim().slice(0, 500);
   if (!rawText) return res.status(400).json({ error: 'empty' });
   const cfg = readApiConfig();
-  const text = addAudioTags(rawText);
   const mmKey = cfg.minimax_key || process.env.MINIMAX_KEY || '';
   const mmGroup = cfg.minimax_group || process.env.MINIMAX_GROUP || '';
   if (mmKey && mmGroup) {
@@ -3037,7 +3036,7 @@ app.post('/chat/tts', async (req, res) => {
       const resp = await fetch(`https://api.minimax.chat/v1/t2a_v2?GroupId=${mmGroup}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${mmKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'speech-01-turbo', text, voice_setting: { voice_id: cfg.minimax_voice || 'moss_audio_1a55478f-ba99-11f1-82c5-2243c502fa03', speed: 0.9, vol: 1.0, pitch: -2 } })
+        body: JSON.stringify({ model: 'speech-01-turbo', text: rawText, voice_setting: { voice_id: cfg.minimax_voice || 'moss_audio_1a55478f-ba99-11f1-82c5-2243c502fa03', speed: 0.9, vol: 1.0, pitch: -2 } })
       });
       const d = await resp.json();
       if (d.data && d.data.audio) {
@@ -3052,11 +3051,12 @@ app.post('/chat/tts', async (req, res) => {
   const elVoice = process.env.ELEVENLABS_VOICE || cfg.elevenlabs_voice || 'F5jFuB8I58iHHNYwQLaN';
   if (elKey) {
     try {
+      const elText = addAudioTags(rawText);
       const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`, {
         method: 'POST',
         headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text,
+          text: elText,
           model_id: 'eleven_v3',
           language_code: detectLang(rawText),
           voice_settings: { stability: 0.82, similarity_boost: 0.85, style: 0.20, speed: 0.85 }
