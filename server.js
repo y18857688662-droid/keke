@@ -1935,6 +1935,15 @@ function readChat() {
 function writeChat(data) {
   fs.writeFileSync(CHAT_FILE, JSON.stringify(data));
 }
+let _chatMutexQueue = Promise.resolve();
+function updateChat(fn) {
+  _chatMutexQueue = _chatMutexQueue.then(() => {
+    const chat = readChat();
+    fn(chat);
+    writeChat(chat);
+  }).catch(e => console.log('[updateChat] error:', e.message));
+  return _chatMutexQueue;
+}
 
 function stripVoiceActions(text) {
   // normalize: [voice] must start its own line
@@ -2221,9 +2230,10 @@ app.post('/chat/send', async (req, res) => {
     if (whisperKey && fs.existsSync(audioPath)) {
       transcribeAudio(audioPath, whisperKey).then(text => {
         if (text) {
-          const c = readChat();
-          const idx = c.findIndex(m => m.audioUrl === audioUrl);
-          if (idx !== -1) { c[idx].content = '[语音] ' + text; writeChat(c); console.log('[whisper] transcribed:', text); }
+          updateChat(c => {
+            const idx = c.findIndex(m => m.audioUrl === audioUrl);
+            if (idx !== -1) { c[idx].content = '[语音] ' + text; console.log('[whisper] transcribed:', text); }
+          });
         }
       }).catch(e => console.log('[whisper] error:', e.message));
     }
@@ -2314,8 +2324,6 @@ app.post('/chat/send', async (req, res) => {
           fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
         }
         const savedContent = cliThinking ? '<think>' + cliThinking + '</think>\n' + savedReply : savedReply;
-        const chat2 = readChat();
-        chat2.forEach(m => { if (m.pending) delete m.pending; });
         const cliEntry = { role: 'assistant', content: savedContent, time: replyTime };
         if (cliVideoUrls.length) cliEntry.videoUrls = cliVideoUrls;
         if (cliGifStickers.length) cliEntry.gifStickers = cliGifStickers;
@@ -2323,9 +2331,11 @@ app.post('/chat/send', async (req, res) => {
           cliEntry.searchQuery = cliSearchTopic;
           try { addFootprint('search', '搜了「' + cliSearchTopic + '」'); } catch(e) {}
         }
-        chat2.push(cliEntry);
-        if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
-        writeChat(chat2);
+        await updateChat(chat2 => {
+          chat2.forEach(m => { if (m.pending) delete m.pending; });
+          chat2.push(cliEntry);
+          if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
+        });
         sseBroadcast({ type: 'message', role: 'assistant', content: savedContent, time: replyTime, searchQuery: cliEntry.searchQuery, clawd: cliClawdMatch ? cliClawdMatch[1] : undefined, gifStickers: cliGifStickers.length ? cliGifStickers : undefined, videoUrls: cliVideoUrls.length ? cliVideoUrls : undefined });
         const cleanReply = savedReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         let cliAudioUrl = null;
@@ -2361,9 +2371,10 @@ app.post('/chat/send', async (req, res) => {
                     fs.writeFileSync(path.join(UPLOADS_DIR, audioFile), audioBuf);
                     if (vi === 0) {
                       cliAudioUrl = '/uploads/' + audioFile;
-                      const c3 = readChat();
-                      const lastIdx = c3.length - 1;
-                      if (lastIdx >= 0 && c3[lastIdx].time === replyTime) { c3[lastIdx].audioUrl = cliAudioUrl; writeChat(c3); }
+                      await updateChat(c3 => {
+                        const lastIdx = c3.length - 1;
+                        if (lastIdx >= 0 && c3[lastIdx].time === replyTime) { c3[lastIdx].audioUrl = cliAudioUrl; }
+                      });
                       sseBroadcast({ type: 'voice_ready', time: replyTime, audioUrl: cliAudioUrl });
                     } else {
                       sseBroadcast({ type: 'voice_ready', time: replyTime, audioUrl: '/uploads/' + audioFile, extra: true });
@@ -2413,11 +2424,11 @@ app.post('/chat/send', async (req, res) => {
         if (cliReply2) {
           const replyTime2 = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
           const savedReply2 = stripVoiceActions(cliReply2);
-          const chat3 = readChat();
-          chat3.forEach(m => { if (m.pending) delete m.pending; });
-          chat3.push({ role: 'assistant', content: savedReply2, time: replyTime2 });
-          if (chat3.length > 200) chat3.splice(0, chat3.length - 200);
-          writeChat(chat3);
+          await updateChat(chat3 => {
+            chat3.forEach(m => { if (m.pending) delete m.pending; });
+            chat3.push({ role: 'assistant', content: savedReply2, time: replyTime2 });
+            if (chat3.length > 200) chat3.splice(0, chat3.length - 200);
+          });
           sseBroadcast({ type: 'message', role: 'assistant', content: savedReply2, time: replyTime2 });
           return res.json({ ok: true, reply: savedReply2, time: replyTime2, memoryLoaded: sysPrompt2.includes('记忆'), source: 'cli-pro-retry' });
         }
@@ -2495,8 +2506,6 @@ app.post('/chat/send', async (req, res) => {
     for (const bm of apiBarkMsgs2) {
       fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
     }
-    const chat2 = readChat();
-    chat2.forEach(m => { if (m.pending) delete m.pending; });
     const replyMsg = { role: 'assistant', content: savedContentApi, time: replyTime };
     if (apiVideoUrls.length) replyMsg.videoUrls = apiVideoUrls;
     if (apiGifStickers2.length) replyMsg.gifStickers = apiGifStickers2;
@@ -2504,9 +2513,11 @@ app.post('/chat/send', async (req, res) => {
       replyMsg.searchQuery = apiSearchMatch[1];
       try { addFootprint('search', '搜了「' + apiSearchMatch[1] + '」'); } catch(e) {}
     }
-    chat2.push(replyMsg);
-    if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
-    writeChat(chat2);
+    await updateChat(chat2 => {
+      chat2.forEach(m => { if (m.pending) delete m.pending; });
+      chat2.push(replyMsg);
+      if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
+    });
     sseBroadcast({ type: 'message', role: 'assistant', content: savedContentApi, time: replyTime, searchQuery: replyMsg.searchQuery, clawd: apiClawdMatch ? apiClawdMatch[1] : undefined, gifStickers: apiGifStickers2.length ? apiGifStickers2 : undefined, videoUrls: apiVideoUrls.length ? apiVideoUrls : undefined });
     const cleanReply = savedReplyApi.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     const lines = cleanReply.split(/\n+/).map(l => l.trim()).filter(l => l);
@@ -2553,8 +2564,6 @@ app.post('/chat/reply', async (req, res) => {
   if (!reply) return res.json({ ok: false });
   const now = new Date(Date.now() + 8 * 3600000);
   const time = now.toISOString().slice(0, 19).replace('T', ' ');
-  const chat = readChat();
-  chat.forEach(m => { if (m.pending) delete m.pending; });
   const searchMatch = reply.match(/\[search:(.+?)\]/);
   const apiGifStickers = [];
   let _agr; const _agre = /\[gifsticker:([\w-]+)\]/g;
@@ -2608,9 +2617,11 @@ app.post('/chat/reply', async (req, res) => {
       }
     } catch(e) { console.log('[chat] voice generation error:', e.message); }
   }
-  chat.push(msg);
-  if (chat.length > 200) chat.splice(0, chat.length - 200);
-  writeChat(chat);
+  await updateChat(chat => {
+    chat.forEach(m => { if (m.pending) delete m.pending; });
+    chat.push(msg);
+    if (chat.length > 200) chat.splice(0, chat.length - 200);
+  });
   const clawdMatch = reply.match(/\[clawd:([\w-]+)\]/);
   sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time, imageUrl: msg.imageUrl, audioUrl: msg.audioUrl, searchQuery: msg.searchQuery, clawd: clawdMatch ? clawdMatch[1] : undefined, gifStickers: apiGifStickers.length ? apiGifStickers : undefined, videoUrls: apiVideoUrls.length ? apiVideoUrls : undefined });
   const cleanReply = savedReply.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
@@ -2692,15 +2703,15 @@ app.get('/chat/archive', (req, res) => {
   res.json({ messages: msgs, remaining: start });
 });
 
-app.post('/chat/delete', (req, res) => {
+app.post('/chat/delete', async (req, res) => {
   const { role, content, time } = req.body;
   if (!content) return res.json({ ok: false, error: 'missing content' });
-  const chat = readChat();
-  const idx = chat.findLastIndex(m => m.role === role && m.content === content && (!time || m.time === time));
-  if (idx === -1) return res.json({ ok: false, error: 'not found' });
-  chat.splice(idx, 1);
-  writeChat(chat);
-  res.json({ ok: true });
+  let found = false;
+  await updateChat(chat => {
+    const idx = chat.findLastIndex(m => m.role === role && m.content === content && (!time || m.time === time));
+    if (idx !== -1) { chat.splice(idx, 1); found = true; }
+  });
+  res.json(found ? { ok: true } : { ok: false, error: 'not found' });
 });
 
 const CHUNK_DIR = path.join(__dirname, 'chunks');
@@ -2759,16 +2770,16 @@ app.post('/chat/upload-finalize', (req, res) => {
             }
           }
           const frameUrls = frames.map(f => '/uploads/' + path.basename(f));
-          const c2 = readChat();
-          const vi = c2.findIndex(m => m.videoUrl === fileUrl && m.role === 'user');
-          if (vi !== -1) {
-            c2[vi].videoFrames = frameUrls;
-            c2[vi].videoDuration = duration;
-            if (transcript) c2[vi].videoTranscript = transcript;
-            c2[vi].content = '[视频' + (duration ? ' ' + duration + '秒' : '') + ']' + (transcript ? ' ' + transcript.slice(0, 100) : '');
-            delete c2[vi].pending;
-            writeChat(c2);
-          }
+          await updateChat(c2 => {
+            const vi = c2.findIndex(m => m.videoUrl === fileUrl && m.role === 'user');
+            if (vi !== -1) {
+              c2[vi].videoFrames = frameUrls;
+              c2[vi].videoDuration = duration;
+              if (transcript) c2[vi].videoTranscript = transcript;
+              c2[vi].content = '[视频' + (duration ? ' ' + duration + '秒' : '') + ']' + (transcript ? ' ' + transcript.slice(0, 100) : '');
+              delete c2[vi].pending;
+            }
+          });
           console.log('[video] processed:', frames.length, 'frames,', duration + 's, transcript:', transcript ? transcript.slice(0, 50) + '...' : '(none)');
           sseBroadcast({ type: 'video-processed', videoUrl: fileUrl, frames: frameUrls.length, duration });
           // auto-trigger AI response now that frames are ready
@@ -2810,14 +2821,14 @@ app.post('/chat/upload-finalize', (req, res) => {
                 for (const bm of barkMsgs) {
                   fetch('https://api.day.app/' + (process.env.BARK_KEY || 'U9cbrTUrCJBUPVMSADNDHf') + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
                 }
-                const c3 = readChat();
-                c3.forEach(m => { if (m.pending) delete m.pending; });
                 const vidEntry = { role: 'assistant', content: savedReply, time: replyTime };
                 if (videoUrlsOut.length) vidEntry.videoUrls = videoUrlsOut;
                 if (gifStickers.length) vidEntry.gifStickers = gifStickers;
-                c3.push(vidEntry);
-                if (c3.length > 200) c3.splice(0, c3.length - 200);
-                writeChat(c3);
+                await updateChat(c3 => {
+                  c3.forEach(m => { if (m.pending) delete m.pending; });
+                  c3.push(vidEntry);
+                  if (c3.length > 200) c3.splice(0, c3.length - 200);
+                });
                 sseBroadcast({ type: 'message', role: 'assistant', content: savedReply, time: replyTime, clawd: clawdMatch ? clawdMatch[1] : undefined, gifStickers: gifStickers.length ? gifStickers : undefined, videoUrls: videoUrlsOut.length ? videoUrlsOut : undefined });
                 console.log('[video] AI auto-replied:', savedReply.slice(0, 60));
               }
@@ -3464,12 +3475,12 @@ app.post('/tg/webhook', async (req, res) => {
     const tgVideoUrls = []; let _tvr; const _tvre = /\[video:([^\]]+)\]/g;
     while ((_tvr = _tvre.exec(reply)) !== null) tgVideoUrls.push(_tvr[1].trim());
     const savedReplyTg = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').trim();
-    const chat2 = readChat();
     const tgEntry = { role: 'assistant', content: savedReplyTg, time: replyTime, source: 'telegram' };
     if (tgVideoUrls.length) tgEntry.videoUrls = tgVideoUrls;
-    chat2.push(tgEntry);
-    if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
-    writeChat(chat2);
+    await updateChat(chat2 => {
+      chat2.push(tgEntry);
+      if (chat2.length > 200) chat2.splice(0, chat2.length - 200);
+    });
 
     sseBroadcast({ type: 'message', role: 'assistant', content: savedReplyTg, time: replyTime, videoUrls: tgVideoUrls.length ? tgVideoUrls : undefined });
 
@@ -3478,7 +3489,7 @@ app.post('/tg/webhook', async (req, res) => {
 
     (async () => {
       try {
-        const last5 = chat2.slice(-6);
+        const last5 = readChat().slice(-6);
         const convo = last5.map(m => `${m.role}: ${m.content}`).join('\n');
         const shouldStore = convo.length > 40 &&
           (/约定|记住|以后|生日|喜欢|讨厌|重要|答应|纪念|秘密|第一次|新梗|昵称|习惯/).test(convo);
