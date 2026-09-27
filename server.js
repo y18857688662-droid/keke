@@ -3042,7 +3042,7 @@ app.post('/chat/tts', async (req, res) => {
       const resp = await fetch(`https://api.minimax.chat/v1/t2a_v2?GroupId=${mmGroup}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${mmKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'speech-01-hd', text: rawText, voice_setting: { voice_id: cfg.minimax_voice || 'moss_audio_be678d9a-ba9b-11f1-94de-e22cb72c308c', speed: 1.2, vol: 1.0, pitch: 0 }, audio_setting: { sample_rate: 32000, bitrate: 320000, format: 'mp3' } })
+        body: JSON.stringify({ model: 'speech-03', text: rawText, voice_setting: { voice_id: cfg.minimax_voice || 'moss_audio_be678d9a-ba9b-11f1-94de-e22cb72c308c', speed: 1.2, vol: 1.0, pitch: 0 }, audio_setting: { sample_rate: 32000, bitrate: 320000, format: 'mp3' } })
       });
       const d = await resp.json();
       if (d.data && d.data.audio) {
