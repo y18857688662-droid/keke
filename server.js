@@ -1691,11 +1691,14 @@ app.post('/setup/elevenlabs', (req, res) => {
 });
 
 app.post('/setup/minimax', (req, res) => {
-  const { key, group } = req.body;
-  if (!key || !group) return res.status(400).json({ error: 'need key and group' });
+  const { key, group, voice } = req.body;
   const cfg = readApiConfig();
-  cfg.minimax_key = key;
-  cfg.minimax_group = group;
+  if (key && group) {
+    cfg.minimax_key = key;
+    cfg.minimax_group = group;
+  }
+  if (voice) cfg.minimax_voice = voice;
+  if (!key && !group && !voice) return res.status(400).json({ error: 'need key+group or voice' });
   writeApiConfig(cfg);
   res.json({ ok: true });
 });
