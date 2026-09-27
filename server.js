@@ -3050,8 +3050,9 @@ app.post('/chat/tts', async (req, res) => {
         res.set({ 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
         return res.send(buf);
       }
-      console.error('MiniMax TTS error:', JSON.stringify(d).slice(0, 200));
-    } catch (e) { console.error('MiniMax TTS error:', e.message); }
+      console.error('MiniMax TTS resp:', JSON.stringify(d).slice(0, 300));
+      if (!res.headersSent) return res.status(500).json({ error: 'minimax_detail', detail: JSON.stringify(d).slice(0, 500) });
+    } catch (e) { console.error('MiniMax TTS catch:', e.message); if (!res.headersSent) return res.status(500).json({ error: 'minimax_catch', detail: e.message }); }
   }
   const elKey = process.env.ELEVENLABS_KEY || cfg.elevenlabs_key || '';
   const elVoice = process.env.ELEVENLABS_VOICE || cfg.elevenlabs_voice || 'F5jFuB8I58iHHNYwQLaN';
