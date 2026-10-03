@@ -2946,6 +2946,16 @@ app.post('/thoughts/delete', (req, res) => {
   res.json({ ok: true, remaining: thoughts.length });
 });
 
+app.post('/thoughts/cleanup', (req, res) => {
+  let thoughts = readThoughts();
+  const before = thoughts.length;
+  thoughts.forEach(t => {
+    if (t.text) t.text = t.text.replace(/\[think:[\s\S]*?\]/g, m => m.slice(7, -1)).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  });
+  writeThoughts(thoughts);
+  res.json({ ok: true, cleaned: before });
+});
+
 app.get('/thoughts', (req, res) => {
   res.sendFile(path.join(__dirname, 'thoughts.html'));
 });
@@ -4730,7 +4740,7 @@ async function autoThink() {
       return;
     }
     if (thought) {
-      thought = thought.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/^["""「」『』]/g, '').replace(/["""「」『』]$/g, '').trim();
+      thought = thought.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\[think:[\s\S]*?\]/g, '').replace(/^["""「」『』]/g, '').replace(/["""「」『』]$/g, '').trim();
       if (thought.length > 10) {
         const thoughts = readThoughts();
         thoughts.push({ text: thought, mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: true });
