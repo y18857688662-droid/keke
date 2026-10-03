@@ -240,6 +240,40 @@ function cliOneshot(prompt) {
   });
 }
 
+function isOAuthExpired(text) {
+  if (typeof text !== 'string') return false;
+  return /OAuth session expi|Failed to authenticate|session.expired|token.*expired/i.test(text);
+}
+
+let _cliAuthFailed = false;
+function cliKeepAlive() {
+  setInterval(async () => {
+    try {
+      const out = await cliOneshot('hi');
+      if (isOAuthExpired(out)) {
+        if (!_cliAuthFailed) {
+          _cliAuthFailed = true;
+          console.log('[cli-keepalive] OAuth expired, sending Bark notification');
+          sendPushNotification('CLI 登录过期', '去VPS跑 claude login 重新登录').catch(() => {});
+        }
+      } else {
+        if (_cliAuthFailed) { _cliAuthFailed = false; console.log('[cli-keepalive] OAuth recovered'); }
+      }
+    } catch (e) { console.log('[cli-keepalive] error:', e.message); }
+  }, 4 * 3600000);
+}
+cliKeepAlive();
+
+(async () => {
+  try {
+    await updateChat(c => {
+      for (let i = c.length - 1; i >= 0; i--) {
+        if (isOAuthExpired(c[i].content)) { console.log('[cleanup] removing OAuth error msg at', i); c.splice(i, 1); }
+      }
+    });
+  } catch(e) { console.log('[cleanup] error:', e.message); }
+})();
+
 const TEXT_EXTS = new Set(['.txt','.md','.json','.csv','.js','.ts','.py','.html','.css','.xml','.yaml','.yml','.toml','.ini','.sh','.log','.sql','.java','.c','.cpp','.h','.rb','.go','.rs','.swift','.kt']);
 const IMG_EXTS = new Set(['.png','.jpg','.jpeg','.gif','.webp']);
 const VIDEO_EXTS = new Set(['.mp4','.webm','.mov','.avi','.mkv','.m4v']);
@@ -2294,6 +2328,19 @@ app.post('/chat/send', async (req, res) => {
       const cliThinking = cliResult?.thinking || '';
       const cliUsage = cliResult?.usage;
       const cliWebSearchQuery = cliResult?.webSearchQuery || '';
+      if (isOAuthExpired(cliReply) || isOAuthExpired(cliThinking)) {
+        console.log('[cli] OAuth expired detected, not saving error as message');
+        if (!_cliAuthFailed) {
+          _cliAuthFailed = true;
+          sendPushNotification('CLI 登录过期', '顾晏说不了话了，去VPS跑 claude login').catch(() => {});
+        }
+        await updateChat(c => { c.forEach(m => { if (m.pending) delete m.pending; }); });
+        const fb = fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
+        const fbTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+        await updateChat(c => { c.push({ role: 'assistant', content: fb, time: fbTime }); });
+        sseBroadcast({ type: 'message', role: 'assistant', content: fb, time: fbTime });
+        return res.json({ ok: true, reply: fb, time: fbTime, source: 'fallback-oauth' });
+      }
       if (!cliReply) {
         await updateChat(c => { c.forEach(m => { if (m.pending) delete m.pending; }); });
       }
@@ -4456,6 +4503,11 @@ async function autoChat(reason) {
     if (!msg) msg = await cliOneshot(prompt) || '';
     msg = msg.trim();
     if (!msg) return;
+    if (isOAuthExpired(msg)) {
+      console.log('[autoChat] OAuth expired, skipping');
+      if (!_cliAuthFailed) { _cliAuthFailed = true; sendPushNotification('CLI 登录过期', '去VPS跑 claude login').catch(() => {}); }
+      return;
+    }
     if (!msg.includes('<think>')) msg = '<think>想她了</think>' + msg;
     msg = msg.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '');
     const now = new Date(Date.now() + 8 * 3600000);
