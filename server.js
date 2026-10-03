@@ -264,6 +264,19 @@ function cliKeepAlive() {
 }
 cliKeepAlive();
 
+app.get('/test/keepalive', async (req, res) => {
+  try {
+    const out = await cliOneshot('hi');
+    if (isOAuthExpired(out)) {
+      if (!_cliAuthFailed) { _cliAuthFailed = true; sendPushNotification('CLI 登录过期', '去VPS跑 claude login 重新登录').catch(() => {}); }
+      res.json({ ok: false, status: 'oauth_expired', output: (out || '').slice(0, 100) });
+    } else {
+      if (_cliAuthFailed) { _cliAuthFailed = false; }
+      res.json({ ok: true, status: 'alive', output: (out || '').slice(0, 100) });
+    }
+  } catch (e) { res.json({ ok: false, status: 'error', error: e.message }); }
+});
+
 (async () => {
   try {
     await updateChat(c => {
