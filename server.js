@@ -4242,7 +4242,7 @@ app.get('/footprints/list', (req, res) => {
 app.post('/footprints/cleanup', (req, res) => {
   const fp = readFootprints();
   const before = fp.length;
-  const cleaned = fp.filter(f => !(f.detail === 'silent' || (f.summary && f.summary.includes('安静睡了'))));
+  const cleaned = fp.filter(f => !(f.detail === 'silent' || (f.summary && f.summary.includes('安静睡了')) || isOAuthExpired(f.detail) || isOAuthExpired(f.summary)));
   writeFootprints(cleaned);
   res.json({ ok: true, before, after: cleaned.length, removed: before - cleaned.length });
 });
@@ -4711,6 +4711,11 @@ async function autoThink() {
     '\n\n只输出碎碎念本身，不要任何前缀后缀';
   try {
     let thought = await cliOneshot(prompt);
+    if (isOAuthExpired(thought)) {
+      console.log('[autoThink] OAuth expired, skipping');
+      if (!_cliAuthFailed) { _cliAuthFailed = true; sendPushNotification('CLI 登录过期', '去VPS跑 claude login').catch(() => {}); }
+      return;
+    }
     if (thought) {
       thought = thought.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/^["""「」『』]/g, '').replace(/["""「」『』]$/g, '').trim();
       if (thought.length > 10) {
@@ -4797,6 +4802,11 @@ async function autoMoment() {
         '\n- 只输出评论本身';
       try {
         let commentText = await cliOneshot(prompt);
+        if (isOAuthExpired(commentText)) {
+          console.log('[autoMoment] OAuth expired, skipping comment');
+          if (!_cliAuthFailed) { _cliAuthFailed = true; sendPushNotification('CLI 登录过期', '去VPS跑 claude login').catch(() => {}); }
+          return;
+        }
         if (commentText) {
           commentText = commentText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').trim();
           if (commentText) {
@@ -4827,6 +4837,11 @@ async function autoMoment() {
         '\n- 只输出朋友圈内容本身';
       try {
         let postText = await cliOneshot(prompt);
+        if (isOAuthExpired(postText)) {
+          console.log('[autoMoment] OAuth expired, skipping post');
+          if (!_cliAuthFailed) { _cliAuthFailed = true; sendPushNotification('CLI 登录过期', '去VPS跑 claude login').catch(() => {}); }
+          return;
+        }
         if (postText) {
           postText = postText.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/。$/g, '').replace(/\s*\[(?:moment_post|clawd|gifsticker|bark|search|voice|video|sms|email|think|next|remember|forget|digest):?[^\]]*\]\s*/g, '').trim();
           if (postText) {
