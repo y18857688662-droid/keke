@@ -25,7 +25,7 @@ const PUBLIC_PATHS = new Set([
   '/sms/incoming', '/tg/webhook', '/auth/callback',
   '/deploy', '/deploy/ombre-brain', '/setup/deploy-token', '/setup/api', '/setup/site-password',
 ]);
-const PUBLIC_PREFIXES = ['/static/', '/ob/', '/.well-known/oauth-', '/oauth/'];
+const PUBLIC_PREFIXES = ['/static/', '/ob/', '/.well-known/oauth-', '/oauth/', '/mcp'];
 function getSitePassword() {
   return readApiConfig().site_password || process.env.KEKE_PASSWORD || '';
 }
@@ -1410,6 +1410,7 @@ function _proxyToOmbre(req, res) {
 app.use('/.well-known/oauth-authorization-server', _proxyToOmbre);
 app.use('/.well-known/oauth-protected-resource', _proxyToOmbre);
 app.use('/oauth', _proxyToOmbre);
+app.use('/mcp', _proxyToOmbre);
 
 // Ombre Brain reverse proxy at /ob/
 const { createProxyMiddleware } = (() => {
