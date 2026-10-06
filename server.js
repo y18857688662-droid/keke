@@ -1710,6 +1710,17 @@ app.post('/deploy', (req, res) => {
   });
 });
 
+app.post('/deploy/ombre-brain', (req, res) => {
+  const token = req.body.token || req.query.token;
+  if (token !== DEPLOY_TOKEN) return res.status(403).json({ ok: false, error: 'forbidden' });
+  res.json({ ok: true, msg: 'deploying ombre-brain...' });
+  const { exec } = require('child_process');
+  exec('cd /root/ombre-brain && git pull origin main && venv/bin/pip install -r requirements.txt && systemctl restart ombre-brain', { timeout: 120000 }, (err, stdout, stderr) => {
+    console.log('[deploy:ombre-brain]', stdout, stderr);
+    if (err) console.error('[deploy:ombre-brain error]', err.message);
+  });
+});
+
 app.post('/setup/api', (req, res) => {
   const { key, provider } = req.body;
   if (!key) return res.json({ ok: false, error: 'missing key' });
