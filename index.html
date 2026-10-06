@@ -2686,7 +2686,46 @@ document.getElementById('photoInput').addEventListener('change', function() {
   var inp = document.getElementById('msgInput');
   var caption = inp ? inp.value.trim() : '';
   if (caption) inp.value = '';
-  files.forEach(function(f, i) { sendImage(f, i === 0 ? caption : ''); });
+  if (files.length === 1) { sendImage(files[0], caption); return; }
+  if (files.length > 1) {
+    if (sending) return;
+    sending = true; sendingAt = Date.now();
+    Promise.all(files.map(function(f){ return compressImage(f, 1600, 0.85); })).then(function(bases) {
+      var displayContent = caption || '[图片]';
+      var userMsg = {role:'user', content: displayContent, images: bases, time: new Date(Date.now()+8*3600000).toISOString().slice(0,19).replace('T',' ')};
+      msgContainer.appendChild(renderMessage(userMsg, -1));
+      scrollBottom();
+      var ctrl = new AbortController();
+      var timer = setTimeout(function(){ ctrl.abort(); }, 120000);
+      fetch('/chat/send', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({message: displayContent, images: bases, time: userMsg.time}),
+        signal: ctrl.signal
+      }).then(function(r){return r.json()}).then(function(data) {
+        clearTimeout(timer);
+        sending = false;
+        if (data.ok && data.reply) {
+          pollKnown += 2;
+          lastRenderedTime = data.time;
+          if (!msgContainer.querySelector('.msg-group[data-time="'+data.time+'"]')) {
+            var replyMsg = {role:'assistant', content: data.reply, time: data.time, audioUrl: data.audioUrl, searchQuery: data.searchQuery, videoUrls: data.videoUrls};
+            var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
+            if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
+            msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
+            msgContainer.appendChild(replyEl);
+            scrollBottom();
+            petMood(data.clawd && _petMoodSprite[data.clawd] ? data.clawd : detectMood(data.reply));
+            renderAiGifStickers(data.gifStickers);
+          }
+        } else { pollKnown++; if (!data.ok) alert('图片发送失败'); }
+      }).catch(function(e) {
+        clearTimeout(timer);
+        sending = false;
+        if (e && e.name === 'AbortError') { pollKnown++; } else { alert('图片发送失败，请重试'); }
+      });
+    });
+  }
 });
 
 function sendFile(file) {

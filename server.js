@@ -4730,6 +4730,7 @@ async function autoThink() {
     '\n- 口语，简短，不要文艺腔不要小说感' +
     '\n- 禁止物理生活（做饭关门擦桌子窗外路灯店铺流水快递）' +
     '\n- 禁止编造你们没聊过的事情' +
+    '\n- 禁止使用emoji表情符号' +
     (recentThoughts ? '\n【已写过的，禁止重复】：\n- ' + recentThoughts : '') +
     '\n\n只输出碎碎念本身，不要任何前缀后缀';
   try {
