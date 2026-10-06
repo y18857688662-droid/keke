@@ -338,7 +338,7 @@ function setupCliListeners() {
 function ensureCliProc() {
   if (cliProc && !cliProc.killed) return;
   console.log('[cli] spawning persistent claude process...');
-  cliProc = spawn('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', 'claude-opus-4-6', '--allowedTools', 'WebSearch,WebFetch'], {
+  cliProc = spawn('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', 'claude-opus-4-6', '--allowedTools', 'WebSearch,WebFetch,mcp__*'], {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, HOME: '/root' },
     cwd: '/tmp'
@@ -372,7 +372,7 @@ async function forgeCliProc(systemPrompt, recentMessages) {
 
 function cliOneshot(prompt) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('claude', ['-p', '--model', 'claude-opus-4-6'], {
+    const proc = spawn('claude', ['-p', '--model', 'claude-opus-4-6', '--allowedTools', 'WebSearch,WebFetch,mcp__*'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, HOME: '/root' },
       cwd: '/tmp'
@@ -5076,7 +5076,7 @@ async function autoSearch() {
       '\n- 末尾加 [search:你搜的话题] 标签' +
       '\n- 加一个 [bark:推送内容] 给她手机发推送' +
       '\n- 只输出消息本身';
-    const proc = spawn('claude', ['-p', '--model', 'claude-opus-4-6', '--allowedTools', 'WebSearch,WebFetch'], {
+    const proc = spawn('claude', ['-p', '--model', 'claude-opus-4-6', '--allowedTools', 'WebSearch,WebFetch,mcp__*'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, HOME: '/root' },
       cwd: '/tmp'
