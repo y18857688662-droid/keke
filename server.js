@@ -412,7 +412,7 @@ async function claudeCliReply(systemPrompt, recentMessages) {
           if (m.comments && m.comments.length) s += '[评论:' + m.comments.slice(-2).map(c => (c.author === 'gy' ? '你' : '瑶瑶') + ':' + c.text.slice(0, 20)).join('；') + ']';
           return s;
         }).join('；');
-        liveCtx += ' 可用[moment_post:内容][moment_like:id][moment_comment:id:评论][think:碎碎念][email:邮件内容][sms:短信内容][game_invite:游戏名][game_solo:游戏名]';
+        liveCtx += ' 可用[moment_post:内容][moment_like:id][moment_comment:id:评论][think:碎碎念][email:邮件内容][sms:短信内容][game_invite:游戏名][game_solo:游戏名][image:图片描述英文][html:HTML代码][file:文件名:文件内容]';
       }
     } catch(e) {}
     try {
@@ -1497,6 +1497,9 @@ async function getChatSystem() {
       momentsCtx += '\n给瑶瑶发邮件：[email:邮件内容]（会发到她Gmail）';
       momentsCtx += '\n给瑶瑶发短信：[sms:短信内容] 或带特效 [sms:短信内容:特效名]';
       momentsCtx += '\n短信特效：fireworks/hearts/lasers/sparkles/slam/gentle/invisible/confetti/balloons';
+      momentsCtx += '\n发图片给瑶瑶：[image:英文图片描述]（AI生成图片）';
+      momentsCtx += '\n发HTML网页：[html:完整HTML代码]（会生成一个可打开的网页文件）';
+      momentsCtx += '\n发文件：[file:文件名.后缀:文件内容]（发任意文本文件）';
       momentsCtx += '\n想用就用，不想用就不用，自然就好';
     }
   } catch(e) {}
@@ -2186,6 +2189,99 @@ async function processMomentActions(text) {
     })();
     cleaned = cleaned.replace(/\[game_solo:[^\]]+\]/g, '');
   }
+  const imgMatch = cleaned.match(/\[image:([^\]]+)\]/);
+  if (imgMatch) {
+    const imgPrompt = imgMatch[1].trim();
+    (async () => {
+      try {
+        const cfg = readApiConfig();
+        const sfKey = cfg.siliconflow_key || '';
+        const geminiKey = cfg.gemini_key || '';
+        let imgUrl = '';
+        if (sfKey) {
+          const models = ['stabilityai/stable-diffusion-3-5-large', 'black-forest-labs/FLUX.1-schnell'];
+          for (const model of models) {
+            try {
+              const r = await fetch('https://api.siliconflow.cn/v1/images/generations', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sfKey}` },
+                body: JSON.stringify({ model, prompt: imgPrompt, image_size: '1024x1024' })
+              });
+              if (!r.ok) continue;
+              const data = await r.json();
+              const imgs = data.images || data.data || [];
+              if (imgs.length) {
+                if (imgs[0].url) { imgUrl = imgs[0].url; break; }
+                if (imgs[0].b64_json) {
+                  const imgFile = Date.now() + '_ai.png';
+                  fs.writeFileSync(path.join(UPLOADS_DIR, imgFile), Buffer.from(imgs[0].b64_json, 'base64'));
+                  imgUrl = '/uploads/' + imgFile; break;
+                }
+              }
+            } catch {}
+          }
+        }
+        if (!imgUrl && geminiKey) {
+          try {
+            const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiKey}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: `Generate an image: ${imgPrompt}` }] }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'] } })
+            });
+            if (r.ok) {
+              const data = await r.json();
+              const parts = data.candidates?.[0]?.content?.parts || [];
+              for (const p of parts) {
+                if (p.inlineData) {
+                  const ext = p.inlineData.mimeType === 'image/png' ? '.png' : '.jpg';
+                  const imgFile = Date.now() + '_ai' + ext;
+                  fs.writeFileSync(path.join(UPLOADS_DIR, imgFile), Buffer.from(p.inlineData.data, 'base64'));
+                  imgUrl = '/uploads/' + imgFile; break;
+                }
+              }
+            }
+          } catch {}
+        }
+        if (imgUrl) {
+          const now = new Date(Date.now() + 8 * 3600000);
+          const t = now.toISOString().slice(0, 19).replace('T', ' ');
+          await updateChat(c => { c.push({ role: 'assistant', content: '[图片]', imageUrl: imgUrl, time: t }); });
+          sseBroadcast({ type: 'message', role: 'assistant', content: '[图片]', imageUrl: imgUrl, time: t });
+          addFootprint('image', '画了一张图', imgPrompt.slice(0, 50));
+        }
+      } catch (e) { console.log('[image] error:', e.message); }
+    })();
+    cleaned = cleaned.replace(/\[image:[^\]]+\]/g, '');
+  }
+  const htmlMatch = cleaned.match(/\[html:([\s\S]*?)\]/);
+  if (htmlMatch) {
+    const htmlContent = htmlMatch[1].trim();
+    try {
+      const htmlFile = Date.now() + '_gy.html';
+      fs.writeFileSync(path.join(UPLOADS_DIR, htmlFile), htmlContent);
+      const fileUrl = '/uploads/' + htmlFile;
+      const now = new Date(Date.now() + 8 * 3600000);
+      const t = now.toISOString().slice(0, 19).replace('T', ' ');
+      updateChat(c => { c.push({ role: 'assistant', content: '', fileUrl, filename: htmlFile, time: t }); });
+      sseBroadcast({ type: 'message', role: 'assistant', content: '', fileUrl, filename: htmlFile, time: t });
+      addFootprint('file', '发了一个网页', htmlFile);
+    } catch (e) { console.log('[html] error:', e.message); }
+    cleaned = cleaned.replace(/\[html:[\s\S]*?\]/g, '');
+  }
+  const fileMatch = cleaned.match(/\[file:([^:\]]+):([^\]]+)\]/);
+  if (fileMatch) {
+    const fileName = fileMatch[1].trim();
+    const fileContent = fileMatch[2].trim();
+    try {
+      const safeName = Date.now() + '_' + fileName.replace(/[^a-zA-Z0-9._一-鿿-]/g, '_');
+      fs.writeFileSync(path.join(UPLOADS_DIR, safeName), fileContent);
+      const fileUrl = '/uploads/' + safeName;
+      const now = new Date(Date.now() + 8 * 3600000);
+      const t = now.toISOString().slice(0, 19).replace('T', ' ');
+      updateChat(c => { c.push({ role: 'assistant', content: '[文件] ' + fileName, fileUrl, filename: fileName, time: t }); });
+      sseBroadcast({ type: 'message', role: 'assistant', content: '[文件] ' + fileName, fileUrl, filename: fileName, time: t });
+      addFootprint('file', '发了一个文件', fileName);
+    } catch (e) { console.log('[file] error:', e.message); }
+    cleaned = cleaned.replace(/\[file:[^\]]+\]/g, '');
+  }
   return cleaned.replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -2385,7 +2481,7 @@ app.post('/chat/send', async (req, res) => {
             }
           } catch(e) {}
         }
-        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[check_weather\]\s*/g, '').replace(/\s*\[check_location\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').trim();
+        const savedReply = stripVoiceActions(cliReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[search:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[check_weather\]\s*/g, '').replace(/\s*\[check_location\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').replace(/\s*\[image:[^\]]+\]\s*/g, '').replace(/\s*\[html:[\s\S]*?\]\s*/g, '').replace(/\s*\[file:[^\]]+\]\s*/g, '').trim();
         for (const bm of cliBarkMsgs) {
           fetch('https://api.day.app/' + BARK_KEY + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
         }
@@ -2884,7 +2980,7 @@ app.post('/chat/upload-finalize', async (req, res) => {
                 while ((_b = _be.exec(aiReply)) !== null) barkMsgs.push(_b[1]);
                 const videoUrlsOut = []; let _v; const _ve = /\[video:([^\]]+)\]/g;
                 while ((_v = _ve.exec(aiReply)) !== null) videoUrlsOut.push(_v[1].trim());
-                const savedReply = stripVoiceActions(aiReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').trim();
+                const savedReply = stripVoiceActions(aiReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').replace(/\s*\[image:[^\]]+\]\s*/g, '').replace(/\s*\[html:[\s\S]*?\]\s*/g, '').replace(/\s*\[file:[^\]]+\]\s*/g, '').trim();
                 for (const bm of barkMsgs) {
                   fetch('https://api.day.app/' + (process.env.BARK_KEY || 'U9cbrTUrCJBUPVMSADNDHf') + '/' + encodeURIComponent('顾晏') + '/' + encodeURIComponent(bm) + '?group=' + encodeURIComponent('顾晏') + '&level=timeSensitive&sound=bell&icon=' + encodeURIComponent('https://yyaokeke.top/static/bark-icon.jpg')).catch(() => {});
                 }
@@ -2950,7 +3046,7 @@ app.post('/thoughts/cleanup', (req, res) => {
   let thoughts = readThoughts();
   const before = thoughts.length;
   thoughts.forEach(t => {
-    if (t.text) t.text = t.text.replace(/\[think:[\s\S]*?\]/g, m => m.slice(7, -1)).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    if (t.text) t.text = t.text.replace(/\[think:[\s\S]*?\]/g, m => m.slice(7, -1)).replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\s*\[(?:clawd|gifsticker|bark|search|voice|video|sms|email|moment_post|moment_like|moment_comment|game_invite|game_solo|remember|forget|digest|next):?[^\]]*\]\s*/g, '').trim();
   });
   writeThoughts(thoughts);
   res.json({ ok: true, cleaned: before });
@@ -3550,7 +3646,7 @@ app.post('/tg/webhook', async (req, res) => {
     const replyTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
     const tgVideoUrls = []; let _tvr; const _tvre = /\[video:([^\]]+)\]/g;
     while ((_tvr = _tvre.exec(reply)) !== null) tgVideoUrls.push(_tvr[1].trim());
-    const savedReplyTg = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').trim();
+    const savedReplyTg = stripVoiceActions(reply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[video:[^\]]+\]\s*/g, '').replace(/\s*\[remember:[^\]]+\]\s*/g, '').replace(/\s*\[forget:[a-f0-9]+\]\s*/g, '').replace(/\s*\[digest:[^\]]+\]\s*/g, '').replace(/\s*\[game_invite:[^\]]+\]\s*/g, '').replace(/\s*\[game_solo:[^\]]+\]\s*/g, '').replace(/\s*\[image:[^\]]+\]\s*/g, '').replace(/\s*\[html:[\s\S]*?\]\s*/g, '').replace(/\s*\[file:[^\]]+\]\s*/g, '').trim();
     const tgEntry = { role: 'assistant', content: savedReplyTg, time: replyTime, source: 'telegram' };
     if (tgVideoUrls.length) tgEntry.videoUrls = tgVideoUrls;
     await updateChat(chat2 => {
@@ -4741,7 +4837,7 @@ async function autoThink() {
       return;
     }
     if (thought) {
-      thought = thought.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\[think:[\s\S]*?\]/g, '').replace(/^["""「」『』]/g, '').replace(/["""「」『』]$/g, '').trim();
+      thought = thought.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/\[think:[\s\S]*?\]/g, '').replace(/\s*\[(?:clawd|gifsticker|bark|search|voice|video|sms|email|moment_post|moment_like|moment_comment|game_invite|game_solo|remember|forget|digest|next):?[^\]]*\]\s*/g, '').replace(/^["""「」『』]/g, '').replace(/["""「」『』]$/g, '').trim();
       if (thought.length > 10) {
         const thoughts = readThoughts();
         thoughts.push({ text: thought, mood: '', date: now.toISOString().slice(0, 10), time: now.toISOString().slice(11, 16), autonomous: true });

@@ -2866,7 +2866,7 @@ function attachSSE(src) {
         lastMsgCount++;
         pollKnown++;
         lastRenderedTime = data.time;
-        var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl, audioUrl: data.audioUrl, searchQuery: data.searchQuery, videoUrls: data.videoUrls};
+        var replyMsg = {role:'assistant', content: data.content, time: data.time, imageUrl: data.imageUrl, audioUrl: data.audioUrl, searchQuery: data.searchQuery, videoUrls: data.videoUrls, fileUrl: data.fileUrl, filename: data.filename};
         var replyEl = renderMessage(replyMsg, Object.keys(thinkingStore).length, true);
         if (replyEl._searchQuery) msgContainer.appendChild(renderSearchNarrator(replyEl._searchQuery));
         msgContainer.appendChild(renderTime(data.time, replyEl._thinkIdx));
