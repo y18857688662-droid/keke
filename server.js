@@ -707,7 +707,7 @@ app.post('/pat/tap', async (req, res) => {
 
 app.use('/uploads', express.static(UPLOADS_DIR));
 app.use('/static', express.static(path.join(__dirname, 'static')));
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '5mb', verify: (req, _res, buf) => { if (req.url === '/webhook/github') req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // 头像存储
@@ -1865,15 +1865,16 @@ app.post('/deploy/ombre-brain', (req, res) => {
   });
 });
 
-app.post('/webhook/github', express.raw({ type: 'application/json' }), (req, res) => {
+app.post('/webhook/github', (req, res) => {
   const crypto = require('crypto');
   const cfg = readApiConfig();
   const secret = cfg.webhook_secret;
   if (!secret) return res.status(500).send('no webhook secret configured');
   const sig = req.headers['x-hub-signature-256'] || '';
-  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(req.body).digest('hex');
+  const rawBody = req.rawBody || Buffer.from(JSON.stringify(req.body));
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
   if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return res.status(403).send('bad signature');
-  const payload = JSON.parse(req.body);
+  const payload = req.body;
   const repo = payload.repository && payload.repository.name;
   const ref = payload.ref;
   if (ref !== 'refs/heads/main') return res.json({ ok: true, msg: 'ignored non-main push' });
@@ -2959,7 +2960,7 @@ app.post('/chat/send', async (req, res) => {
     res.json({ ok: true, reply: savedContentApi, time: replyTime, memoryLoaded, searchQuery: replyMsg.searchQuery });
     (async () => {
       try {
-        const last5 = chat2.slice(-6);
+        const last5 = readChat().slice(-6);
         const convo = last5.map(m => `${m.role}: ${m.content}`).join('\n');
         const shouldStore = convo.length > 40 &&
           (/约定|记住|以后|生日|喜欢|讨厌|重要|答应|纪念|秘密|第一次|新梗|昵称|习惯/).test(convo);
