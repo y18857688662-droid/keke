@@ -6,6 +6,13 @@ const net = require('net');
 const PORT = 9587;
 const UPSTREAM = 'ws://127.0.0.1:8080/bridge/ws';
 
+// keke 开了全站鉴权：只读的 poll/status 用本机配置里的密码，
+// 发指令的 /command 只转发调用方自己带的口令，不替它补，否则这里就成了绕过鉴权的后门
+function siteToken() {
+  try { return JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'api_config.json'), 'utf8')).site_password || ''; }
+  catch { return ''; }
+}
+
 function wsFrame(data) {
   const buf = Buffer.from(data);
   const frame = Buffer.alloc(2 + (buf.length > 125 ? 2 : 0) + buf.length);
@@ -39,7 +46,7 @@ const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', () => {
-      const opts = { method: 'POST', hostname: '127.0.0.1', port: 8080, path: '/bridge/command', headers: { 'Content-Type': 'application/json' } };
+      const opts = { method: 'POST', hostname: '127.0.0.1', port: 8080, path: '/bridge/command', headers: { 'Content-Type': 'application/json', 'x-keke-token': req.headers['x-keke-token'] || '' } };
       const r = http.request(opts, (upstream) => {
         let d = '';
         upstream.on('data', c => d += c);
@@ -52,7 +59,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'GET' && (req.url === '/bridge/poll' || req.url.startsWith('/bridge/poll?'))) {
-    const opts = { hostname: '127.0.0.1', port: 8080, path: req.url };
+    const opts = { hostname: '127.0.0.1', port: 8080, path: req.url, headers: { 'x-keke-token': siteToken() } };
     http.get(opts, (upstream) => {
       let d = '';
       upstream.on('data', c => d += c);
@@ -62,7 +69,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'GET' && req.url === '/status') {
-    const opts = { hostname: '127.0.0.1', port: 8080, path: '/bridge/status' };
+    const opts = { hostname: '127.0.0.1', port: 8080, path: '/bridge/status', headers: { 'x-keke-token': siteToken() } };
     http.get(opts, (upstream) => {
       let d = '';
       upstream.on('data', c => d += c);
