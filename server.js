@@ -25,7 +25,7 @@ const PUBLIC_PATHS = new Set([
   '/sms/incoming', '/tg/webhook', '/auth/callback',
   '/deploy', '/deploy/ombre-brain', '/setup/deploy-token', '/setup/api', '/setup/site-password',
 ]);
-const PUBLIC_PREFIXES = ['/static/'];
+const PUBLIC_PREFIXES = ['/static/', '/ob/', '/.well-known/oauth-', '/oauth/'];
 function getSitePassword() {
   return readApiConfig().site_password || process.env.KEKE_PASSWORD || '';
 }
@@ -1380,6 +1380,37 @@ app.get('/memory/diag', async (req, res) => {
   }
 });
 
+// Proxy OAuth discovery & auth endpoints to Ombre Brain for MCP connectors (e.g. claude.ai)
+function _proxyToOmbre(req, res) {
+  const url = `${OMBRE_URL}${req.originalUrl}`;
+  const fwdHeaders = { 'x-forwarded-proto': 'https', 'x-forwarded-host': req.headers.host || 'yyaokeke.top' };
+  if (req.headers['content-type']) fwdHeaders['content-type'] = req.headers['content-type'];
+  if (req.headers['authorization']) fwdHeaders['authorization'] = req.headers['authorization'];
+  if (req.headers['accept']) fwdHeaders['accept'] = req.headers['accept'];
+  const isBody = !['GET', 'HEAD'].includes(req.method);
+  let body;
+  if (isBody && req.body != null) {
+    const ct = req.headers['content-type'] || '';
+    if (ct.includes('x-www-form-urlencoded') && typeof req.body === 'object') {
+      body = new URLSearchParams(req.body).toString();
+    } else if (typeof req.body === 'object') {
+      body = JSON.stringify(req.body);
+    } else {
+      body = String(req.body);
+    }
+  }
+  fetch(url, { method: req.method, headers: fwdHeaders, body: isBody ? body : undefined, signal: AbortSignal.timeout(30000) })
+    .then(async (r) => {
+      res.status(r.status);
+      for (const [k, v] of r.headers) { if (!['transfer-encoding', 'connection'].includes(k.toLowerCase())) res.setHeader(k, v); }
+      const buf = Buffer.from(await r.arrayBuffer());
+      res.end(buf);
+    }).catch(e => res.status(502).json({ error: e.message }));
+}
+app.use('/.well-known/oauth-authorization-server', _proxyToOmbre);
+app.use('/.well-known/oauth-protected-resource', _proxyToOmbre);
+app.use('/oauth', _proxyToOmbre);
+
 // Ombre Brain reverse proxy at /ob/
 const { createProxyMiddleware } = (() => {
   try { return require('http-proxy-middleware'); } catch { return {}; }
@@ -1405,9 +1436,10 @@ if (createProxyMiddleware) {
     const obPath = req.params[0] || '';
     const url = `${OMBRE_URL}/${obPath}`;
     try {
-      const fwdHeaders = { 'content-type': req.headers['content-type'] || 'application/json' };
+      const fwdHeaders = { 'content-type': req.headers['content-type'] || 'application/json', 'x-forwarded-proto': 'https', 'x-forwarded-host': req.headers.host || 'yyaokeke.top' };
       if (req.headers['authorization']) fwdHeaders['authorization'] = req.headers['authorization'];
       if (req.headers['mcp-session-id']) fwdHeaders['mcp-session-id'] = req.headers['mcp-session-id'];
+      if (req.headers['accept']) fwdHeaders['accept'] = req.headers['accept'];
       const isBody = !['GET', 'HEAD'].includes(req.method);
       const r = await fetch(url, {
         method: req.method,
