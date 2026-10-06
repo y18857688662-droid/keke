@@ -2646,12 +2646,12 @@ app.post('/chat/send', async (req, res) => {
       sseBroadcast({ type: 'memory', action: sysPrompt.includes('记忆') ? 'read_ok' : 'read_none' });
       console.log('[cli] calling claude CLI for reply...');
       const chatNow = readChat();
-      const cliResult = await claudeCliReply(sysPrompt, chatNow.slice(-10));
+      let cliResult = await claudeCliReply(sysPrompt, chatNow.slice(-10));
       let cliReply = cliResult?.text || cliResult;
       if (typeof cliReply === 'string') cliReply = cliReply.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '').replace(/。(?=\s*\*)/g, '');
-      const cliThinking = cliResult?.thinking || '';
-      const cliUsage = cliResult?.usage;
-      const cliWebSearchQuery = cliResult?.webSearchQuery || '';
+      let cliThinking = cliResult?.thinking || '';
+      let cliUsage = cliResult?.usage;
+      let cliWebSearchQuery = cliResult?.webSearchQuery || '';
       if (isOAuthExpired(cliReply) || isOAuthExpired(cliThinking)) {
         console.log('[cli] persistent proc OAuth/auth error, trying cliOneshot fallback...');
         try {
@@ -2666,7 +2666,9 @@ app.post('/chat/send', async (req, res) => {
             console.log('[cli] oneshot fallback succeeded');
             if (_cliAuthFailed) { _cliAuthFailed = false; }
             cliReply = oneshotReply.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '').replace(/。(?=\s*\*)/g, '');
-            // continue to normal reply processing below
+            cliThinking = '';
+            cliUsage = null;
+            cliWebSearchQuery = '';
           } else {
             throw new Error('oneshot also failed');
           }

@@ -2606,14 +2606,18 @@ function sendMessage() {
         renderAiGifStickers(data.gifStickers);
       }
     } else { pollKnown++; }
+    setTimeout(syncNewMessages, 5000);
   }).catch(function(e) {
     clearTimeout(sendTimer);
     sending = false;
     if (e && e.name === 'AbortError') {
       var hs = document.querySelector('.header-status');
-      if (hs) hs.innerHTML = '<span class="status-dot" style="background:#ccc"></span>回复超时了，再发一条试试';
+      if (hs) hs.innerHTML = '<span class="status-dot" style="background:#ccc"></span>回复超时了，稍等...';
       pollKnown++;
     }
+    setTimeout(syncNewMessages, 3000);
+    setTimeout(syncNewMessages, 10000);
+    setTimeout(syncNewMessages, 20000);
   });
 }
 
@@ -2938,6 +2942,10 @@ setInterval(function() {
 window.addEventListener('pageshow', function(e) {
   if (e.persisted) sseReconnect();
 });
+window.addEventListener('focus', function() {
+  syncNewMessages();
+  if (evtSource.readyState !== 1) sseReconnect();
+});
 window.addEventListener('online', function() {
   sseReconnect();
 });
@@ -3033,7 +3041,7 @@ function syncNewMessages() {
     }
     pollKnown = data.messages.length;
     if (added > 0) scrollBottom();
-  }).catch(function(){});
+  }).catch(function(e){ console.log('[sync] error:', e); });
 }
 
 document.addEventListener('visibilitychange', function() {
