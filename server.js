@@ -252,6 +252,8 @@ function setupCliListeners() {
       try {
         const msg = JSON.parse(line);
         if (msg.type === 'result' && msg.result && cliPending) {
+          const preview = typeof msg.result === 'string' ? msg.result.slice(0, 80) : JSON.stringify(msg.result).slice(0, 80);
+          console.log('[cli:result]', preview);
           cliPending.usage = msg.usage || msg.stats || { keys: Object.keys(msg) };
           cliPending.resolve(msg.result);
           cliPending = null;
@@ -272,10 +274,15 @@ function setupCliListeners() {
             sseBroadcast({ type: 'searching', query: q });
           }
         }
-      } catch {}
+      } catch (parseErr) {
+        console.log('[cli:stdout] non-JSON line:', line.slice(0, 200));
+      }
     }
   });
-  cliProc.stderr.on('data', () => {});
+  cliProc.stderr.on('data', d => {
+    const errText = d.toString().trim();
+    if (errText) console.log('[cli:stderr]', errText.slice(0, 500));
+  });
   cliProc.on('close', (code) => {
     console.log('[cli] process exited, code=' + code);
     cliProc = null;
