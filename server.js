@@ -1698,10 +1698,13 @@ app.get('/auth/status', (req, res) => {
   res.json({ connected: !!auth.access_token, api: !!(cfg.api_key || cfg.anthropic_key) });
 });
 
-const DEPLOY_TOKEN = 'igh1KcpnAfKtPiI_fSmIEIIcBH3ZkKAR';
+function getDeployToken() {
+  try { const cfg = readApiConfig(); if (cfg.deploy_token) return cfg.deploy_token; } catch {}
+  return process.env.DEPLOY_TOKEN || 'igh1KcpnAfKtPiI_fSmIEIIcBH3ZkKAR';
+}
 app.post('/deploy', (req, res) => {
   const token = req.body.token || req.query.token;
-  if (token !== DEPLOY_TOKEN) return res.status(403).json({ ok: false, error: 'forbidden' });
+  if (token !== getDeployToken()) return res.status(403).json({ ok: false, error: 'forbidden' });
   res.json({ ok: true, msg: 'deploying...' });
   const { exec } = require('child_process');
   exec('which ffmpeg || apt-get install -y ffmpeg 2>/dev/null; cd /root/keke && git stash push -q -- api_config.json 2>/dev/null; git checkout -- . && git pull origin main && npm install --production && node --check server.js && git stash pop -q 2>/dev/null; bash fix-nginx.sh && systemctl restart bridge-relay && systemctl restart keke || echo "DEPLOY_FAILED: syntax error or install failed, NOT restarting"', { timeout: 120000 }, (err, stdout, stderr) => {
@@ -1712,7 +1715,7 @@ app.post('/deploy', (req, res) => {
 
 app.post('/deploy/ombre-brain', (req, res) => {
   const token = req.body.token || req.query.token;
-  if (token !== DEPLOY_TOKEN) return res.status(403).json({ ok: false, error: 'forbidden' });
+  if (token !== getDeployToken()) return res.status(403).json({ ok: false, error: 'forbidden' });
   res.json({ ok: true, msg: 'deploying ombre-brain...' });
   const { exec } = require('child_process');
   exec('cd /root/ombre-brain && git pull origin main && venv/bin/pip install -r requirements.txt && systemctl restart ombre-brain', { timeout: 120000 }, (err, stdout, stderr) => {
@@ -1721,7 +1724,20 @@ app.post('/deploy/ombre-brain', (req, res) => {
   });
 });
 
+app.post('/setup/deploy-token', (req, res) => {
+  const authToken = req.body.token || req.query.token;
+  if (authToken !== getDeployToken()) return res.status(403).json({ ok: false, error: 'forbidden' });
+  const newToken = req.body.new_token;
+  if (!newToken || newToken.length < 16) return res.json({ ok: false, error: 'new_token must be at least 16 chars' });
+  const cfg = readApiConfig();
+  cfg.deploy_token = newToken;
+  writeApiConfig(cfg);
+  res.json({ ok: true, msg: 'deploy token updated' });
+});
+
 app.post('/setup/api', (req, res) => {
+  const authToken = req.body.token || req.query.token;
+  if (authToken !== getDeployToken()) return res.status(403).json({ ok: false, error: 'forbidden' });
   const { key, provider } = req.body;
   if (!key) return res.json({ ok: false, error: 'missing key' });
   const cfg = readApiConfig();
