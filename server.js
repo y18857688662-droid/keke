@@ -2646,17 +2646,36 @@ app.post('/chat/send', async (req, res) => {
       const cliUsage = cliResult?.usage;
       const cliWebSearchQuery = cliResult?.webSearchQuery || '';
       if (isOAuthExpired(cliReply) || isOAuthExpired(cliThinking)) {
-        console.log('[cli] OAuth expired detected, not saving error as message');
-        if (!_cliAuthFailed) {
-          _cliAuthFailed = true;
-          sendPushNotification('CLI 登录过期', '顾晏说不了话了，去VPS跑 claude login').catch(() => {});
+        console.log('[cli] persistent proc OAuth/auth error, trying cliOneshot fallback...');
+        try {
+          const chatCtx = chatNow.slice(-8).map(m => {
+            const name = m.role === 'user' ? '瑶瑶' : '顾晏';
+            const c = typeof m.content === 'string' ? m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() : '[图片]';
+            return name + ': ' + c;
+          }).join('\n');
+          const oneshotPrompt = sysPrompt + '\n\n对话记录：\n' + chatCtx + '\n\n请以顾晏的身份回复最后一条消息';
+          const oneshotReply = await cliOneshot(oneshotPrompt);
+          if (oneshotReply && !isOAuthExpired(oneshotReply)) {
+            console.log('[cli] oneshot fallback succeeded');
+            if (_cliAuthFailed) { _cliAuthFailed = false; }
+            cliReply = oneshotReply.replace(/。$/g, '').replace(/。\n/g, '\n').replace(/。(?=\s*\[)/g, '').replace(/。(?=\s*\*)/g, '');
+            // continue to normal reply processing below
+          } else {
+            throw new Error('oneshot also failed');
+          }
+        } catch (oneshotErr) {
+          console.log('[cli] oneshot fallback also failed:', oneshotErr.message);
+          if (!_cliAuthFailed) {
+            _cliAuthFailed = true;
+            sendPushNotification('CLI 登录过期', '顾晏说不了话了，去VPS跑 claude login').catch(() => {});
+          }
+          await updateChat(c => { c.forEach(m => { if (m.pending) delete m.pending; }); });
+          const fb = fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
+          const fbTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+          await updateChat(c => { c.push({ role: 'assistant', content: fb, time: fbTime }); });
+          sseBroadcast({ type: 'message', role: 'assistant', content: fb, time: fbTime });
+          return res.json({ ok: true, reply: fb, time: fbTime, source: 'fallback-oauth' });
         }
-        await updateChat(c => { c.forEach(m => { if (m.pending) delete m.pending; }); });
-        const fb = fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
-        const fbTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
-        await updateChat(c => { c.push({ role: 'assistant', content: fb, time: fbTime }); });
-        sseBroadcast({ type: 'message', role: 'assistant', content: fb, time: fbTime });
-        return res.json({ ok: true, reply: fb, time: fbTime, source: 'fallback-oauth' });
       }
       if (!cliReply) {
         await updateChat(c => { c.forEach(m => { if (m.pending) delete m.pending; }); });
@@ -2805,6 +2824,30 @@ app.post('/chat/send', async (req, res) => {
         }
       } catch (e2) { console.log('[cli] retry also failed:', e2.message); }
     }
+    // persistent process failed twice — try oneshot as last resort
+    try {
+      console.log('[cli] persistent proc failed, trying cliOneshot as last resort...');
+      const sysPromptFinal = await getChatSystem();
+      const chatFinal = readChat().slice(-8);
+      const chatCtxFinal = chatFinal.map(m => {
+        const name = m.role === 'user' ? '瑶瑶' : '顾晏';
+        const c = typeof m.content === 'string' ? m.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() : '[图片]';
+        return name + ': ' + c;
+      }).join('\n');
+      const oneshotReply = await cliOneshot(sysPromptFinal + '\n\n对话记录：\n' + chatCtxFinal + '\n\n请以顾晏的身份回复最后一条消息');
+      if (oneshotReply && !isOAuthExpired(oneshotReply)) {
+        let finalReply = oneshotReply.replace(/。$/g, '').replace(/。\n/g, '\n');
+        finalReply = stripVoiceActions(finalReply).replace(/\s*\[clawd:[\w-]+\]\s*/g, '').replace(/\s*\[bark:[^\]]+\]\s*/g, '').replace(/\s*\[gifsticker:[\w-]+\]\s*/g, '').trim();
+        const finalTime = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+        await updateChat(c => {
+          c.forEach(m => { if (m.pending) delete m.pending; });
+          c.push({ role: 'assistant', content: finalReply, time: finalTime });
+          if (c.length > 200) c.splice(0, c.length - 200);
+        });
+        sseBroadcast({ type: 'message', role: 'assistant', content: finalReply, time: finalTime });
+        return res.json({ ok: true, reply: finalReply, time: finalTime, source: 'cli-oneshot-fallback' });
+      }
+    } catch (e3) { console.log('[cli] oneshot last resort also failed:', e3.message); }
     await updateChat(c => { c.forEach(m => { if (m.pending) delete m.pending; }); });
     return res.json({ ok: false, error: 'CLI不可用，请稍后再试', time });
   }
