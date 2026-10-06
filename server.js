@@ -1106,9 +1106,6 @@ app.get('/auth/start', async (req, res) => {
   const verifier = crypto.randomBytes(32).toString('base64url');
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
   const state = crypto.randomBytes(16).toString('hex');
-  pkceStore[state] = verifier;
-  // 每次现注册一个客户端：Ombre 只认登记过的 client_id + redirect_uri，
-  // 写死的 OMBRE_CLIENT_ID 不一定在它的登记表里
   let clientId = OMBRE_CLIENT_ID;
   try {
     const r = await fetch(`${OMBRE_URL}/oauth/register`, {
@@ -1118,6 +1115,7 @@ app.get('/auth/start', async (req, res) => {
     const d = await r.json();
     if (d.client_id) clientId = d.client_id;
   } catch (e) { console.error('[auth/start] register failed:', e.message); }
+  pkceStore[state] = { verifier, clientId };
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
@@ -1133,9 +1131,10 @@ app.get('/auth/start', async (req, res) => {
 
 app.get('/auth/callback', async (req, res) => {
   const { code, state } = req.query;
-  const verifier = pkceStore[state];
+  const stored = pkceStore[state];
   delete pkceStore[state];
-  if (!code || !verifier) return res.send('授权失败，请重试');
+  if (!code || !stored) return res.send('授权失败，请重试');
+  const { verifier, clientId } = stored;
   try {
     const r = await fetch(`${OMBRE_URL}/oauth/token`, {
       method: 'POST',
@@ -1144,7 +1143,7 @@ app.get('/auth/callback', async (req, res) => {
         grant_type: 'authorization_code',
         code,
         redirect_uri: OMBRE_REDIRECT,
-        client_id: OMBRE_CLIENT_ID,
+        client_id: clientId,
         code_verifier: verifier
       })
     });
