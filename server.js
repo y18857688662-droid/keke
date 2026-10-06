@@ -226,7 +226,9 @@ function readApiConfig() {
 function writeApiConfig(data) {
   fs.writeFileSync(API_CONFIG_FILE, JSON.stringify(data));
 }
-function isProMode() { const cfg = readApiConfig(); return cfg.pro_mode !== undefined ? cfg.pro_mode === true : (process.env.PRO_MODE !== 'false'); }
+function isProMode() { const cfg = readApiConfig(); return cfg.pro_mode !== undefined ? (cfg.pro_mode === true || cfg.pro_mode === 'true') : (process.env.PRO_MODE !== 'false'); }
+// 启动时确保 pro_mode=true（CLI 模式），防止之前设 API key 时被意外关掉
+try { const _cfg = readApiConfig(); if (_cfg.pro_mode === false || _cfg.pro_mode === 'false') { _cfg.pro_mode = true; writeApiConfig(_cfg); console.log('[startup] pro_mode was false, forced to true (CLI mode)'); } } catch {}
 function getApiKey() { if (isProMode()) return ''; return readApiConfig().api_key || process.env.DEEPSEEK_API_KEY || ''; }
 function getApiUrl() { return readApiConfig().api_url || process.env.API_URL || 'https://api.deepseek.com/chat/completions'; }
 function getModel() { return readApiConfig().model || process.env.MODEL || 'deepseek-chat'; }
@@ -1940,7 +1942,6 @@ app.post('/setup/api', (req, res) => {
     cfg.api_key = key;
     cfg.api_url = 'https://openrouter.ai/api/v1/chat/completions';
     cfg.model = 'anthropic/claude-haiku-4-5-20251001';
-    cfg.pro_mode = false;
   }
   writeApiConfig(cfg);
   res.json({ ok: true });
