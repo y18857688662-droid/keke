@@ -24,7 +24,7 @@ const PUBLIC_PATHS = new Set([
   '/login', '/sw.js', '/manifest.json', '/icon-gy.png', '/icon.svg', '/favicon.ico', '/push/vapid',
   '/sms/incoming', '/tg/webhook', '/auth/callback',
   '/deploy', '/deploy/ombre-brain', '/setup/deploy-token', '/setup/api', '/setup/site-password',
-  '/webhook/github', '/ping', '/ping/memory',
+  '/webhook/github', '/ping', '/ping/memory', '/ping/memory/test',
 ]);
 const PUBLIC_PREFIXES = ['/static/', '/ob/', '/.well-known/oauth-', '/oauth/', '/mcp'];
 function getSitePassword() {
@@ -95,6 +95,15 @@ app.get('/ping/memory', async (req, res) => {
     res.json({ hasToken, tokenAge, ombreStatus: r.status, sessionId: sid || null, body: text.slice(0, 200) });
   } catch (e) {
     res.json({ hasToken, tokenAge, ombreError: e.message });
+  }
+});
+
+app.get('/ping/memory/test', async (req, res) => {
+  try {
+    const mem = await fetchMemories();
+    res.json({ ok: !!mem, length: mem ? mem.length : 0, preview: mem ? mem.slice(0, 300) : null });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
   }
 });
 
