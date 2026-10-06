@@ -1399,7 +1399,7 @@ function _proxyToOmbre(req, res) {
       body = String(req.body);
     }
   }
-  fetch(url, { method: req.method, headers: fwdHeaders, body: isBody ? body : undefined, signal: AbortSignal.timeout(30000) })
+  fetch(url, { method: req.method, headers: fwdHeaders, body: isBody ? body : undefined, redirect: 'manual', signal: AbortSignal.timeout(30000) })
     .then(async (r) => {
       res.status(r.status);
       for (const [k, v] of r.headers) { if (!['transfer-encoding', 'connection'].includes(k.toLowerCase())) res.setHeader(k, v); }
