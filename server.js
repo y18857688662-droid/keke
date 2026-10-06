@@ -1774,14 +1774,20 @@ app.post('/setup/api', (req, res) => {
     cfg.anthropic_key = key;
   } else if (provider === 'openrouter') {
     cfg.openrouter_key = key;
-    writeApiConfig(cfg);
-    return res.json({ ok: true });
+  } else if (provider === 'siliconflow') {
+    cfg.siliconflow_key = key;
+  } else if (provider === 'gemini') {
+    cfg.gemini_key = key;
+  } else if (provider === 'webhook_secret') {
+    cfg.webhook_secret = key;
+  } else if (provider === 'minimax') {
+    cfg.minimax_key = key;
   } else {
     cfg.api_key = key;
     cfg.api_url = 'https://openrouter.ai/api/v1/chat/completions';
     cfg.model = 'anthropic/claude-haiku-4-5-20251001';
+    cfg.pro_mode = false;
   }
-  cfg.pro_mode = false;
   writeApiConfig(cfg);
   res.json({ ok: true });
 });
