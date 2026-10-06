@@ -24,7 +24,7 @@ const PUBLIC_PATHS = new Set([
   '/login', '/sw.js', '/manifest.json', '/icon-gy.png', '/icon.svg', '/favicon.ico', '/push/vapid',
   '/sms/incoming', '/tg/webhook', '/auth/callback',
   '/deploy', '/deploy/ombre-brain', '/setup/deploy-token', '/setup/api', '/setup/site-password',
-  '/webhook/github',
+  '/webhook/github', '/ping',
 ]);
 const PUBLIC_PREFIXES = ['/static/', '/ob/', '/.well-known/oauth-', '/oauth/', '/mcp'];
 function getSitePassword() {
@@ -68,6 +68,13 @@ app.use((req, res, next) => {
     return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
   }
   res.status(401).json({ ok: false, error: 'unauthorized' });
+});
+
+app.get('/ping', (req, res) => {
+  try {
+    const rev = require('child_process').execSync('git rev-parse --short HEAD', { cwd: __dirname, timeout: 3000 }).toString().trim();
+    res.json({ pong: true, commit: rev });
+  } catch { res.json({ pong: true }); }
 });
 
 app.get('/login', (req, res) => {
