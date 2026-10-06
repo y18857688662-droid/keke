@@ -71,12 +71,32 @@ app.use((req, res, next) => {
 
 app.get('/login', (req, res) => {
   res.type('html').send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>登录</title><style>body{font-family:-apple-system,sans-serif;background:#111;color:#eee;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
-form{display:flex;flex-direction:column;gap:12px;width:260px}input,button{padding:12px;border-radius:10px;border:1px solid #333;font-size:16px}
-input{background:#222;color:#eee}button{background:#4a6cf7;color:#fff;border:none}.e{color:#f77;font-size:14px}</style></head>
-<body><form method="post" action="/login"><input type="password" name="password" placeholder="密码" autofocus>
+<title>克克</title><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;
+background:linear-gradient(135deg,#0a0a1a 0%,#1a1a2e 50%,#16213e 100%);color:#e0e0e0;overflow:hidden}
+.card{width:300px;padding:40px 32px;border-radius:20px;background:rgba(255,255,255,0.04);backdrop-filter:blur(20px);
+border:1px solid rgba(255,255,255,0.08);box-shadow:0 8px 32px rgba(0,0,0,0.3);text-align:center}
+.avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);
+display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px;box-shadow:0 4px 15px rgba(102,126,234,0.3)}
+h1{font-size:20px;font-weight:600;margin-bottom:6px;letter-spacing:1px}
+.sub{font-size:13px;color:#888;margin-bottom:28px}
+input[type="password"]{width:100%;padding:14px 16px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);
+background:rgba(255,255,255,0.06);color:#eee;font-size:16px;outline:none;transition:border .2s,box-shadow .2s}
+input[type="password"]:focus{border-color:rgba(102,126,234,0.5);box-shadow:0 0 0 3px rgba(102,126,234,0.15)}
+input[type="password"]::placeholder{color:#666}
+button{width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#667eea,#764ba2);
+color:#fff;font-size:16px;font-weight:500;cursor:pointer;margin-top:14px;transition:opacity .2s,transform .1s;letter-spacing:1px}
+button:hover{opacity:.9}button:active{transform:scale(.98)}
+.e{color:#ef6b6b;font-size:13px;margin-top:10px}
+.glow{position:fixed;width:300px;height:300px;border-radius:50%;filter:blur(80px);opacity:.15;pointer-events:none}
+.g1{top:-100px;left:-50px;background:#667eea}.g2{bottom:-100px;right:-50px;background:#764ba2}
+</style></head><body>
+<div class="glow g1"></div><div class="glow g2"></div>
+<div class="card"><div class="avatar">K</div><h1>克克</h1><p class="sub">Private Space</p>
+<form method="post" action="/login"><input type="password" name="password" placeholder="输入密码" autofocus>
 <input type="hidden" name="next" value="${String(req.query.next || '/').replace(/[^\w\/?=&%.-]/g, '')}">
-${req.query.e ? '<div class="e">密码不对</div>' : ''}<button>进入</button></form></body></html>`);
+${req.query.e ? '<div class="e">密码不对哦，再试试</div>' : ''}<button>进入</button></form></div></body></html>`);
 });
 
 app.post('/login', express.urlencoded({ extended: false }), async (req, res) => {
