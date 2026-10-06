@@ -1700,7 +1700,7 @@ app.get('/auth/status', (req, res) => {
 
 function getDeployToken() {
   try { const cfg = readApiConfig(); if (cfg.deploy_token) return cfg.deploy_token; } catch {}
-  return process.env.DEPLOY_TOKEN || 'igh1KcpnAfKtPiI_fSmIEIIcBH3ZkKAR';
+  return process.env.DEPLOY_TOKEN || '';
 }
 app.post('/deploy', (req, res) => {
   const token = req.body.token || req.query.token;
