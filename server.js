@@ -11,6 +11,86 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+// ── 全站鉴权 ──
+// 仓库和域名都是公开的，不加锁的话任何人都能读位置、聊天、记忆，或调用花钱的接口。
+// 密码存在 api_config.json 的 site_password（不进 git）。没设置时不拦截、只打警告，
+// 这样部署这版代码不会把自己锁在外面；设了密码才生效。部署口令也算有效凭证。
+// 凭证可以放在：请求头 x-keke-token、?token=、或登录后种下的 cookie。
+// 注意：nginx 反代过来的请求都来自 127.0.0.1，所以不能按来源 IP 放行。
+const AUTH_COOKIE = 'keke_auth';
+// 外部服务回调、浏览器/系统必须能直接拿到的文件，以及自带部署口令校验的接口
+const PUBLIC_PATHS = new Set([
+  '/login', '/sw.js', '/manifest.json', '/icon-gy.png', '/icon.svg', '/favicon.ico', '/push/vapid',
+  '/sms/incoming', '/tg/webhook', '/auth/callback',
+  '/deploy', '/deploy/ombre-brain', '/setup/deploy-token', '/setup/api', '/setup/site-password',
+]);
+const PUBLIC_PREFIXES = ['/static/'];
+function getSitePassword() {
+  return readApiConfig().site_password || process.env.KEKE_PASSWORD || '';
+}
+function sessionValue(pw) {
+  return crypto.createHash('sha256').update(pw + ':keke-session').digest('hex');
+}
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a)), bb = Buffer.from(String(b));
+  return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
+}
+function readCookie(req, name) {
+  const m = (req.headers.cookie || '').match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)'));
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function isAuthorized(req, pw) {
+  const cookie = readCookie(req, AUTH_COOKIE);
+  if (cookie && safeEqual(cookie, sessionValue(pw))) return true;
+  const t = req.get('x-keke-token') || req.query.token || '';
+  if (!t) return false;
+  if (safeEqual(t, pw)) return true;
+  const dt = getDeployToken();
+  return !!dt && safeEqual(t, dt);
+}
+// 自己调自己的接口时带上口令
+function selfAuthHeaders() {
+  const pw = getSitePassword();
+  return pw ? { 'x-keke-token': pw } : {};
+}
+let warnedNoPassword = false;
+app.use((req, res, next) => {
+  const pw = getSitePassword();
+  if (!pw) {
+    if (!warnedNoPassword) { console.warn('[auth] site_password 未设置，全站不设防'); warnedNoPassword = true; }
+    return next();
+  }
+  if (PUBLIC_PATHS.has(req.path) || PUBLIC_PREFIXES.some(p => req.path.startsWith(p))) return next();
+  if (isAuthorized(req, pw)) return next();
+  if (req.method === 'GET' && (req.headers.accept || '').includes('text/html')) {
+    return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
+  }
+  res.status(401).json({ ok: false, error: 'unauthorized' });
+});
+
+app.get('/login', (req, res) => {
+  res.type('html').send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>登录</title><style>body{font-family:-apple-system,sans-serif;background:#111;color:#eee;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+form{display:flex;flex-direction:column;gap:12px;width:260px}input,button{padding:12px;border-radius:10px;border:1px solid #333;font-size:16px}
+input{background:#222;color:#eee}button{background:#4a6cf7;color:#fff;border:none}.e{color:#f77;font-size:14px}</style></head>
+<body><form method="post" action="/login"><input type="password" name="password" placeholder="密码" autofocus>
+<input type="hidden" name="next" value="${String(req.query.next || '/').replace(/[^\w\/?=&%.-]/g, '')}">
+${req.query.e ? '<div class="e">密码不对</div>' : ''}<button>进入</button></form></body></html>`);
+});
+
+app.post('/login', express.urlencoded({ extended: false }), async (req, res) => {
+  const pw = getSitePassword();
+  const next = String(req.body.next || '/');
+  const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
+  if (pw && safeEqual(req.body.password || '', pw)) {
+    res.setHeader('Set-Cookie', `${AUTH_COOKIE}=${sessionValue(pw)}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax`);
+    return res.redirect(safeNext);
+  }
+  await new Promise(r => setTimeout(r, 1000)); // 拖慢暴力猜密码
+  res.redirect('/login?e=1&next=' + encodeURIComponent(safeNext));
+});
+
 const PUSH_FILE = path.join(__dirname, 'push_subs.json');
 
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC || 'BNHqpsqvhslrhCzVz2GPcySqIJuKH7-hha6DJhaXRLUX3FIoJQ_dyQBF_qjJ0aZ1QDvhaSStqHU3uio2wsyysTU';
@@ -1764,6 +1844,18 @@ app.post('/setup/deploy-token', (req, res) => {
   res.json({ ok: true, msg: 'deploy token updated' });
 });
 
+// 设置全站密码（见文件开头的全站鉴权）。设了之后立即生效，所有浏览器需要重新登录。
+app.post('/setup/site-password', (req, res) => {
+  const authToken = req.body.token || req.query.token;
+  if (authToken !== getDeployToken()) return res.status(403).json({ ok: false, error: 'forbidden' });
+  const newPassword = req.body.new_password;
+  if (!newPassword || newPassword.length < 8) return res.json({ ok: false, error: 'new_password must be at least 8 chars' });
+  const cfg = readApiConfig();
+  cfg.site_password = newPassword;
+  writeApiConfig(cfg);
+  res.json({ ok: true, msg: 'site password updated' });
+});
+
 app.post('/setup/api', (req, res) => {
   const authToken = req.body.token || req.query.token;
   if (authToken !== getDeployToken()) return res.status(403).json({ ok: false, error: 'forbidden' });
@@ -3348,10 +3440,13 @@ app.get('/auth/url', (req, res) => {
 app.get('/vps-auth.sh', (req, res) => {
   res.type('text/plain').send(`#!/bin/bash
 KEKE="https://yyaokeke.top"
+# 全站密码从 VPS 本地配置读，不经过网络
+KEKE_TOKEN=$(python3 -c "import json;print(json.load(open('/root/keke/api_config.json')).get('site_password',''))" 2>/dev/null)
+export KEKE_TOKEN
 
 # Clear old data
-curl -s -X POST "$KEKE/auth/code" -H 'Content-Type: application/json' -d '{"code":""}' > /dev/null 2>&1
-curl -s -X POST "$KEKE/auth/url" -H 'Content-Type: application/json' -d '{"url":""}' > /dev/null 2>&1
+curl -s -X POST "$KEKE/auth/code" -H "x-keke-token: $KEKE_TOKEN" -H 'Content-Type: application/json' -d '{"code":""}' > /dev/null 2>&1
+curl -s -X POST "$KEKE/auth/url" -H "x-keke-token: $KEKE_TOKEN" -H 'Content-Type: application/json' -d '{"url":""}' > /dev/null 2>&1
 
 echo "=== Claude Code VPS 认证助手 ==="
 echo ""
@@ -3373,7 +3468,7 @@ import pty, os, sys, time, select, subprocess, json, re
 
 def get_code():
     try:
-        r = subprocess.run(['curl', '-s', 'https://yyaokeke.top/auth/code'],
+        r = subprocess.run(['curl', '-s', '-H', 'x-keke-token: ' + os.environ.get('KEKE_TOKEN', ''), 'https://yyaokeke.top/auth/code'],
                           capture_output=True, text=True, timeout=5)
         d = json.loads(r.stdout)
         return d.get('code', '')
@@ -3384,6 +3479,7 @@ def post_url(url):
     try:
         subprocess.run(['curl', '-s', '-X', 'POST',
                        'https://yyaokeke.top/auth/url',
+                       '-H', 'x-keke-token: ' + os.environ.get('KEKE_TOKEN', ''),
                        '-H', 'Content-Type: application/json',
                        '-d', json.dumps({'url': url})],
                       capture_output=True, timeout=5)
@@ -3870,7 +3966,7 @@ app.get('/period/data', async (req, res) => {
   // 文件丢失时（重新部署后）从记忆库找回记录
   if (periods.length <= PERIOD_SEED.length) {
     try {
-      const r = await fetch('http://127.0.0.1:' + PORT + '/memory/read');
+      const r = await fetch('http://127.0.0.1:' + PORT + '/memory/read', { headers: selfAuthHeaders() });
       const j = await r.json();
       const text = typeof j === 'string' ? j : JSON.stringify(j);
       const found = text.match(/PERIOD_LOG[^\d]*(\d{4}-\d{2}-\d{2})/g) || [];
@@ -3896,7 +3992,7 @@ app.post('/period/start', (req, res) => {
   writePeriods(periods);
   if (!near || date < near) {
     fetch('http://127.0.0.1:' + PORT + '/memory/store', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...selfAuthHeaders() },
       body: JSON.stringify({ text: '[PERIOD_LOG] 月经开始 ' + date })
     }).catch(() => {});
   }
@@ -3925,7 +4021,7 @@ app.post('/period/end', (req, res) => {
   ends[lastStart] = date;
   writePeriodEnds(ends);
   fetch('http://127.0.0.1:' + PORT + '/memory/store', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...selfAuthHeaders() },
     body: JSON.stringify({ text: '[PERIOD_LOG] 月经结束 ' + date + '（开始于' + lastStart + '，持续' + (pd2n(date) - pd2n(lastStart) + 1) + '天）' })
   }).catch(() => {});
   res.json({ ok: true, ends });
@@ -5870,7 +5966,7 @@ app.post('/movie/end', async (req, res) => {
       let summary = (memOut || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
       if (!summary || summary.length < 5) summary = '和瑶瑶一起看了「' + t + '」，看了' + duration + '分钟';
       fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/memory/store', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...selfAuthHeaders() },
         body: JSON.stringify({ text: summary, category: '日常' })
       }).catch(() => {});
     }).catch(() => {});
