@@ -24,7 +24,7 @@ const PUBLIC_PATHS = new Set([
   '/login', '/sw.js', '/manifest.json', '/icon-gy.png', '/icon.svg', '/favicon.ico', '/push/vapid',
   '/sms/incoming', '/tg/webhook', '/auth/callback',
   '/deploy', '/deploy/ombre-brain', '/setup/deploy-token', '/setup/api', '/setup/site-password',
-  '/webhook/github', '/ping',
+  '/webhook/github', '/ping', '/ping/memory',
 ]);
 const PUBLIC_PREFIXES = ['/static/', '/ob/', '/.well-known/oauth-', '/oauth/', '/mcp'];
 function getSitePassword() {
@@ -75,6 +75,27 @@ app.get('/ping', (req, res) => {
     const rev = require('child_process').execSync('git rev-parse --short HEAD', { cwd: __dirname, timeout: 3000 }).toString().trim();
     res.json({ pong: true, commit: rev });
   } catch { res.json({ pong: true }); }
+});
+
+app.get('/ping/memory', async (req, res) => {
+  const auth = readAuth();
+  const hasToken = !!auth.access_token;
+  const tokenAge = auth.ts ? Math.round((Date.now() - auth.ts) / 1000) + 's ago' : 'unknown';
+  try {
+    const r = await fetch(`${OMBRE_URL}/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(auth.access_token ? { Authorization: 'Bearer ' + auth.access_token } : {})
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'ping', version: '1.0' } } })
+    });
+    const sid = r.headers.get('mcp-session-id');
+    const text = await r.text();
+    res.json({ hasToken, tokenAge, ombreStatus: r.status, sessionId: sid || null, body: text.slice(0, 200) });
+  } catch (e) {
+    res.json({ hasToken, tokenAge, ombreError: e.message });
+  }
 });
 
 app.get('/login', (req, res) => {
@@ -1219,18 +1240,24 @@ async function initOmbreSession() {
 async function callOmbreTool(toolName, args) {
   if (!ombreSessionId) {
     const ok = await initOmbreSession();
-    if (!ok) return null;
+    if (!ok) { console.error('[ombre] callOmbreTool: initOmbreSession failed'); return null; }
   }
   try {
     const headers = { 'Content-Type': 'application/json' };
     const auth = readAuth();
     if (auth.access_token) headers['Authorization'] = 'Bearer ' + auth.access_token;
+    else console.warn('[ombre] callOmbreTool: no access_token in ombre_auth.json');
     if (ombreSessionId) headers['Mcp-Session-Id'] = ombreSessionId;
     let r = await fetch(`${OMBRE_URL}/mcp`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: toolName, arguments: args || {} } })
     });
+    if (r.status === 401) {
+      console.error('[ombre] callOmbreTool: 401 Unauthorized, token may be invalid');
+      ombreSessionId = null;
+      return null;
+    }
     const text = await r.text();
     const lines = text.split('\n');
     for (const line of lines) {
@@ -1246,8 +1273,9 @@ async function callOmbreTool(toolName, args) {
         }
       }
     }
+    console.warn('[ombre] callOmbreTool(' + toolName + '): no result in response, status=' + r.status);
   } catch (e) {
-    console.error('Ombre error:', e.message);
+    console.error('[ombre] callOmbreTool error:', e.message);
   }
   return null;
 }
