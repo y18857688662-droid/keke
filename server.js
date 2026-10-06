@@ -1724,6 +1724,35 @@ app.post('/deploy/ombre-brain', (req, res) => {
   });
 });
 
+app.post('/webhook/github', express.raw({ type: 'application/json' }), (req, res) => {
+  const crypto = require('crypto');
+  const cfg = readApiConfig();
+  const secret = cfg.webhook_secret;
+  if (!secret) return res.status(500).send('no webhook secret configured');
+  const sig = req.headers['x-hub-signature-256'] || '';
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(req.body).digest('hex');
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return res.status(403).send('bad signature');
+  const payload = JSON.parse(req.body);
+  const repo = payload.repository && payload.repository.name;
+  const ref = payload.ref;
+  if (ref !== 'refs/heads/main') return res.json({ ok: true, msg: 'ignored non-main push' });
+  const { exec } = require('child_process');
+  if (repo === 'keke') {
+    console.log('[webhook] keke push to main, deploying...');
+    exec('which ffmpeg || apt-get install -y ffmpeg 2>/dev/null; cd /root/keke && git stash push -q -- api_config.json 2>/dev/null; git checkout -- . && git pull origin main && npm install --production && node --check server.js && git stash pop -q 2>/dev/null; bash fix-nginx.sh && systemctl restart bridge-relay && systemctl restart keke || echo "DEPLOY_FAILED"', { timeout: 120000 }, (err, stdout, stderr) => {
+      console.log('[webhook:keke]', stdout, stderr);
+    });
+  } else if (repo === 'ombre-brain' || repo === 'Ombre-Brain') {
+    console.log('[webhook] ombre-brain push to main, deploying...');
+    exec('cd /root/ombre-brain && git pull origin main && venv/bin/pip install -r requirements.txt && systemctl restart ombre-brain', { timeout: 120000 }, (err, stdout, stderr) => {
+      console.log('[webhook:ombre-brain]', stdout, stderr);
+    });
+  } else {
+    console.log('[webhook] unknown repo:', repo);
+  }
+  res.json({ ok: true, msg: 'deploying ' + repo });
+});
+
 app.post('/setup/deploy-token', (req, res) => {
   const authToken = req.body.token || req.query.token;
   if (authToken !== getDeployToken()) return res.status(403).json({ ok: false, error: 'forbidden' });
