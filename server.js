@@ -24,6 +24,7 @@ const PUBLIC_PATHS = new Set([
   '/login', '/sw.js', '/manifest.json', '/icon-gy.png', '/icon.svg', '/favicon.ico', '/push/vapid',
   '/sms/incoming', '/tg/webhook', '/auth/callback',
   '/deploy', '/deploy/ombre-brain', '/setup/deploy-token', '/setup/api', '/setup/site-password',
+  '/webhook/github',
 ]);
 const PUBLIC_PREFIXES = ['/static/', '/ob/', '/.well-known/oauth-', '/oauth/', '/mcp'];
 function getSitePassword() {
