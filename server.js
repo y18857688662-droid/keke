@@ -321,8 +321,8 @@ async function forgeCliProc(systemPrompt, recentMessages) {
       return name + ': ' + c;
     }).join(' | ');
     console.log('[cli] forge: saving context summary before restart');
-    await fetch('https://yyaokeke.top/memory/store', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    await fetch('http://127.0.0.1:' + PORT + '/memory/store', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...selfAuthHeaders() },
       body: JSON.stringify({ text: '[forge摘要] ' + new Date().toISOString().slice(0, 16) + ' 最近对话：' + last5 })
     }).catch(() => {});
   } catch {}
@@ -1102,21 +1102,33 @@ app.post('/diary/reply', (req, res) => {
 // === OAuth 记忆库授权 ===
 let pkceStore = {};
 
-app.get('/auth/start', (req, res) => {
+app.get('/auth/start', async (req, res) => {
   const verifier = crypto.randomBytes(32).toString('base64url');
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
   const state = crypto.randomBytes(16).toString('hex');
   pkceStore[state] = verifier;
+  // 每次现注册一个客户端：Ombre 只认登记过的 client_id + redirect_uri，
+  // 写死的 OMBRE_CLIENT_ID 不一定在它的登记表里
+  let clientId = OMBRE_CLIENT_ID;
+  try {
+    const r = await fetch(`${OMBRE_URL}/oauth/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_name: 'keke', redirect_uris: [OMBRE_REDIRECT] })
+    });
+    const d = await r.json();
+    if (d.client_id) clientId = d.client_id;
+  } catch (e) { console.error('[auth/start] register failed:', e.message); }
   const params = new URLSearchParams({
     response_type: 'code',
-    client_id: OMBRE_CLIENT_ID,
+    client_id: clientId,
     redirect_uri: OMBRE_REDIRECT,
     code_challenge: challenge,
     code_challenge_method: 'S256',
     scope: 'mcp offline_access',
     state
   });
-  res.redirect(`${OMBRE_URL}/oauth/authorize?${params}`);
+  // 浏览器要能打开，所以走公网地址（keke 会把 /oauth/* 转给 Ombre），不能用 127.0.0.1
+  res.redirect(`https://yyaokeke.top/oauth/authorize?${params}`);
 });
 
 app.get('/auth/callback', async (req, res) => {
